@@ -1,0 +1,33 @@
+{
+  "name": "@saas-contabil/worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node --esm src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@saas-contabil/shared": "workspace:*",
+    "@saas-contabil/database": "workspace:*",
+    "@saas-contabil/credentials": "workspace:*",
+    "@saas-contabil/audit": "workspace:*",
+    "@saas-contabil/storage": "workspace:*",
+    "@saas-contabil/scraper": "workspace:*",
+    "@saas-contabil/normalizer": "workspace:*",
+    "@saas-contabil/conciliation": "workspace:*",
+    "@saas-contabil/fiscal": "workspace:*",
+    "@saas-contabil/contabil": "workspace:*",
+    "@saas-contabil/portals": "workspace:*",
+    "bullmq": "^5.12.0",
+    "ioredis": "^5.4.1",
+    "decimal.js": "^10.4.3",
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.2"
+  }
+}

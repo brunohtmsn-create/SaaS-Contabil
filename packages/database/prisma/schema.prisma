@@ -1,0 +1,711 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── TENANT (Multi-tenancy) ────────────────────────────────────────────────
+
+model Tenant {
+  id         String   @id @default(uuid())
+  nome       String
+  cnpj       String   @unique
+  subdominio String   @unique
+  ativo      Boolean  @default(true)
+  plano      PlanoTenant @default(BASICO)
+  criadoEm  DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  empresas    EmpresaCliente[]
+  credenciais Credencial[]
+  usuarios    Usuario[]
+  auditEvents AuditEvent[]
+
+  @@map("tenants")
+}
+
+enum PlanoTenant {
+  BASICO
+  PROFISSIONAL
+  ENTERPRISE
+}
+
+// ─── USUÁRIO ───────────────────────────────────────────────────────────────
+
+model Usuario {
+  id       String   @id @default(uuid())
+  tenantId String
+  nome     String
+  email    String
+  senhaHash String
+  perfil   PerfilUsuario @default(CONTADOR)
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("usuarios")
+}
+
+enum PerfilUsuario {
+  ADMIN
+  CONTADOR
+  AUXILIAR
+  CLIENTE
+}
+
+// ─── EMPRESA CLIENTE ───────────────────────────────────────────────────────
+
+model EmpresaCliente {
+  id           String   @id @default(uuid())
+  tenantId     String
+  cnpj         String
+  razaoSocial  String
+  nomeFantasia String?
+  regime       RegimeTributario
+  cnae         String
+  uf           String   @db.Char(2)
+  municipio    String
+  ibge         String   @db.VarChar(7)
+  ativa        Boolean  @default(true)
+  dataAbertura DateTime
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  credenciais         Credencial[]
+  documentos          DocumentoFiscal[]
+  apuracoesFiscais    ApuracaoFiscal[]
+  lancamentosContabeis LancamentoContabil[]
+  transacoesBancarias TransacaoBancaria[]
+  obrigacoes          Obrigacao[]
+  alertas             Alerta[]
+
+  @@unique([tenantId, cnpj])
+  @@index([tenantId])
+  @@index([tenantId, cnpj])
+  @@map("empresas_clientes")
+}
+
+enum RegimeTributario {
+  SIMPLES_NACIONAL
+  MEI
+  LUCRO_PRESUMIDO
+  LUCRO_REAL
+}
+
+// ─── CREDENCIAIS ──────────────────────────────────────────────────────────
+
+model Credencial {
+  id              String   @id @default(uuid())
+  tenantId        String
+  empresaId       String
+  cnpj            String
+  tipo            TipoCredencial
+  encryptedData   Bytes
+  iv              Bytes
+  authTag         Bytes
+  validade        DateTime?
+  status          StatusCredencial @default(ATIVO)
+  escopos         String[]
+  criadoPor       String
+  ultimoUso       DateTime?
+  ultimoResultado ResultadoCredencial?
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  empresa EmpresaCliente @relation(fields: [empresaId], references: [id])
+
+  @@index([tenantId, cnpj])
+  @@index([tenantId, tipo])
+  @@map("credenciais")
+}
+
+enum TipoCredencial {
+  CERTIFICADO_A1_ECPF
+  CERTIFICADO_A1_ECNPJ
+  PROCURACAO_SEFAZ
+  PROCURACAO_ECAC
+  LOGIN_SIMPLES_NACIONAL
+  LOGIN_PREFEITURA
+  LOGIN_FGTS_DIGITAL
+  LOGIN_ESOCIAL
+  LOGIN_SEFAZ_ESTADUAL
+  TOKEN_API
+}
+
+enum StatusCredencial {
+  ATIVO
+  VENCIDO
+  REVOGADO
+  ERRO
+}
+
+enum ResultadoCredencial {
+  SUCESSO
+  FALHA
+}
+
+// ─── DOCUMENTO FISCAL ─────────────────────────────────────────────────────
+
+model DocumentoFiscal {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  empresaId             String
+  chaveUnica            String
+  tipo                  TipoDocumento
+  direcao               DirecaoDocumento
+  chaveAcesso           String?
+  numero                String
+  serie                 String?
+  dataEmissao           DateTime
+  dataCompetencia       DateTime
+  cfop                  String?
+  cst                   String?
+  cstPis                String?
+  cstCofins             String?
+  cnpjEmitente          String
+  nomeEmitente          String
+  ufEmitente            String   @db.Char(2)
+  municipioEmitente     String?
+  ibgeEmitente          String?
+  cnpjDestinatario      String
+  cpfDestinatario       String?
+  ufDestinatario        String   @db.Char(2)
+  valorTotal            Decimal  @db.Decimal(15, 2)
+  valorProdutos         Decimal  @db.Decimal(15, 2) @default(0)
+  valorServicos         Decimal  @db.Decimal(15, 2) @default(0)
+  valorIcms             Decimal  @db.Decimal(15, 2) @default(0)
+  valorIcmsSt           Decimal  @db.Decimal(15, 2) @default(0)
+  valorIpi              Decimal  @db.Decimal(15, 2) @default(0)
+  valorPis              Decimal  @db.Decimal(15, 2) @default(0)
+  valorCofins           Decimal  @db.Decimal(15, 2) @default(0)
+  valorIss              Decimal  @db.Decimal(15, 2) @default(0)
+  valorIssRetido        Decimal  @db.Decimal(15, 2) @default(0)
+  valorIrrf             Decimal  @db.Decimal(15, 2) @default(0)
+  valorInss             Decimal  @db.Decimal(15, 2) @default(0)
+  valorCsll             Decimal  @db.Decimal(15, 2) @default(0)
+  aliquotaIss           Decimal? @db.Decimal(8, 4)
+  aliquotaIcms          Decimal? @db.Decimal(8, 4)
+  baseCalcIcms          Decimal  @db.Decimal(15, 2) @default(0)
+  baseCalcIss           Decimal  @db.Decimal(15, 2) @default(0)
+  operacaoInterestadual Boolean  @default(false)
+  ufOrigem              String?  @db.Char(2)
+  ufDestino             String?  @db.Char(2)
+  aliquotaInterna       Decimal? @db.Decimal(8, 4)
+  aliquotaInterestadual Decimal? @db.Decimal(8, 4)
+  valorDifal            Decimal? @db.Decimal(15, 2)
+  valorFundoPobreza     Decimal? @db.Decimal(15, 2)
+  fonte                 FonteDocumento
+  municipioIBGE         String?
+  urlOrigem             String?
+  xmlS3Key              String?
+  pdfS3Key              String?
+  hashIntegridade       String
+  status                StatusDocumento @default(CAPTURADO)
+  capturedAt            DateTime @default(now())
+  processedAt           DateTime?
+
+  empresa EmpresaCliente @relation(fields: [empresaId], references: [id])
+
+  @@unique([tenantId, chaveUnica])
+  @@index([tenantId, empresaId])
+  @@index([tenantId, dataCompetencia])
+  @@index([tenantId, status])
+  @@index([chaveAcesso])
+  @@map("documentos_fiscais")
+}
+
+enum TipoDocumento {
+  NFE
+  NFCE
+  NFSE_EMITIDA
+  NFSE_TOMADA
+  CTE
+  MDFE
+}
+
+enum DirecaoDocumento {
+  ENTRADA
+  SAIDA
+  PRESTACAO
+}
+
+enum FonteDocumento {
+  SEFAZ_FEDERAL
+  SEFAZ_ESTADUAL
+  PORTAL_NACIONAL_NFSE
+  PREFEITURA
+  EMAIL
+  UPLOAD_MANUAL
+  ERP
+}
+
+enum StatusDocumento {
+  CAPTURADO
+  NORMALIZADO
+  VALIDADO
+  EM_CONCILIACAO
+  CONCILIADO
+  DIVERGENTE
+  NAO_ENCONTRADO
+  PENDENTE_REVISAO
+  ENCERRADO
+  AUDITADO
+  ARQUIVADO
+}
+
+// ─── CONCILIAÇÃO ──────────────────────────────────────────────────────────
+
+model Conciliacao {
+  id           String   @id @default(uuid())
+  tenantId     String
+  empresaId    String
+  competencia  String
+  tipo         TipoConciliacao
+  documentoId  String
+  score        Int
+  status       StatusConciliacao
+  detalhes     Json
+  aprovadoPor  String?
+  aprovadoEm   DateTime?
+  criadoEm     DateTime @default(now())
+
+  @@index([tenantId, empresaId, competencia])
+  @@index([tenantId, status])
+  @@map("conciliacoes")
+}
+
+enum TipoConciliacao {
+  NFSE_TOMADAS
+  NFSE_EMITIDAS
+  NFCE
+  NFE
+  BANCARIA
+}
+
+enum StatusConciliacao {
+  CONCILIADA
+  PENDENTE_REVISAO
+  DIVERGENTE
+  APROVADA
+}
+
+// ─── APURAÇÃO FISCAL ──────────────────────────────────────────────────────
+
+model ApuracaoFiscal {
+  id          String   @id @default(uuid())
+  tenantId    String
+  empresaId   String
+  competencia String
+  tipo        TipoApuracao
+  dados       Json
+  status      StatusApuracao @default(PENDENTE)
+  recibo      String?
+  s3Key       String?
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  empresa EmpresaCliente @relation(fields: [empresaId], references: [id])
+
+  @@unique([tenantId, empresaId, competencia, tipo])
+  @@index([tenantId, empresaId])
+  @@index([tenantId, competencia])
+  @@map("apuracoes_fiscais")
+}
+
+enum TipoApuracao {
+  PGDAS
+  DAS
+  DIFAL
+  ICMS_ST
+  DESTDA
+  GNRE
+  ISS
+  DMS
+  EFD_REINF
+  DCTFWEB
+  IRPJ_LP
+  CSLL_LP
+  IRPJ_LR
+  CSLL_LR
+  PIS
+  COFINS
+}
+
+enum StatusApuracao {
+  PENDENTE
+  CALCULADO
+  TRANSMITIDO
+  PAGO
+  ERRO
+}
+
+// ─── LANÇAMENTO CONTÁBIL ──────────────────────────────────────────────────
+
+model LancamentoContabil {
+  id          String   @id @default(uuid())
+  tenantId    String
+  empresaId   String
+  competencia String
+  data        DateTime
+  historico   String
+  documentoId String?
+  partidas    Json
+  conciliadoEm DateTime?
+  criadoEm    DateTime @default(now())
+
+  empresa EmpresaCliente @relation(fields: [empresaId], references: [id])
+
+  @@index([tenantId, empresaId, competencia])
+  @@map("lancamentos_contabeis")
+}
+
+// ─── TRANSAÇÃO BANCÁRIA ───────────────────────────────────────────────────
+
+model TransacaoBancaria {
+  id          String   @id @default(uuid())
+  tenantId    String
+  empresaId   String
+  data        DateTime
+  valor       Decimal  @db.Decimal(15, 2)
+  tipo        TipoTransacao
+  descricao   String
+  banco       String
+  agencia     String
+  conta       String
+  status      StatusTransacao @default(NAO_CONCILIADA)
+  documentoId String?
+  criadoEm    DateTime @default(now())
+
+  empresa EmpresaCliente @relation(fields: [empresaId], references: [id])
+
+  @@index([tenantId, empresaId])
+  @@index([tenantId, data])
+  @@map("transacoes_bancarias")
+}
+
+enum TipoTransacao {
+  DEBITO
+  CREDITO
+}
+
+enum StatusTransacao {
+  NAO_CONCILIADA
+  CONCILIADA
+  DIVERGENTE
+}
+
+// ─── OBRIGAÇÃO ────────────────────────────────────────────────────────────
+
+model Obrigacao {
+  id          String   @id @default(uuid())
+  tenantId    String
+  empresaId   String
+  tipo        TipoObrigacao
+  competencia String
+  vencimento  DateTime
+  status      StatusObrigacao @default(PENDENTE)
+  valor       Decimal? @db.Decimal(15, 2)
+  recibo      String?
+  s3Key       String?
+  criadoEm    DateTime @default(now())
+  cumprideEm  DateTime?
+
+  empresa EmpresaCliente @relation(fields: [empresaId], references: [id])
+
+  @@index([tenantId, empresaId])
+  @@index([tenantId, vencimento])
+  @@index([tenantId, status])
+  @@map("obrigacoes")
+}
+
+enum TipoObrigacao {
+  DAS
+  PGDAS
+  EFD_REINF
+  DCTFWEB
+  DESTDA
+  GNRE_DIFAL
+  GNRE_ST
+  ISS
+  DMS
+  ECD
+  ECF
+  DASN
+  ESOCIAL
+  FGTS_DIGITAL
+  DCTF
+  IRPJ
+  CSLL
+  PIS
+  COFINS
+}
+
+enum StatusObrigacao {
+  PENDENTE
+  TRANSMITIDA
+  PAGA
+  ATRASADA
+  DISPENSADA
+  ERRO
+}
+
+// ─── ALERTA ───────────────────────────────────────────────────────────────
+
+model Alerta {
+  id          String   @id @default(uuid())
+  tenantId    String
+  empresaId   String
+  tipo        TipoAlerta
+  mensagem    String
+  dados       Json?
+  lido        Boolean  @default(false)
+  criadoEm    DateTime @default(now())
+
+  empresa EmpresaCliente @relation(fields: [empresaId], references: [id])
+
+  @@index([tenantId, lido])
+  @@map("alertas")
+}
+
+enum TipoAlerta {
+  CREDENCIAL_VENCENDO
+  CREDENCIAL_VENCIDA
+  SUBLIMITE_ESTADUAL
+  RISCO_EXCLUSAO_SN
+  VENCIMENTO_OBRIGACAO
+  DIVERGENCIA_CONCILIACAO
+  DISTRIBUICAO_LUCROS
+  FATOR_R_MUDOU
+  PGDAS_PENDENTE
+  CERTIFICADO_VENCENDO
+}
+
+// ─── BEM DO ATIVO IMOBILIZADO ─────────────────────────────────────────────
+
+model BemAtivo {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  empresaId           String
+  descricao           String
+  dataAquisicao       DateTime
+  valorAquisicao      Decimal  @db.Decimal(15, 2)
+  vidaUtil            Int
+  valorResidual       Decimal  @db.Decimal(15, 2) @default(0)
+  metodoDepreciacao   MetodoDepreciacao @default(LINEAR)
+  icmsCiap            Decimal? @db.Decimal(15, 2)
+  parcelasCiap        Int?
+  parcelasUsadasCiap  Int      @default(0)
+  status              StatusBemAtivo @default(ATIVO)
+  criadoEm            DateTime @default(now())
+
+  @@index([tenantId, empresaId])
+  @@map("bens_ativos")
+}
+
+enum MetodoDepreciacao {
+  LINEAR
+  ACELERADO
+}
+
+enum StatusBemAtivo {
+  ATIVO
+  BAIXADO
+  CONCLUIDO
+}
+
+// ─── AUDITORIA (IMUTÁVEL) ─────────────────────────────────────────────────
+
+model AuditEvent {
+  id              String   @id @default(uuid())
+  sequencia       BigInt   @default(autoincrement())
+  tenantId        String
+  cnpj            String?
+  entidadeTipo    EntidadeAuditavel
+  entidadeId      String
+  evento          TipoEventoAudit
+  estadoAnterior  Json?
+  estadoNovo      Json?
+  responsavel     String
+  responsavelTipo TipoResponsavel
+  evidencias      String[]
+  score           Int?
+  aprovadoPor     String?
+  observacao      String?
+  hashEvento      String
+  hashAnterior    String
+  timestamp       DateTime @default(now())
+  ipOrigem        String?
+  jobId           String?
+  duracao         Int?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, timestamp])
+  @@index([tenantId, cnpj])
+  @@index([tenantId, evento])
+  @@index([sequencia])
+  @@map("audit_events")
+}
+
+enum EntidadeAuditavel {
+  DOCUMENTO_FISCAL
+  CREDENCIAL
+  CONCILIACAO
+  APURACAO_FISCAL
+  LANCAMENTO_CONTABIL
+  OBRIGACAO
+  PORTAL_JOB
+  ARQUIVO_S3
+}
+
+enum TipoEventoAudit {
+  DOCUMENTO_CAPTURADO
+  DOCUMENTO_NORMALIZADO
+  DOCUMENTO_VALIDADO
+  CONCILIACAO_INICIADA
+  CONCILIADA_AUTOMATICO
+  PENDENTE_REVISAO_HUMANA
+  DIVERGENCIA_DETECTADA
+  DIVERGENCIA_CORRIGIDA
+  CONCILIACAO_APROVADA_HUMANO
+  NFSE_ENCERRADA
+  ENCERRAMENTO_FALHOU
+  DIFAL_CALCULADO
+  GNRE_GERADA
+  PGDAS_APURADO
+  DAS_GERADO
+  PGDAS_TRANSMITIDO
+  DESTDA_GERADO
+  DESTDA_TRANSMITIDO
+  LANCAMENTO_GERADO
+  CONCILIACAO_BANCARIA
+  DEPRECIACAO_CALCULADA
+  ECD_GERADA
+  ECD_TRANSMITIDA
+  FECHAMENTO_INICIADO
+  FECHAMENTO_CONCLUIDO
+  PORTAL_ACESSO_REALIZADO
+  PORTAL_ACESSO_FALHOU
+  CERTIDAO_BAIXADA
+  OBRIGACAO_TRANSMITIDA
+  OBRIGACAO_FALHOU
+  CREDENCIAL_USADA
+  CREDENCIAL_VENCIDA
+  CREDENCIAL_RENOVADA
+  ARQUIVO_SALVO
+  ARQUIVO_INTEGRO
+  ARQUIVO_CORROMPIDO
+  APROVACAO_HUMANA
+  CORRECAO_MANUAL
+  REVISAO_SOLICITADA
+  EFDREINF_TRANSMITIDA
+  DCTFWEB_TRANSMITIDA
+  ESOCIAL_TRANSMITIDO
+}
+
+enum TipoResponsavel {
+  SISTEMA
+  USUARIO
+}
+
+// ─── PORTAL JOB ───────────────────────────────────────────────────────────
+
+model PortalJob {
+  id           String   @id @default(uuid())
+  tenantId     String
+  empresaId    String
+  cnpj         String
+  portal       TipoPortal
+  operacao     String
+  credencialId String
+  prioridade   Int      @default(2)
+  agendamento  String?
+  status       StatusJob @default(AGUARDANDO)
+  resultado    Json?
+  erro         String?
+  tentativas   Int      @default(0)
+  jobBullId    String?
+  iniciadoEm   DateTime?
+  concluidoEm  DateTime?
+  criadoEm     DateTime @default(now())
+
+  @@index([tenantId, status])
+  @@index([tenantId, cnpj])
+  @@map("portal_jobs")
+}
+
+enum TipoPortal {
+  ECAC
+  SIMPLES_NACIONAL
+  SEFAZ_FEDERAL
+  SEFAZ_ESTADUAL
+  PREFEITURA
+  FGTS_DIGITAL
+  ESOCIAL
+  CAGED
+  SINTEGRA
+}
+
+enum StatusJob {
+  AGUARDANDO
+  EM_EXECUCAO
+  CONCLUIDO
+  ERRO
+  CANCELADO
+}
+
+// ─── ARQUIVO S3 ───────────────────────────────────────────────────────────
+
+model ArquivoS3 {
+  id           String   @id @default(uuid())
+  tenantId     String
+  empresaId    String
+  cnpj         String
+  competencia  String
+  categoria    CategoriaArquivo
+  s3Key        String   @unique
+  nome         String
+  tamanho      Int
+  hash         String
+  criadoEm     DateTime @default(now())
+
+  @@index([tenantId, cnpj, competencia])
+  @@index([s3Key])
+  @@map("arquivos_s3")
+}
+
+enum CategoriaArquivo {
+  NF_EMITIDA_XML
+  NF_EMITIDA_PDF
+  NF_TOMADA_XML
+  NF_TOMADA_PDF
+  GUIA_DAS
+  GUIA_GNRE
+  GUIA_ISS
+  GUIA_FGTS
+  RELATORIO_CONCILIACAO
+  RELATORIO_APURACAO
+  ENCERRAMENTO_NFSE
+  RECIBO_PGDAS
+  RECIBO_DESTDA
+  RECIBO_ECD
+  RECIBO_EFDREINF
+  RECIBO_DCTFWEB
+  RECIBO_ESOCIAL
+  CONTABIL_LANCAMENTOS
+  CONTABIL_ECD
+  CONTABIL_BALANCO
+  AUDITORIA_RELATORIO
+  AUDITORIA_EVIDENCIA
+  PORTAL_CERTIDAO
+  ERRO_SCREENSHOT
+  ERRO_LOG
+}
