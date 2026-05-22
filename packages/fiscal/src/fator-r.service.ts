@@ -23,7 +23,40 @@ export class FatorRService {
     })
 
     const receitaBruta12m = new Decimal(rb12._sum.valorTotal?.toString() ?? '0')
-    const folha12m = new Decimal(0)
+
+    // Busca lançamentos de folha dos últimos 12 meses
+    // Critério: historico contém "Salário", "Folha" ou "Pro Labore"
+    const lancamentosFolha = await this.db.lancamentoContabil.findMany({
+      where: {
+        tenantId,
+        empresaId,
+        competencia: { in: competencias },
+        OR: [
+          { historico: { contains: 'Salário', mode: 'insensitive' } },
+          { historico: { contains: 'Salario', mode: 'insensitive' } },
+          { historico: { contains: 'Folha', mode: 'insensitive' } },
+          { historico: { contains: 'Pro Labore', mode: 'insensitive' } },
+          { historico: { contains: 'Pró-Labore', mode: 'insensitive' } },
+        ],
+      },
+      select: { partidas: true },
+    })
+
+    // Soma partidas do tipo DEBITO em contas de despesas de pessoal (iniciadas com '6.1.')
+    let folha12m = new Decimal(0)
+    for (const lancamento of lancamentosFolha) {
+      const partidas = lancamento.partidas as Array<{ conta: string; valor: string | number; tipo: string }>
+      if (!Array.isArray(partidas)) continue
+      for (const partida of partidas) {
+        if (
+          partida.tipo === 'DEBITO' &&
+          typeof partida.conta === 'string' &&
+          partida.conta.startsWith('6.1.')
+        ) {
+          folha12m = folha12m.plus(new Decimal(partida.valor.toString()))
+        }
+      }
+    }
 
     const fatorR = receitaBruta12m.gt(0) ? folha12m.div(receitaBruta12m).times(100) : new Decimal(0)
     const anexo: 'III' | 'V' = fatorR.gte(28) ? 'III' : 'V'

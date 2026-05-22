@@ -110,3 +110,20 @@ export type R4080 = {
   vrCOFINS: Decimal
   nfseNumero: string
 }
+
+export type ResultadoFGTS = {
+  competencia: string
+  cnpj: string
+  baseCalculo: Decimal
+  aliquota: Decimal   // 8%
+  valorFGTS: Decimal
+  totalEmpregados: number
+}
+
+export type ResultadoGRRF = {
+  competencia: string
+  cnpj: string
+  saldoFGTS: Decimal
+  multaRescisoria: Decimal  // 40% sobre saldo FGTS (demissão sem justa causa)
+  totalGuia: Decimal
+}

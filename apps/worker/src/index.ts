@@ -5,6 +5,7 @@ import { scraperJob } from './jobs/scraper.job.js'
 import { fiscalJob } from './jobs/fiscal.job.js'
 import { portalJob } from './jobs/portal.job.js'
 import { monitoramentoDiario } from './jobs/monitoramento.job.js'
+import { gerarRelatorioMensal } from './jobs/relatorio.job.js'
 
 const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
@@ -15,6 +16,7 @@ const QUEUE_SCRAPER = 'scraper'
 const QUEUE_FISCAL = 'fiscal'
 const QUEUE_PORTAL = 'portal'
 const QUEUE_MONITORAMENTO = 'monitoramento'
+const QUEUE_RELATORIO = 'relatorio'
 
 export const queues = {
   fechamento: new Queue(QUEUE_FECHAMENTO, { connection: redis }),
@@ -22,6 +24,7 @@ export const queues = {
   fiscal: new Queue(QUEUE_FISCAL, { connection: redis }),
   portal: new Queue(QUEUE_PORTAL, { connection: redis }),
   monitoramento: new Queue(QUEUE_MONITORAMENTO, { connection: redis }),
+  relatorio: new Queue(QUEUE_RELATORIO, { connection: redis }),
 }
 
 // Cron: monitoramento:diario toda manhã às 7h BRT (= 10h UTC)
@@ -40,6 +43,7 @@ const workers = [
   new Worker(QUEUE_FISCAL, fiscalJob, { connection: redis, concurrency: 5 }),
   new Worker(QUEUE_PORTAL, portalJob, { connection: redis, concurrency: 2 }),
   new Worker(QUEUE_MONITORAMENTO, monitoramentoDiario, { connection: redis, concurrency: 1 }),
+  new Worker(QUEUE_RELATORIO, gerarRelatorioMensal, { connection: redis, concurrency: 2 }),
 ]
 
 for (const worker of workers) {
