@@ -6,14 +6,17 @@ import { api } from '@/lib/api'
 type Props = { empresaId: string; competencia: string }
 
 const FASES = [
-  { key: 'CAPTURA', label: 'Captura de Documentos', icon: '📥' },
-  { key: 'CONCILIACAO', label: 'Conciliação', icon: '⚖️' },
-  { key: 'FISCAL', label: 'Apuração Fiscal', icon: '💰' },
-  { key: 'EFD_REINF', label: 'EFD-Reinf', icon: '📋' },
-  { key: 'DCTFWEB', label: 'DCTFWeb', icon: '🏛️' },
-  { key: 'ESTADUAL', label: 'DIFAL + DeSTDA', icon: '🗺️' },
-  { key: 'CONTABIL', label: 'Lançamentos Contábeis', icon: '📒' },
-  { key: 'BANCARIA', label: 'Conciliação Bancária', icon: '🏦' },
+  { key: 'CAPTURA',   label: 'Captura de Documentos',  icon: '📥' },
+  { key: 'CONCILIACAO', label: 'Conciliação',           icon: '⚖️' },
+  { key: 'PGDAS',    label: 'PGDAS + Fator R',          icon: '💰' },
+  { key: 'DIFAL',    label: 'DIFAL + GNRE',             icon: '🗺️' },
+  { key: 'DESTDA',   label: 'DeSTDA',                   icon: '📋' },
+  { key: 'EFD_REINF', label: 'EFD-Reinf',              icon: '📑' },
+  { key: 'ESOCIAL',  label: 'e-Social',                 icon: '👥' },
+  { key: 'DCTFWEB',  label: 'DCTFWeb',                  icon: '🏛️' },
+  { key: 'CONTABIL', label: 'Lançamentos + Depreciação', icon: '📒' },
+  { key: 'BANCARIA', label: 'Open Finance + Concil. Bancária', icon: '🏦' },
+  { key: 'FGTS',     label: 'FGTS Digital',             icon: '💼' },
 ]
 
 export function FechamentoPanel({ empresaId, competencia }: Props) {
