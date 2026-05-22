@@ -1,13 +1,22 @@
 import { NFeSefazAdapter } from './adapters/nfe-sefaz.adapter.js'
 import { NFCeSefazAdapter } from './adapters/nfce-sefaz.adapter.js'
 import { NFSePortalNacionalAdapter } from './adapters/nfse-portal-nacional.adapter.js'
-import { DocumentoRaw, Periodo } from './interfaces/base.js'
+import { Prefeitura3550308Adapter } from './adapters/prefeitura-3550308.adapter.js'
+import { Prefeitura3304557Adapter } from './adapters/prefeitura-3304557.adapter.js'
+import { Prefeitura3106200Adapter } from './adapters/prefeitura-3106200.adapter.js'
+import { DocumentoRaw, Periodo, PrefeituraAdapter, Credential } from './interfaces/base.js'
 import { parsePeriodo } from '@saas-contabil/shared'
 
 export class ScraperOrchestrator {
   private nfeSefaz = new NFeSefazAdapter()
   private nfceSefaz = new NFCeSefazAdapter()
   private nfsePortalNacional = new NFSePortalNacionalAdapter()
+
+  private prefeituras: Map<string, PrefeituraAdapter> = new Map([
+    ['3550308', new Prefeitura3550308Adapter()],
+    ['3304557', new Prefeitura3304557Adapter()],
+    ['3106200', new Prefeitura3106200Adapter()],
+  ])
 
   async capturarTodos(cnpj: string, competencia: string, credencial: any): Promise<{
     nfe: DocumentoRaw[]
