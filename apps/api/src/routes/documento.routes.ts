@@ -1,9 +1,41 @@
 import { FastifyInstance } from 'fastify'
+import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
 import { parsePeriodo } from '@saas-contabil/shared'
+import { Queue } from 'bullmq'
+import IORedis from 'ioredis'
 
 export async function documentoRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null })
+  const scraperQueue = new Queue('scraper', { connection: redis })
+
+  app.post('/capturar/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = z.object({
+      empresaId: z.string().uuid(),
+      competencia: z.string().regex(/^\d{4}-\d{2}$/),
+    }).parse(request.params)
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    const credencial = await db.credencial.findFirst({
+      where: { tenantId, empresaId, status: 'ATIVO' },
+    })
+    if (!credencial) return reply.code(400).send({ error: 'Nenhuma credencial ativa para esta empresa' })
+
+    const job = await scraperQueue.add('scraper-job', {
+      tenantId,
+      empresaId,
+      cnpj: empresa.cnpj,
+      competencia,
+      credencialId: credencial.id,
+      tipo: 'TODOS',
+    }, { attempts: 3, backoff: { type: 'exponential', delay: 3000 } })
+
+    return { jobId: job.id, status: 'AGUARDANDO', cnpj: empresa.cnpj, competencia }
+  })
 
   app.get('/', async (request) => {
     const { tenantId } = request.user as any

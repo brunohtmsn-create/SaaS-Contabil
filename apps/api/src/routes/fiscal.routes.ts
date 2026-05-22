@@ -53,6 +53,21 @@ export async function fiscalRoutes(app: FastifyInstance) {
     return service.gerar(tenantId, empresaId, competencia)
   })
 
+  app.get('/apuracoes', async (request) => {
+    const { tenantId } = request.user as any
+    const { competencia, tipo } = request.query as { competencia?: string; tipo?: string }
+
+    const where: any = { tenantId }
+    if (competencia) where.competencia = competencia
+    if (tipo) where.tipo = tipo
+
+    return db.apuracaoFiscal.findMany({
+      where,
+      include: { empresa: { select: { cnpj: true, razaoSocial: true } } },
+      orderBy: { competencia: 'desc' },
+    })
+  })
+
   app.get('/apuracoes/:empresaId', async (request) => {
     const { tenantId } = request.user as any
     const { empresaId } = request.params as { empresaId: string }
@@ -62,6 +77,23 @@ export async function fiscalRoutes(app: FastifyInstance) {
     if (competencia) where.competencia = competencia
 
     return db.apuracaoFiscal.findMany({ where, orderBy: { competencia: 'desc' } })
+  })
+
+  app.post('/pgdas/transmitir/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'PGDAS' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'PGDAS não apurado para este período' })
+
+    await db.apuracaoFiscal.update({
+      where: { id: apuracao.id },
+      data: { status: 'TRANSMITIDO' },
+    })
+
+    return { success: true, status: 'TRANSMITIDO' }
   })
 
   app.get('/obrigacoes/:empresaId', async (request) => {
