@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
-import { PGDASService, DifalService, GNREService, DeSTDAService } from '@saas-contabil/fiscal'
+import { PGDASService, DifalService, GNREService, DeSTDAService, DCTFWebService, ESocialService, MonitoramentoSNService } from '@saas-contabil/fiscal'
 
 const params = z.object({ empresaId: z.string().uuid(), competencia: z.string().regex(/^\d{4}-\d{2}$/) })
 
@@ -67,10 +67,57 @@ export async function fiscalRoutes(app: FastifyInstance) {
   app.get('/obrigacoes/:empresaId', async (request) => {
     const { tenantId } = request.user as any
     const { empresaId } = request.params as { empresaId: string }
+    const { mes } = request.query as { mes?: string }
+
+    const where: any = { tenantId, empresaId }
+    if (mes) {
+      const { inicio, fim } = (await import('@saas-contabil/shared')).parsePeriodo(mes)
+      where.vencimento = { gte: inicio, lte: fim }
+    }
+
+    return db.obrigacao.findMany({ where, orderBy: { vencimento: 'asc' } })
+  })
+
+  app.get('/obrigacoes', async (request) => {
+    const { tenantId } = request.user as any
+    const { mes, status } = request.query as { mes?: string; status?: string }
+
+    const where: any = { tenantId }
+    if (status) where.status = status
+    if (mes) {
+      const { inicio, fim } = (await import('@saas-contabil/shared')).parsePeriodo(mes)
+      where.vencimento = { gte: inicio, lte: fim }
+    }
 
     return db.obrigacao.findMany({
-      where: { tenantId, empresaId },
+      where,
+      include: { empresa: { select: { cnpj: true, razaoSocial: true } } },
       orderBy: { vencimento: 'asc' },
     })
+  })
+
+  app.post('/esocial/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new ESocialService()
+    return service.transmitirFolha(tenantId, empresaId, competencia)
+  })
+
+  app.post('/dctfweb/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new DCTFWebService()
+    return service.gerar(tenantId, empresaId, competencia)
+  })
+
+  app.post('/monitoramento/calendario/:empresaId', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId } = request.params as { empresaId: string }
+    const { ano } = request.query as { ano?: string }
+
+    const service = new MonitoramentoSNService()
+    return service.gerarCalendarioAnual(tenantId, empresaId, Number(ano ?? new Date().getFullYear()))
   })
 }

@@ -9,10 +9,12 @@ const navItems = [
   { href: '/empresas', label: 'Empresas', icon: '🏢' },
   { href: '/documentos', label: 'Documentos', icon: '📄' },
   { href: '/fiscal', label: 'Fiscal', icon: '💰' },
+  { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },
   { href: '/contabil', label: 'Contábil', icon: '📒' },
   { href: '/portais', label: 'Portais Gov.', icon: '🏛️' },
   { href: '/auditoria', label: 'Auditoria', icon: '🔍' },
+  { href: '/relatorios', label: 'Relatórios', icon: '📊' },
   { href: '/credenciais', label: 'Credenciais', icon: '🔐' },
 ]
 
