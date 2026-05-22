@@ -29,7 +29,11 @@ export class AuditChainVerifier {
       }
 
       const payload = { ...rest, hashAnterior }
-      const expectedHash = sha256(JSON.stringify(payload))
+      const expectedHash = sha256(
+        JSON.stringify(payload, (_key, value) =>
+          typeof value === 'bigint' ? value.toString() : value,
+        ),
+      )
 
       if (expectedHash !== hashEvento) {
         primeiraFalha = { sequencia: evento.sequencia, id: evento.id }

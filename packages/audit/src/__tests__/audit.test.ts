@@ -436,7 +436,13 @@ describe('AuditChainVerifier — verificar()', () => {
         jobId: null,
         duracao: null,
       }
-      const hashEvento = sha256(JSON.stringify({ ...rest, hashAnterior }))
+      // Usa o mesmo replacer que chain-verifier.ts para serializar BigInt
+      const hashEvento = sha256(
+        JSON.stringify(
+          { ...rest, hashAnterior },
+          (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
+        ),
+      )
       eventos.push({ ...rest, hashEvento, hashAnterior })
       hashAnterior = hashEvento
     }
