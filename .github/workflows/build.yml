@@ -1,0 +1,80 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: 9
+
+jobs:
+  build:
+    name: Build — all packages & apps
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @saas-contabil/database db:generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas_contabil
+
+      - name: Build — all packages & apps
+        run: |
+          # Build only packages/apps that declare a "build" script
+          pnpm --filter '*' --if-present run build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas_contabil
+          # Next.js needs these at build time to be defined (values are placeholders)
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+
+      - name: Collect dist artifacts
+        run: |
+          mkdir -p /tmp/dist-artifact
+          # Collect dist from every package and app that produced one
+          for dir in packages/*/dist apps/*/dist apps/dashboard/.next; do
+            if [ -d "$dir" ]; then
+              dest="/tmp/dist-artifact/$(echo $dir | tr '/' '__')"
+              cp -r "$dir" "$dest"
+            fi
+          done
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: /tmp/dist-artifact/
+          retention-days: 7
+          if-no-files-found: error

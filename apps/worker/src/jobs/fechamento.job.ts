@@ -3,6 +3,7 @@ import { ConciliationService } from '@saas-contabil/conciliation'
 import { PGDASService, DifalService, GNREService, DeSTDAService, EFDReinfService } from '@saas-contabil/fiscal'
 import { LancamentoService, DepreciacaoService, ConciliacaoBancariaService } from '@saas-contabil/contabil'
 import { AuditService } from '@saas-contabil/audit'
+import { NotificationService } from '@saas-contabil/notifications'
 import { getPrismaClient } from '@saas-contabil/database'
 import { parsePeriodo } from '@saas-contabil/shared'
 
@@ -16,6 +17,7 @@ const lancamento = new LancamentoService()
 const depreciacao = new DepreciacaoService()
 const bancaria = new ConciliacaoBancariaService()
 const audit = new AuditService()
+const notificacao = new NotificationService()
 const db = getPrismaClient()
 
 type FechamentoJobData = {
@@ -87,6 +89,12 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
     await job.updateProgress(95)
 
     await auditJob('FECHAMENTO_CONCLUIDO', { competencia, jobId: job.id })
+
+    await notificacao.notificarTenant(tenantId, 'FECHAMENTO_CONCLUIDO', {
+      empresaId,
+      cnpj,
+      competencia,
+    })
 
     await job.updateProgress(100)
     await job.log('Fechamento concluído com sucesso!')

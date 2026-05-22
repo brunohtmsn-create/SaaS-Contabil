@@ -1,5 +1,22 @@
 import { Decimal } from 'decimal.js'
 
+export type ResultadoDCTFWeb = {
+  competencia: string
+  cnpj: string
+  totalInss: Decimal
+  totalIrrf: Decimal
+  totalCsrf: Decimal
+  totalDebitos: Decimal
+  status: 'GERADA' | 'TRANSMITIDA'
+}
+
+export type DebitosDCTF = {
+  inss: Decimal
+  irrf: Decimal
+  csrf: Decimal
+  total: Decimal
+}
+
 export type ReceitaSegregada = {
   cnpj: string
   competencia: string

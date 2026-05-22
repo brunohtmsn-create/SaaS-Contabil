@@ -1,0 +1,268 @@
+version: 2
+
+updates:
+  # Root workspace dependencies
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      typescript-ecosystem:
+        patterns:
+          - typescript
+          - '@types/*'
+          - '@typescript-eslint/*'
+          - prettier
+          - eslint
+      testing:
+        patterns:
+          - vitest
+          - '@vitest/*'
+
+  # packages/shared
+  - package-ecosystem: npm
+    directory: /packages/shared
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:shared'
+    commit-message:
+      prefix: 'chore(deps/shared)'
+
+  # packages/database
+  - package-ecosystem: npm
+    directory: /packages/database
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:database'
+    commit-message:
+      prefix: 'chore(deps/database)'
+
+  # packages/credentials
+  - package-ecosystem: npm
+    directory: /packages/credentials
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:credentials'
+    commit-message:
+      prefix: 'chore(deps/credentials)'
+
+  # packages/audit
+  - package-ecosystem: npm
+    directory: /packages/audit
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:audit'
+    commit-message:
+      prefix: 'chore(deps/audit)'
+
+  # packages/storage
+  - package-ecosystem: npm
+    directory: /packages/storage
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:storage'
+    commit-message:
+      prefix: 'chore(deps/storage)'
+
+  # packages/scraper
+  - package-ecosystem: npm
+    directory: /packages/scraper
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:scraper'
+    commit-message:
+      prefix: 'chore(deps/scraper)'
+
+  # packages/normalizer
+  - package-ecosystem: npm
+    directory: /packages/normalizer
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:normalizer'
+    commit-message:
+      prefix: 'chore(deps/normalizer)'
+
+  # packages/conciliation
+  - package-ecosystem: npm
+    directory: /packages/conciliation
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:conciliation'
+    commit-message:
+      prefix: 'chore(deps/conciliation)'
+
+  # packages/fiscal
+  - package-ecosystem: npm
+    directory: /packages/fiscal
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:fiscal'
+    commit-message:
+      prefix: 'chore(deps/fiscal)'
+
+  # packages/contabil
+  - package-ecosystem: npm
+    directory: /packages/contabil
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:contabil'
+    commit-message:
+      prefix: 'chore(deps/contabil)'
+
+  # packages/portals
+  - package-ecosystem: npm
+    directory: /packages/portals
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:portals'
+    commit-message:
+      prefix: 'chore(deps/portals)'
+
+  # packages/notifications
+  - package-ecosystem: npm
+    directory: /packages/notifications
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'pkg:notifications'
+    commit-message:
+      prefix: 'chore(deps/notifications)'
+
+  # apps/api
+  - package-ecosystem: npm
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'app:api'
+    commit-message:
+      prefix: 'chore(deps/api)'
+
+  # apps/dashboard
+  - package-ecosystem: npm
+    directory: /apps/dashboard
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'app:dashboard'
+    commit-message:
+      prefix: 'chore(deps/dashboard)'
+
+  # apps/worker
+  - package-ecosystem: npm
+    directory: /apps/worker
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'app:worker'
+    commit-message:
+      prefix: 'chore(deps/worker)'
+
+  # GitHub Actions themselves
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - 'ci'
+    commit-message:
+      prefix: 'chore(ci)'

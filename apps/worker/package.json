@@ -20,6 +20,7 @@
     "@saas-contabil/fiscal": "workspace:*",
     "@saas-contabil/contabil": "workspace:*",
     "@saas-contabil/portals": "workspace:*",
+    "@saas-contabil/notifications": "workspace:*",
     "bullmq": "^5.12.0",
     "ioredis": "^5.4.1",
     "decimal.js": "^10.4.3",

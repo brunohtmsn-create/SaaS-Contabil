@@ -66,4 +66,8 @@ export class S3KeyBuilder {
   static auditoriaEvidencia(tenantId: string, auditEventId: string, filename: string): string {
     return `auditoria/evidencias/${auditEventId}/${filename}`
   }
+
+  static relatorio(tenantId: string, competencia: string): string {
+    return `tenants/${tenantId}/relatorios/relatorio-consolidado-${competencia}.csv`
+  }
 }
