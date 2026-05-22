@@ -66,11 +66,11 @@ export async function portalRoutes(app: FastifyInstance) {
         label,
         status: ultimoJob
           ? ultimoJob.status === 'CONCLUIDO' ? 'OK'
-          : ultimoJob.status === 'FALHOU' ? 'ERRO'
-          : ultimoJob.status === 'PROCESSANDO' ? 'PROCESSANDO'
+          : ultimoJob.status === 'ERRO' ? 'ERRO'
+          : ultimoJob.status === 'EM_EXECUCAO' ? 'PROCESSANDO'
           : 'PENDENTE'
           : 'PENDENTE',
-        ultimaVerificacao: ultimoJob?.atualizadoEm ?? null,
+        ultimaVerificacao: ultimoJob?.concluidoEm ?? ultimoJob?.criadoEm ?? null,
         mensagem: ultimoJob?.erro ?? null,
       }
     })

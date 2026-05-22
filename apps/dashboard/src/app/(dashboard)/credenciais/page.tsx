@@ -9,9 +9,9 @@ type Credencial = {
   empresaId: string
   tipo: string
   label?: string
-  status: 'ATIVO' | 'REVOGADO' | 'EXPIRADO'
+  status: 'ATIVO' | 'REVOGADO' | 'VENCIDO' | 'ERRO'
   validade?: string
-  createdAt: string
+  criadoEm: string
   empresa?: { razaoSocial: string; cnpj: string }
 }
 
@@ -26,7 +26,8 @@ const TIPO_ICONS: Record<string, string> = {
 const STATUS_COR: Record<string, string> = {
   ATIVO: 'bg-green-100 text-green-700',
   REVOGADO: 'bg-red-100 text-red-700',
-  EXPIRADO: 'bg-gray-100 text-gray-500',
+  VENCIDO: 'bg-gray-100 text-gray-500',
+  ERRO: 'bg-red-50 text-red-500',
 }
 
 export default function CredenciaisPage() {
@@ -234,7 +235,7 @@ export default function CredenciaisPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-400">
-                      {new Date(cred.createdAt).toLocaleDateString('pt-BR')}
+                      {new Date(cred.criadoEm).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {cred.status === 'ATIVO' && (
