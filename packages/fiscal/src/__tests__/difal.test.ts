@@ -19,17 +19,20 @@ import { Decimal } from 'decimal.js'
 import { FUNDO_POBREZA } from '@saas-contabil/shared'
 
 // ---------------------------------------------------------------------------
-// Mocks (devem vir ANTES do import do serviço)
+// Singleton de mock do DB — o getPrismaClient() sempre retorna o mesmo objeto,
+// assim os testes podem configurar mocks antes de instanciar o serviço.
 // ---------------------------------------------------------------------------
 
+const mockDb = {
+  empresaCliente: { findUnique: vi.fn() },
+  documentoFiscal: {
+    findMany: vi.fn(),
+    update: vi.fn(),
+  },
+}
+
 vi.mock('@saas-contabil/database', () => ({
-  getPrismaClient: vi.fn(() => ({
-    empresaCliente: { findUnique: vi.fn() },
-    documentoFiscal: {
-      findMany: vi.fn().mockResolvedValue([]),
-      update: vi.fn().mockResolvedValue({}),
-    },
-  })),
+  getPrismaClient: vi.fn(() => mockDb),
 }))
 
 vi.mock('@saas-contabil/audit', () => ({
@@ -39,6 +42,17 @@ vi.mock('@saas-contabil/audit', () => ({
 }))
 
 import { DifalService } from '../difal.service.js'
+
+// ---------------------------------------------------------------------------
+// Reset dos mocks entre testes
+// ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockDb.documentoFiscal.findMany.mockResolvedValue([])
+  mockDb.documentoFiscal.update.mockResolvedValue({})
+  mockDb.empresaCliente.findUnique.mockResolvedValue(null)
+})
 
 // ---------------------------------------------------------------------------
 // Helper: calcula DIFAL e Fundo de Pobreza de forma pura
@@ -216,14 +230,10 @@ describe('DIFAL cálculo puro — SP → AM', () => {
 // Cálculo DIFAL puro: SP → SP (mesma UF — diferencial = 0)
 // ---------------------------------------------------------------------------
 
-describe('DIFAL cálculo puro — SP → SP (operação interna, sem DIFAL)', () => {
-  it('Diferencial zero → DIFAL = R$0,00', () => {
+describe('DIFAL cálculo puro — diferencial zero', () => {
+  it('Quando alíquota interestadual = alíquota interna → DIFAL = R$0,00', () => {
     const base = new Decimal(10000)
-    const aliqInterestadual = new Decimal(12)
     const aliqInterna = new Decimal(18)
-    // Operações internas têm interestadual = interna = 18%, mas
-    // na prática o serviço só processa NF-e interestaduais.
-    // Aqui validamos que a fórmula produz 0 quando diferencial = 0.
     const aliqInterIgualInterna = new Decimal(18)
     const { difal } = calcularDifalPuro(base, aliqInterIgualInterna, aliqInterna, 'SP')
     expect(difal.toFixed(2)).toBe('0.00')
@@ -276,14 +286,10 @@ describe('Fundo de Pobreza — constante FUNDO_POBREZA', () => {
 
 describe('DIFAL — somente documentos CONCILIADOS entram no cálculo', () => {
   it('calcular() chama findMany apenas com status CONCILIADO', async () => {
-    const { getPrismaClient } = await import('@saas-contabil/database')
-    const mockDb = (getPrismaClient as any)()
-
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
       id: 'emp-1',
       cnpj: '00.000.000/0001-00',
     })
-    // Sem documentos retornados (lista vazia = cenário sem DIFAL a calcular)
     mockDb.documentoFiscal.findMany.mockResolvedValueOnce([])
 
     const service = new DifalService()
@@ -297,18 +303,13 @@ describe('DIFAL — somente documentos CONCILIADOS entram no cálculo', () => {
 
   it('Documentos não conciliados NÃO aparecem nos resultados', async () => {
     // O mock retorna lista vazia para simular que o DB filtrou os não-conciliados.
-    // Em produção, o filtro status: 'CONCILIADO' na query garante isso.
-    const service = new DifalService()
-    const { getPrismaClient } = await import('@saas-contabil/database')
-    const mockDb = (getPrismaClient as any)()
-
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
       id: 'emp-2',
       cnpj: '11.111.111/0001-11',
     })
-    // Simula que o banco não retornou nenhum documento CONCILIADO
     mockDb.documentoFiscal.findMany.mockResolvedValueOnce([])
 
+    const service = new DifalService()
     const resultados = await service.calcular('tenant-1', 'emp-2', '2025-01')
     expect(resultados).toHaveLength(0)
   })
@@ -320,9 +321,6 @@ describe('DIFAL — somente documentos CONCILIADOS entram no cálculo', () => {
 
 describe('DifalService — calcular() com documento mockado', () => {
   it('Processa um documento SP → BA e retorna DIFAL + Fundo Pobreza corretos', async () => {
-    const { getPrismaClient } = await import('@saas-contabil/database')
-    const mockDb = (getPrismaClient as any)()
-
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
       id: 'emp-3',
       cnpj: '22.222.222/0001-22',
@@ -337,8 +335,6 @@ describe('DifalService — calcular() com documento mockado', () => {
         status: 'CONCILIADO',
       },
     ])
-
-    mockDb.documentoFiscal.update.mockResolvedValue({})
 
     const service = new DifalService()
     const resultados = await service.calcular('tenant-1', 'emp-3', '2025-01')
@@ -356,9 +352,6 @@ describe('DifalService — calcular() com documento mockado', () => {
   })
 
   it('Processa um documento SP → AM e retorna DIFAL correto (sem Fundo Pobreza)', async () => {
-    const { getPrismaClient } = await import('@saas-contabil/database')
-    const mockDb = (getPrismaClient as any)()
-
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
       id: 'emp-4',
       cnpj: '33.333.333/0001-33',
@@ -374,8 +367,6 @@ describe('DifalService — calcular() com documento mockado', () => {
       },
     ])
 
-    mockDb.documentoFiscal.update.mockResolvedValue({})
-
     const service = new DifalService()
     const resultados = await service.calcular('tenant-1', 'emp-4', '2025-01')
 
@@ -388,5 +379,13 @@ describe('DifalService — calcular() com documento mockado', () => {
     expect(r.valorDifal.toFixed(2)).toBe('1300.00')
     expect(r.valorFundoPobreza.toFixed(2)).toBe('0.00')
     expect(r.valorTotal.toFixed(2)).toBe('1300.00')
+  })
+
+  it('Lança erro quando empresa não encontrada', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
+
+    const service = new DifalService()
+    await expect(service.calcular('tenant-1', 'emp-inexistente', '2025-01'))
+      .rejects.toThrow('Empresa não encontrada')
   })
 })

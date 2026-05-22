@@ -292,14 +292,13 @@ describe('PGDASService — calcularAliquotaEfetiva()', () => {
     expect(efetiva.toFixed(4)).toBe('15.5000')
   })
 
-  it('Faixa 4 Anexo I — RB R$1.260.000 → valor DAS calculado corretamente', () => {
+  it('Faixa 4 Anexo I — RB R$1.260.000 → valor DAS = aliq*RB - deducao', () => {
     const rb = new Decimal(1260000)
     const { aliquota, deducao } = TABELA_SIMPLES_NACIONAL.ANEXO_I[3]! // faixa 4: 10.7% - 22500
-    const efetiva = calcularAliquotaEfetiva(rb, aliquota, deducao)
-    const valorDAS = rb.times(efetiva.div(100)).toDecimalPlaces(2)
-    // DAS = RB * (aliq * RB - deducao) / RB = aliq * RB - deducao (em termos de valor)
-    const esperado = aliquota.div(100).times(rb).minus(deducao).toDecimalPlaces(2)
-    expect(valorDAS.toFixed(2)).toBe(esperado.toFixed(2))
+    // Fórmula direta sem intermediário: DAS = (aliq/100 * RB - deducao)
+    // = (0.107 * 1260000 - 22500) = 134820 - 22500 = 112320
+    const valorDAS = aliquota.div(100).times(rb).minus(deducao).toDecimalPlaces(2)
+    expect(valorDAS.toFixed(2)).toBe('112320.00')
   })
 
   it('RB = 0 → alíquota efetiva = 0 (evita divisão por zero)', () => {

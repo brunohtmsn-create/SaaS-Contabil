@@ -8,28 +8,39 @@
  *  - Valores representativos: folha R$280k / RB R$1M = 28% → Anexo III
  *                              folha R$270k / RB R$1M = 27% → Anexo V
  *
- * O PrismaClient é mockado. O FatorRService depende de DB apenas para
- * buscar a receita bruta dos 12 meses; a folha de pagamento ainda está
- * com valor fixo 0 na implementação (campo futuro). Os testes exercitam
- * a fórmula e a lógica de decisão via mock.
+ * O PrismaClient é mockado via singleton. O FatorRService depende de DB
+ * apenas para buscar a receita bruta dos 12 meses; a folha de pagamento
+ * está com valor fixo 0 na implementação atual (campo futuro). Os testes
+ * exercitam a fórmula e a lógica de decisão via mock e lógica pura.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Decimal } from 'decimal.js'
 
 // ---------------------------------------------------------------------------
-// Mocks (devem vir ANTES do import do serviço)
+// Singleton de mock do DB — sempre retorna o mesmo objeto
 // ---------------------------------------------------------------------------
 
+const mockDb = {
+  documentoFiscal: {
+    aggregate: vi.fn(),
+  },
+}
+
 vi.mock('@saas-contabil/database', () => ({
-  getPrismaClient: vi.fn(() => ({
-    documentoFiscal: {
-      aggregate: vi.fn().mockResolvedValue({ _sum: { valorTotal: null } }),
-    },
-  })),
+  getPrismaClient: vi.fn(() => mockDb),
 }))
 
 import { FatorRService } from '../fator-r.service.js'
+
+// ---------------------------------------------------------------------------
+// Reset dos mocks entre testes
+// ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockDb.documentoFiscal.aggregate.mockResolvedValue({ _sum: { valorTotal: null } })
+})
 
 // ---------------------------------------------------------------------------
 // Helper: calcula o Fator R de forma pura (sem DB)
@@ -90,7 +101,6 @@ describe('FatorR — fórmula pura (folha / receita_bruta × 100)', () => {
   })
 
   it('Fator R exatamente 28% → Anexo III (limite inclusivo)', () => {
-    // Qualquer par folha/receita que resulte em 28%
     const { fatorR, anexo } = calcularFatorRPuro(new Decimal(28), new Decimal(100))
     expect(fatorR.toFixed(2)).toBe('28.00')
     expect(anexo).toBe('III')
@@ -114,7 +124,7 @@ describe('FatorR — fórmula pura (folha / receita_bruta × 100)', () => {
     expect(anexo).toBe('III')
   })
 
-  it('Valores decimais: folha R$123.456,78 / RB R$500.000 = 24.69%', () => {
+  it('Valores decimais: folha R$123.456,78 / RB R$500.000 ≈ 24.69%', () => {
     const folha = new Decimal('123456.78')
     const rb = new Decimal('500000')
     const { fatorR, anexo } = calcularFatorRPuro(folha, rb)
@@ -129,20 +139,12 @@ describe('FatorR — fórmula pura (folha / receita_bruta × 100)', () => {
 // ---------------------------------------------------------------------------
 
 describe('FatorRService — calcular() com mock do DB', () => {
-  let service: FatorRService
-
-  beforeEach(() => {
-    service = new FatorRService()
-  })
-
   it('RB 12m = R$1M → Fator R = 0% (folha hardcoded = 0 na implementação atual)', async () => {
-    const { getPrismaClient } = await import('@saas-contabil/database')
-    const mockDb = (getPrismaClient as any)()
-
     mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
       _sum: { valorTotal: '1000000' },
     })
 
+    const service = new FatorRService()
     const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
 
     // Na implementação atual folha12m = 0 (stub), então fatorR = 0
@@ -151,48 +153,62 @@ describe('FatorRService — calcular() com mock do DB', () => {
   })
 
   it('RB 12m = null (sem documentos) → Fator R = 0%', async () => {
-    const { getPrismaClient } = await import('@saas-contabil/database')
-    const mockDb = (getPrismaClient as any)()
-
     mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
       _sum: { valorTotal: null },
     })
 
+    const service = new FatorRService()
     const resultado = await service.calcular('tenant-1', 'emp-2', '2025-01')
 
     expect(resultado.fatorR.toFixed(2)).toBe('0.00')
     expect(resultado.anexo).toBe('V')
   })
 
-  it('calcular() busca 12 meses de receita bruta no DB', async () => {
-    const { getPrismaClient } = await import('@saas-contabil/database')
-    const mockDb = (getPrismaClient as any)()
-
+  it('calcular() chama aggregate uma vez e agrega valorTotal', async () => {
     mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
       _sum: { valorTotal: '500000' },
     })
 
+    const service = new FatorRService()
     await service.calcular('tenant-1', 'emp-3', '2025-01')
 
     expect(mockDb.documentoFiscal.aggregate).toHaveBeenCalledTimes(1)
     const callArgs = mockDb.documentoFiscal.aggregate.mock.calls[0][0]
-
-    // Verifica filtros obrigatórios
-    expect(callArgs.where.tenantId).toBe('tenant-1')
-    expect(callArgs.where.empresaId).toBe('emp-3')
-    expect(callArgs.where.status).toBe('CONCILIADO')
     expect(callArgs._sum.valorTotal).toBe(true)
   })
 
-  it('calcular() filtra apenas saídas e prestações de serviço', async () => {
-    const { getPrismaClient } = await import('@saas-contabil/database')
-    const mockDb = (getPrismaClient as any)()
-
+  it('calcular() filtra por tenantId e empresaId corretos', async () => {
     mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
       _sum: { valorTotal: '200000' },
     })
 
+    const service = new FatorRService()
+    await service.calcular('tenant-abc', 'emp-xyz', '2025-01')
+
+    const callArgs = mockDb.documentoFiscal.aggregate.mock.calls[0][0]
+    expect(callArgs.where.tenantId).toBe('tenant-abc')
+    expect(callArgs.where.empresaId).toBe('emp-xyz')
+  })
+
+  it('calcular() filtra apenas documentos com status CONCILIADO', async () => {
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
+      _sum: { valorTotal: '200000' },
+    })
+
+    const service = new FatorRService()
     await service.calcular('tenant-1', 'emp-4', '2025-01')
+
+    const callArgs = mockDb.documentoFiscal.aggregate.mock.calls[0][0]
+    expect(callArgs.where.status).toBe('CONCILIADO')
+  })
+
+  it('calcular() filtra apenas saídas e prestações de serviço', async () => {
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
+      _sum: { valorTotal: '200000' },
+    })
+
+    const service = new FatorRService()
+    await service.calcular('tenant-1', 'emp-5', '2025-01')
 
     const callArgs = mockDb.documentoFiscal.aggregate.mock.calls[0][0]
     expect(callArgs.where.direcao).toEqual({ in: ['SAIDA', 'PRESTACAO'] })
@@ -222,12 +238,26 @@ describe('FatorR — casos de negócio', () => {
     expect(anexo).toBe('V')
   })
 
-  it('Fator R é calculado sobre os últimos 12 meses (janela móvel)', () => {
-    // Este teste documenta que o cálculo usa 12 meses de histórico,
-    // não apenas o mês corrente. A implementação usa competencias12Meses().
-    // Verificamos que o aggregate é chamado com intervalo de 12 meses.
-    // (cobertura comportamental via mock — validação de intervalo de datas
-    //  está nos testes de integração completos)
-    expect(true).toBe(true) // placeholder documental
+  it('Fator R é calculado sobre janela de 12 meses de receita bruta', async () => {
+    // Documenta que o aggregate cobre o intervalo de datas dos 12 meses anteriores.
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
+      _sum: { valorTotal: '1200000' },
+    })
+
+    const service = new FatorRService()
+    await service.calcular('tenant-1', 'emp-6', '2025-01')
+
+    const callArgs = mockDb.documentoFiscal.aggregate.mock.calls[0][0]
+    // Verifica que há filtro de dataCompetencia com gte (início) e lte (fim)
+    expect(callArgs.where.dataCompetencia).toBeDefined()
+    expect(callArgs.where.dataCompetencia.gte).toBeInstanceOf(Date)
+    expect(callArgs.where.dataCompetencia.lte).toBeInstanceOf(Date)
+    // Janela: 12 meses → diferença de ~365 dias
+    const diasDiferenca = Math.floor(
+      (callArgs.where.dataCompetencia.lte.getTime() - callArgs.where.dataCompetencia.gte.getTime())
+      / (1000 * 60 * 60 * 24)
+    )
+    expect(diasDiferenca).toBeGreaterThan(300)
+    expect(diasDiferenca).toBeLessThan(400)
   })
 })
