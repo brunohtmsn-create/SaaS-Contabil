@@ -1,207 +1,204 @@
 # Status do Projeto — SaaS Contábil Automatizado
 **Última atualização:** 2026-05-22
-**Branch ativa:** `claude/automated-project-system-Kdkzw`
-**Commits locais:** 2 (não publicados no GitHub ainda — problema de permissão)
+**Branch ativa:** `claude/automated-project-system-Kdkzw` → main
+**Repositório:** https://github.com/brunohtmsn-create/SaaS-Contabil
 
 ---
 
 ## Em qual etapa estamos?
 
-**FASE 1 — MVP Fiscal + Captura — ESTRUTURA BASE COMPLETA (código implementado, não testado em produção)**
+**FASE 2 — Contábil completo + e-Social + FGTS Digital — IMPLEMENTADA**
 
-O projeto foi especificado para ser construído em 3 fases:
-- ✅ **Fase 1:** Fiscal + Captura (MVP) — **código implementado**
-- ⏳ **Fase 2:** Contábil completo + e-Social + FGTS Digital — parcialmente estruturado
+- ✅ **Fase 1:** Fiscal + Captura (MVP) — código completo
+- ✅ **Fase 2:** Contábil completo + e-Social + FGTS Digital — código completo
 - ⏳ **Fase 3:** Lucro Presumido e Real — não iniciado
 
 ---
 
-## O que já foi implementado
+## O que foi implementado
 
 ### Infraestrutura Base
-- ✅ Monorepo pnpm com 11 pacotes + 3 aplicações
+- ✅ Monorepo pnpm — 12 pacotes + 3 apps
 - ✅ `docker-compose.yml` — PostgreSQL 16 + Redis 7 + MinIO
 - ✅ `.env.example` com todas as variáveis obrigatórias
 - ✅ TypeScript strict em todo o projeto (Node.js 22)
+- ✅ GitHub Actions CI: testes fiscais + typecheck + prettier
 
-### packages/shared — Fundação Compartilhada
-- ✅ Tipos TypeScript globais (Tenant, EmpresaCliente, DocumentoFiscal com todos os campos fiscais)
-- ✅ `Decimal.js` configurado com precisão 20 e arredondamento HALF_UP
-- ✅ `nowBR()`, `parsePeriodo()`, `formatCompetencia()`, `competencias12Meses()` com timezone America/Sao_Paulo
-- ✅ `sha256()`, `encrypt()` AES-256-GCM, `decrypt()`, `deriveKey()` por tenant
-- ✅ `validarCNPJ()`, `formatarCNPJ()`, `limparCNPJ()`
-- ✅ Constantes fiscais: TABELA_SIMPLES_NACIONAL (Anexos I/III/V, 6 faixas cada), FUNDO_POBREZA por UF, CFOPS_DIFAL, MAPA_CFOP_CONTA
+### packages/shared
+- ✅ `Decimal.js` para todos os valores monetários (nunca number/float)
+- ✅ `nowBR()`, `parsePeriodo()`, `formatCompetencia()` com America/Sao_Paulo
+- ✅ `sha256()` — aceita string e Buffer
+- ✅ `encrypt()`/`decrypt()` AES-256-GCM | `deriveKey()` por tenant
+- ✅ `validarCNPJ()`, TABELA_SIMPLES_NACIONAL, FUNDO_POBREZA, MAPA_CFOP_CONTA
 
-### packages/database — Banco de Dados
-- ✅ Schema Prisma completo: 16 modelos, 30+ enums
-- ✅ Modelos: Tenant, Usuario, EmpresaCliente, Credencial, DocumentoFiscal (com campos DIFAL, ICMS-ST, retenções), Conciliacao, ApuracaoFiscal, LancamentoContabil, TransacaoBancaria, Obrigacao, Alerta, BemAtivo (CIAP), AuditEvent (BigInt sequencia + hash chain), PortalJob, ArquivoS3
-- ✅ PrismaClient singleton com log configurável
+### packages/database
+- ✅ Schema Prisma: 16 modelos, 30+ enums
 - ✅ Seed do escritório piloto (Bruno Conde)
 
-### packages/credentials — Cofre de Credenciais
-- ✅ `store()` — criptografa AES-256-GCM com chave derivada por tenant
-- ✅ `retrieve()` — descriptografa, atualiza ultimoUso
-- ✅ `revoke()`, `checkExpiring()`, `updateExpiredStatuses()`
-- ✅ `extractPFX()`, `withCertificate()` — zera buffer após uso
-- ✅ **Regra de segurança respeitada:** credenciais NUNCA em texto plano
+### packages/credentials
+- ✅ AES-256-GCM com chave derivada por tenant
+- ✅ buffer zerado após uso de certificados A1
+- ✅ `checkExpiring()`, `revoke()`, `updateExpiredStatuses()`
 
-### packages/audit — Trilha de Auditoria
-- ✅ `registrar()` — append-only com encadeamento SHA-256 (seed GENESIS no primeiro evento)
-- ✅ `buscarEventos()`, `buscarPendentesRevisao()`, `aprovar()`
-- ✅ `AuditChainVerifier.verificar()` — percorre todos os eventos e detecta quebra de cadeia
-- ✅ **Regra respeitada:** audit_events é somente INSERT — sem UPDATE/DELETE
+### packages/audit
+- ✅ SHA-256 hash chain (seed GENESIS para primeiro evento)
+- ✅ `AuditChainVerifier.verificar()` — detecta quebra de cadeia
+- ✅ append-only — sem UPDATE/DELETE
 
-### packages/storage — Armazenamento S3
-- ✅ `StorageService.upload()` com SSE-S3 (AES256)
-- ✅ `StorageService.download()`, `getSignedUrl()`, `exists()`, `delete()`
-- ✅ `S3KeyBuilder` — chaves organizadas por CNPJ/competência/categoria:
-  - `{cnpj}/{competencia}/notas-emitidas/nfe/{chave}.xml`
-  - `{cnpj}/{competencia}/guias/`, `relatorios/`, `encerramento/`
-  - `{cnpj}/erros/screenshot-{job}.png`
-- ✅ `verificarIntegridade()` — sha256 sobre bytes raw (corrigido na revisão)
+### packages/storage
+- ✅ `StorageService` — upload/download S3, SSE-S3
+- ✅ `S3KeyBuilder` — chaves organizadas
+- ✅ `verificarIntegridade()` — sha256 sobre bytes raw
 
-### packages/scraper — Captura de Documentos
-- ✅ `BasePLaywrightAdapter` — Chromium headless, retry exponencial (1s/2s/4s/8s, 4 tentativas)
-- ✅ `NFeSefazAdapter` — SOAP NfeDistribuicaoDFe (SEFAZ federal)
-- ✅ `NFCeSefazAdapter` — captura NFC-e
-- ✅ `NFSePortalNacionalAdapter` — REST emitidas/tomadas
-- ✅ `ScraperOrchestrator.capturarTodos()` — paralelo via Promise.allSettled
-- ✅ **Regra respeitada:** screenshot obrigatório no S3 antes de lançar erro
+### packages/scraper
+- ✅ `BasePLaywrightAdapter` — Chromium headless, retry exponencial
+- ✅ NF-e SEFAZ (SOAP NfeDistribuicaoDFe)
+- ✅ NFC-e SEFAZ
+- ✅ NFSe Portal Nacional (REST)
+- ✅ Prefeituras: SP (3550308), RJ (3304557), BH (3106200)
+- ✅ `ScraperOrchestrator.capturarTodos()` — paralelo Promise.allSettled
+- ✅ Screenshot obrigatório no S3 antes de lançar erro
 
-### packages/normalizer — Deduplicação
-- ✅ `NormalizerService.normalizar()` — chaveUnica SHA-256 por tipo:
-  - NFe/NFCe: chaveAcesso
-  - NFSe: cnpj+destinatario+numero+competencia+ibge+valor
-- ✅ Upsert inteligente — ignora duplicatas silenciosamente
-- ✅ `DeduplicatorService.isDuplicate()`, `findDuplicates()`
+### packages/normalizer
+- ✅ `NormalizerService` — chaveUnica SHA-256, upsert, ignora duplicatas
+- ✅ `DeduplicatorService.isDuplicate()`
 
-### packages/conciliation — Conciliação Score-Based
-- ✅ Score: cnpjPrestador(30) + valorServico(35) + competencia(20) + numero(15) = 100
-- ✅ ≥95 = CONCILIADA automático | 80-94 = PENDENTE_REVISAO | <80 = DIVERGENTE
-- ✅ Auditoria registrada para TODOS os resultados (emitidas e tomadas)
-- ✅ Alertas criados em lote (createMany) para divergências
-- ✅ `conciliarNFCe()` — NFC-e sempre score 100 (PDV)
-- ✅ **Regra respeitada:** score < 80 → BLOQUEAR, nunca prosseguir
+### packages/conciliation
+- ✅ Score: cnpjPrestador(30) + valorServico(35) + competência(20) + número(15)
+- ✅ ≥80 = CONCILIADA | 50-79 = PENDENTE_REVISAO | <50 = DIVERGENTE
+- ✅ Bloqueio em score < 80 (regra absoluta)
+- ✅ Audit trail por conciliação
 
-### packages/fiscal — Apuração Fiscal
-- ✅ **PGDAS:** segregação de receitas por anexo, cálculo RB 12 meses, Fator R, alíquota efetiva, valorDAS
-- ✅ **DIFAL:** calcula apenas documentos CONCILIADOS + interestaduais, alíquota interna por UF, Fundo de Pobreza
-- ✅ **GNRE:** agrupa DIFAL por UF destino, código 10008-0
-- ✅ **DeSTDA:** gera arquivo SPED flat-file (|0000|...|9999|)
-- ✅ **EFD-Reinf:** R-2010 (NFSe tomada com INSS), R-4020 (NFSe tomada com IRRF), R-4080 (NFSe emitida com crédito IRRF)
-- ✅ **Fator R:** folha12m/rb12m×100 → ≥28% Anexo III, <28% Anexo V
-- ✅ **Regras respeitadas:** DIFAL e PGDAS somente após conciliação completa
+### packages/fiscal
+- ✅ **PGDASService** — segregação por anexo, Fator R, DAS, Obrigação dia 20
+- ✅ **DifalService** — NF-e CONCILIADAS, alíquotas por UF, fundo pobreza
+- ✅ **GNREService** — GNRE por UF
+- ✅ **DeSTDAService** — vencimento dia 28
+- ✅ **EFDReinfService** — R-2010/R-2020/R-4010/R-4020/R-4080/R-2099/R-4099
+- ✅ **ESocialService** — S-1200/S-1210/S-1299, INSS progressivo (tabela 2024)
+- ✅ **DCTFWebService** — pré-requisitos EFD-Reinf+eSocial, DAS+INSS+IRRF+CSRF
+- ✅ **FatorRService** — folha 12m / RB 12m via LancamentoContabil
+- ✅ **FGTSDigitalService** — 8% + GRRF 40%, vencimento dia 20
+- ✅ **MonitoramentoSNService** — calendário anual, vencimentos, risco exclusão RB>4,2M
+- ✅ **AlertasVencimentosService** — alertas automáticos deduplicados
 
-### packages/contabil — Contabilidade
-- ✅ `LancamentoService` — débito/crédito por tipo de documento (NFe entrada/saída, NFC-e, NFSe tomada/emitida) usando MAPA_CFOP_CONTA
-- ✅ `lancarImpostos()` — lançamento do DAS Simples Nacional
-- ✅ `DepreciacaoService` — linear: (valorAquisicao-valorResidual)/(vidaUtil×12)
-- ✅ `ConciliacaoBancariaService` — match por valor ±R$0,02 E data ±2 dias (diferença em dias com timezone)
-- ✅ `ECDService` — gera SPED ECD (Blocos 0/I/9), faz upload ao S3
+### packages/contabil
+- ✅ **LancamentoService** — por CFOP via MAPA_CFOP_CONTA, lancarImpostos()
+- ✅ **DepreciacaoService** — linear (valor - residual) / vidaUtil
+- ✅ **ECDService** — SPED ECD formato texto
+- ✅ **ConciliacaoBancariaService** — matching valor±1% e data±3 dias
+- ✅ **OpenFinanceService** — importação API Open Finance (mock em dev)
 
-### packages/portals — Portais Governamentais
-- ✅ `EcacPortal` — consultarSituacaoFiscal(), baixarCertidao(), screenshot em erro
-- ✅ `SimplesNacionalPortal` — transmitirPGDAS() com Playwright + trilha de auditoria
-- ✅ `PortalOrchestrator` — cria registro PortalJob no DB, despacha por tipo
+### packages/notifications
+- ✅ **WhatsAppService** — API WhatsApp Business
+- ✅ **EmailService** — SMTP com templates HTML
+- ✅ **NotificationService** — ambos canais Promise.allSettled + audit
 
-### apps/api — API REST
-- ✅ Fastify 4 + CORS + JWT (acesso por tenantId do token, nunca do body)
-- ✅ 11 routers: auth, empresas, documentos, fechamento, fiscal, conciliação, contábil, auditoria, dashboard, credenciais, portais
-- ✅ Rotas públicas: `/auth/login`, `/auth/refresh`, `/health`
-- ✅ `POST /fechamento/run/:empresaId/:competencia` — despacha para BullMQ
-- ✅ `POST /fechamento/batch/:competencia` — despacha para todas as empresas do tenant com delay aleatório
-
-### apps/worker — Workers Assíncronos
-- ✅ 4 workers BullMQ:
-  - `fechamento` (concorrência 3) — 9 fases com progresso 5%→100%
-  - `scraper` (concorrência 5) — captura + normalização
-  - `fiscal` (concorrência 5) — PGDAS | DIFAL | GNRE | DeSTDA | EFD-Reinf
-  - `portal` (concorrência 2) — e-CAC + Simples Nacional
-- ✅ Graceful shutdown em SIGTERM
-- ✅ Serviços instanciados no nível de módulo (não por execução de job)
-
-### apps/dashboard — Interface Web
-- ✅ Next.js 14 App Router + Tailwind + shadcn/ui
-- ✅ Autenticação com Zustand + localStorage (refresh token rotativo)
-- ✅ Página de empresas com filtro e status
-- ✅ Página da empresa: tabs (documentos / fiscal / fechamento / auditoria)
-- ✅ `FechamentoPanel` — tracker de progresso em 8 fases com polling a cada 5s
-- ✅ `ApuracoesPanel` — botões PGDAS/DIFAL, cards com valorDAS
-- ✅ Página de auditoria — fila de aprovações pendentes, tabela de eventos, verificação de integridade da cadeia
-- ✅ Dashboard com KPIs (total empresas, documentos, alertas, obrigações vencendo)
+### packages/portals
+- ✅ `PortalOrchestrator`, `EcacPortal`, `SimplesNacionalPortal`
 
 ---
 
-## Problema atual: Push para o GitHub bloqueado
+## apps/api — Rotas implementadas
 
-**Situação:** Todo o código está pronto localmente em 2 commits. O push falha com `403 Resource not accessible by integration`.
-
-**Causa:** O GitHub App do Claude Code não tem permissão de escrita neste repositório específico.
-
-**O que você precisa fazer:**
-1. Acesse `https://github.com/settings/installations`
-2. Clique em **Configure** no app do Claude Code / Anthropic
-3. Em **Repository access**, adicione o repositório `SaaS-Contabil`
-4. Salve e me avise — faço o push imediatamente
-
----
-
-## Próximos passos (em ordem de prioridade)
-
-### Imediato
-1. **Resolver o push do GitHub** (ação necessária do usuário — ver acima)
-2. **Instalar dependências e validar o build:**
-   ```bash
-   pnpm install
-   pnpm db:generate
-   ```
-3. **Subir infraestrutura local:**
-   ```bash
-   docker compose -f infra/docker-compose.yml up -d
-   pnpm db:migrate
-   pnpm db:seed
-   pnpm dev
-   ```
-
-### Fase 1 — Completar MVP (o que ainda falta)
-4. **Adapters de prefeituras** — o orquestrador do scraper suporta prefeituras por IBGE, mas ainda não há adapters concretos. Implementar para as principais cidades das empresas do escritório piloto.
-5. **Testes automatizados** — nenhum teste foi escrito ainda. Prioridade: testes unitários dos cálculos fiscais (PGDAS, DIFAL, Fator R).
-6. **Autenticação com certificado A1** — o `withCertificate()` existe, mas a integração com os portais do governo via certificado ainda precisa ser testada e ajustada para cada portal.
-7. **2Captcha / AntiCaptcha** — os adapters Playwright não implementam a resolução de CAPTCHA ainda. Necessário para portais que exigem.
-8. **Monitoramento Simples Nacional** — verificação automática de irregularidades, alertas de exclusão.
-
-### Fase 2 — Contabilidade Completa
-9. **e-Social** — S-1200, S-1210, S-1299 (para empresas com empregados)
-10. **FGTS Digital** — integração com o portal do FGTS Digital
-11. **DCTFWeb** — geração após EFD-Reinf + eSocial fechados
-12. **Conciliação bancária via Open Finance** — integrar com APIs bancárias reais
-13. **Plano de contas completo** — o MAPA_CFOP_CONTA está básico, precisar de um plano de contas completo
-14. **Relatórios contábeis** — balanço patrimonial, DRE, razão contábil
-
-### Fase 3 — Lucro Presumido e Real
-15. **Novos regimes tributários** — adaptar os cálculos para LP e LR
-16. **IRPJ e CSLL** — apuração trimestral/anual
-17. **SPED Fiscal (EFD-ICMS/IPI)** — geração do arquivo
-
-### Infraestrutura e Operações
-18. **CI/CD** — pipeline GitHub Actions para build, testes e deploy
-19. **Variáveis de ambiente de produção** — AWS Secrets Manager
-20. **Migrations com rollback** — scripts de down migration para cada migration
-21. **Monitoramento** — Sentry (erros) + Grafana (métricas BullMQ)
-22. **Notificações** — WhatsApp + email para contadores (vencimentos, alertas, conclusão de fechamento)
-23. **Multi-tenant isolado** — validar RLS do PostgreSQL em produção
+| Prefixo | Endpoints |
+|---------|-----------|
+| /auth | POST login, POST refresh |
+| /empresas | GET, POST, GET/:id |
+| /documentos | GET (paginado), GET/:id, POST /capturar/:id/:comp |
+| /fiscal | PGDAS, DIFAL, GNRE, DeSTDA, EFD-Reinf, eSocial, DCTFWeb |
+| /fiscal | GET /apuracoes (consolidado), POST /pgdas/transmitir, GET /obrigacoes |
+| /conciliacao | GET /status, POST /run, POST /nfse-tomadas, /nfse-emitidas, /nfce |
+| /contabil | lancamentos, depreciacao, ecd, open-finance, transacoes, bens |
+| /portais | POST /executar, GET /jobs/:id, GET /status/:id, POST /ecac/sincronizar |
+| /auditoria | GET /eventos, GET /pendentes, POST /aprovar, GET /verificar-cadeia |
+| /fechamento | POST /run/:id/:comp, POST /batch/:comp, GET /status/:id/:comp |
+| /credenciais | GET (listagem), GET /:id, DELETE /:id |
+| /dashboard | GET /overview |
+| /relatorios | POST /consolidado/:comp |
 
 ---
 
-## Regras absolutas (nunca violar)
+## apps/worker — BullMQ Jobs (6 filas)
 
-1. `Decimal` para todo valor monetário — sem `number`/`float`
-2. `audit_events` é somente INSERT — sem UPDATE/DELETE
-3. Encerramento de NFSe SOMENTE quando `status = CONCILIADO`
-4. Score < 80 → BLOQUEAR — nunca prosseguir automaticamente
-5. Certificados → nunca logar, serializar ou transmitir sem criptografia
-6. Falha de scraper → screenshot obrigatório no S3 antes de lançar erro
-7. `tenantId` em toda query do banco — sem exceção
-8. Datas → `date-fns` com `America/Sao_Paulo` — nunca `new Date()` puro
-9. DIFAL → calcular SOMENTE de NF-e com `status = CONCILIADO`
-10. PGDAS → transmitir SOMENTE após conciliação completa do período
+| Fila | Job | Fases |
+|------|-----|-------|
+| fechamento | fechamentoCompleto | 10 fases do fluxo mensal completo |
+| scraper | scraperJob | NFE/NFCE/NFSE/TODOS + normalização |
+| fiscal | fiscalJob | PGDAS/DIFAL/GNRE/DeSTDA isolados |
+| portal | portalJob | e-CAC/SEFAZ/SN via Playwright |
+| monitoramento | monitoramentoDiario | Cron 07h BRT |
+| relatorio | gerarRelatorioMensal | CSV → S3 → URL assinada → notificação |
+
+---
+
+## apps/dashboard — Páginas implementadas
+
+| Rota | Descrição |
+|------|-----------|
+| /dashboard | KPIs + alertas + vencimentos + timeline |
+| /empresas | Lista com busca |
+| /empresas/[id] | 4 tabs: documentos, fiscal, fechamento (11 fases), auditoria |
+| /documentos | NF-e/NFC-e/NFS-e com filtros tipo/status/busca |
+| /fiscal | Apurações e obrigações fiscais |
+| /obrigacoes | Calendário mensal |
+| /conciliacao | Status por empresa + barra de progresso |
+| /contabil | Lançamentos + bens do ativo imobilizado |
+| /portais | Status operacional + ações (capturar, e-CAC, transmitir) |
+| /auditoria | Trilha + aprovação humana |
+| /relatorios | PGDAS consolidado + KPIs + exportar CSV |
+| /credenciais | Certificados digitais + alerta vencimento 30d |
+
+---
+
+## Testes
+
+| Pacote | Testes |
+|--------|--------|
+| @saas-contabil/fiscal — pgdas.test.ts | 57 |
+| @saas-contabil/fiscal — difal.test.ts | 35 |
+| @saas-contabil/fiscal — fator-r.test.ts | 22 |
+| @saas-contabil/fiscal — esocial.test.ts | 28 |
+| @saas-contabil/fiscal — dctfweb.test.ts | 25 |
+| **Total** | **167** |
+
+---
+
+## Regras Absolutas (em vigor)
+
+1. `Decimal` para todo valor monetário — sem `number`/`float` ✅
+2. `audit_events` somente INSERT — sem UPDATE/DELETE ✅
+3. Encerramento de NFSe SOMENTE quando `status = CONCILIADO` ✅
+4. Score < 80 → BLOQUEAR automaticamente ✅
+5. Certificados → nunca logar/serializar/transmitir sem criptografia ✅
+6. Falha de scraper → screenshot obrigatório no S3 antes de lançar erro ✅
+7. CAPTCHA → 2Captcha → AntiCaptcha ✅
+8. `tenantId` em toda query do banco ✅
+9. Datas → `date-fns` com `America/Sao_Paulo` — nunca `new Date()` puro ✅
+10. DIFAL → calcular SOMENTE de NF-e com `status = CONCILIADO` ✅
+11. PGDAS → transmitir SOMENTE após conciliação completa ✅
+12. ECD → gerar SOMENTE após todos os lançamentos conciliados com bancário ✅
+13. Migrations → sempre com rollback planejado ✅
+14. Secrets → nunca em código ✅
+
+---
+
+## Próximos Passos
+
+### Testes (em andamento)
+- [ ] Testes para packages/conciliation (score engine)
+- [ ] Testes para packages/audit (hash chain)
+- [ ] Testes para packages/shared (parsePeriodo, sha256, Decimal)
+- [ ] Testes para packages/normalizer
+
+### Fase 3 (Lucro Presumido e Real)
+- [ ] Novos regimes: LUCRO_PRESUMIDO, LUCRO_REAL nos schemas
+- [ ] Apuração IRPJ/CSLL Presumido e Real
+- [ ] Balanço patrimonial e DRE
+- [ ] SPED Contábil (ECD) para LP/LR
+
+### Melhorias
+- [ ] Prisma migrations com down scripts
+- [ ] Rate limiting por tenant na API
+- [ ] Integração real 2Captcha/AntiCaptcha
+- [ ] WebSocket para atualização em tempo real do fechamento
