@@ -1,6 +1,8 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
+import IORedis from 'ioredis'
+import { getPrismaClient } from '@saas-contabil/database'
 import { authRoutes } from './routes/auth.routes.js'
 import { empresaRoutes } from './routes/empresa.routes.js'
 import { documentoRoutes } from './routes/documento.routes.js'
@@ -53,7 +55,20 @@ await app.register(credencialRoutes, { prefix: '/credenciais' })
 await app.register(dashboardRoutes, { prefix: '/dashboard' })
 await app.register(relatorioRoutes, { prefix: '/relatorios' })
 
-app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))
+app.get('/health', async (_request, reply) => {
+  const db = getPrismaClient()
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null, lazyConnect: true })
+
+  const [dbOk, redisOk] = await Promise.all([
+    db.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
+    redis.ping().then((r) => r === 'PONG').catch(() => false),
+  ])
+  redis.disconnect()
+
+  const status = dbOk && redisOk ? 'ok' : 'degraded'
+  reply.code(dbOk && redisOk ? 200 : 503)
+  return { status, db: dbOk ? 'ok' : 'error', redis: redisOk ? 'ok' : 'error', timestamp: new Date().toISOString() }
+})
 
 const port = Number(process.env['PORT'] ?? 3000)
 await app.listen({ port, host: '0.0.0.0' })
