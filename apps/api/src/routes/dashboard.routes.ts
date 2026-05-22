@@ -1,27 +1,25 @@
 import { FastifyInstance } from 'fastify'
 import { getPrismaClient } from '@saas-contabil/database'
+import { nowBR, formatCompetencia, subMeses, addDays, parsePeriodo } from '@saas-contabil/shared'
 
 export async function dashboardRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
 
   app.get('/resumo', async (request) => {
     const { tenantId } = request.user as any
-    const competenciaAtual = new Date().toISOString().slice(0, 7)
+    const now = nowBR()
+    const competenciaAtual = formatCompetencia(now)
+    const { inicio } = parsePeriodo(competenciaAtual)
 
     const [totalEmpresas, totalDocs, alertas, obrigacoesVencendo] = await Promise.all([
       db.empresaCliente.count({ where: { tenantId, ativa: true } }),
-      db.documentoFiscal.count({
-        where: {
-          tenantId,
-          dataCompetencia: { gte: new Date(`${competenciaAtual}-01`) },
-        },
-      }),
+      db.documentoFiscal.count({ where: { tenantId, dataCompetencia: { gte: inicio } } }),
       db.alerta.count({ where: { tenantId, lido: false } }),
       db.obrigacao.count({
         where: {
           tenantId,
           status: 'PENDENTE',
-          vencimento: { lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+          vencimento: { lte: addDays(now, 7) },
         },
       }),
     ])
@@ -39,8 +37,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
     const { empresaId } = request.params as { empresaId: string }
 
-    const seisMesesAtras = new Date()
-    seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6)
+    const seisMesesAtras = subMeses(nowBR(), 6)
 
     const docs = await db.documentoFiscal.groupBy({
       by: ['dataCompetencia', 'tipo'],

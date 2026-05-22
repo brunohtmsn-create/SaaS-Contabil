@@ -1,6 +1,6 @@
 import { getPrismaClient } from '@saas-contabil/database'
 import { AuditService } from '@saas-contabil/audit'
-import { Decimal, parsePeriodo, TABELA_SIMPLES_NACIONAL, LIMITES_SIMPLES_NACIONAL, competencias12Meses, decimalSum } from '@saas-contabil/shared'
+import { Decimal, parsePeriodo, TABELA_SIMPLES_NACIONAL, LIMITES_SIMPLES_NACIONAL, competencias12Meses } from '@saas-contabil/shared'
 import type { ReceitaSegregada, ResultadoPGDAS } from './types.js'
 import { FatorRService } from './fator-r.service.js'
 
@@ -29,9 +29,10 @@ export class PGDASService {
 
     const receitas = this.segregarReceitas(docs, empresa.cnpj, competencia)
 
-    const rb12 = await this.calcularRB12Meses(tenantId, empresaId, competencia)
-
-    const { fatorR } = await this.fatorR.calcular(tenantId, empresaId, competencia)
+    const [rb12, { fatorR }] = await Promise.all([
+      this.calcularRB12Meses(tenantId, empresaId, competencia),
+      this.fatorR.calcular(tenantId, empresaId, competencia),
+    ])
 
     const anexoPrincipal = this.determinarAnexoPrincipal(receitas, fatorR)
     const faixa = this.buscarFaixa(rb12, anexoPrincipal)

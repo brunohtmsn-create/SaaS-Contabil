@@ -1,5 +1,5 @@
 import { DocumentoFiscal } from '@saas-contabil/database'
-import { Decimal } from 'decimal.js'
+import { Decimal } from '@saas-contabil/shared'
 import type { ResultadoConciliacao, ScoreConciliacao } from './types.js'
 
 const PESOS = {

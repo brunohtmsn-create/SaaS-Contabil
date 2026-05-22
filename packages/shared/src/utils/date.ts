@@ -1,7 +1,7 @@
-import { format, startOfMonth, endOfMonth, parseISO, addMonths, subMonths } from 'date-fns'
+import { format, startOfMonth, endOfMonth, parseISO, addMonths, subMonths, addDays, differenceInCalendarDays } from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 
-export { startOfMonth, endOfMonth, parseISO, addMonths, subMonths }
+export { startOfMonth, endOfMonth, parseISO, addMonths, subMonths, addDays, differenceInCalendarDays }
 
 const TZ = 'America/Sao_Paulo'
 

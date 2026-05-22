@@ -1,6 +1,6 @@
 import { getPrismaClient } from '@saas-contabil/database'
 import { AuditService } from '@saas-contabil/audit'
-import { Decimal, parsePeriodo } from '@saas-contabil/shared'
+import { Decimal, parsePeriodo, nowBR } from '@saas-contabil/shared'
 
 export class DepreciacaoService {
   private db = getPrismaClient()
@@ -28,7 +28,7 @@ export class DepreciacaoService {
           tenantId,
           empresaId,
           competencia,
-          data: new Date(),
+          data: nowBR(),
           historico: `Depreciação — ${bem.descricao}`,
           partidas: [
             { conta: '6.1.5.01', descricao: 'Depreciação do período', valor: depreciacaoMensal.toString(), tipo: 'DEBITO' },

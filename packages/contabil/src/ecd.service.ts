@@ -52,9 +52,9 @@ export class ECDService {
     await this.storage.upload(s3Key, Buffer.from(conteudo, 'utf8'), 'text/plain')
 
     await this.db.apuracaoFiscal.upsert({
-      where: { tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia: `${ano}`, tipo: 'EFD_REINF' } },
+      where: { tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia: `${ano}`, tipo: 'ECD' } },
       update: { dados: { s3Key, linhas: linhas.length } as any, status: 'CALCULADO' },
-      create: { tenantId, empresaId, competencia: `${ano}`, tipo: 'EFD_REINF', dados: { s3Key, linhas: linhas.length } as any, status: 'CALCULADO' },
+      create: { tenantId, empresaId, competencia: `${ano}`, tipo: 'ECD', dados: { s3Key, linhas: linhas.length } as any, status: 'CALCULADO' },
     })
 
     await this.audit.registrar({

@@ -1,5 +1,5 @@
 import { getPrismaClient, Credencial, StatusCredencial } from '@saas-contabil/database'
-import { deriveKey, encrypt, decrypt, nowBR, addMeses } from '@saas-contabil/shared'
+import { deriveKey, encrypt, decrypt, nowBR, addDays } from '@saas-contabil/shared'
 import type { CredentialDecrypted, CredentialCreateInput } from './types.js'
 
 const MASTER_KEY = process.env['CREDENTIALS_MASTER_KEY'] ?? ''
@@ -76,17 +76,14 @@ export class CredentialService {
   }
 
   async checkExpiring(tenantId: string, daysBefore = 30): Promise<Credencial[]> {
-    const cutoff = addMeses(nowBR(), 0)
-    cutoff.setDate(cutoff.getDate() + daysBefore)
+    const now = nowBR()
+    const cutoff = addDays(now, daysBefore)
 
     return this.db.credencial.findMany({
       where: {
         tenantId,
         status: 'ATIVO',
-        validade: {
-          lte: cutoff,
-          gte: nowBR(),
-        },
+        validade: { lte: cutoff, gte: now },
       },
     })
   }

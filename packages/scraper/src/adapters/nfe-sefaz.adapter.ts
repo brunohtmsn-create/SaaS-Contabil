@@ -1,6 +1,6 @@
 import { BasePLaywrightAdapter } from './base-playwright.adapter.js'
 import { Session, Credential, DocumentoRaw, Periodo } from '../interfaces/base.js'
-import { Decimal } from 'decimal.js'
+import { Decimal } from '@saas-contabil/shared'
 import axios from 'axios'
 
 export class NFeSefazAdapter extends BasePLaywrightAdapter {

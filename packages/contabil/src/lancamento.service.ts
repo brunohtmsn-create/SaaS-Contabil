@@ -1,6 +1,6 @@
 import { getPrismaClient, DocumentoFiscal } from '@saas-contabil/database'
 import { AuditService } from '@saas-contabil/audit'
-import { Decimal, parsePeriodo, MAPA_CFOP_CONTA } from '@saas-contabil/shared'
+import { Decimal, parsePeriodo, nowBR, MAPA_CFOP_CONTA } from '@saas-contabil/shared'
 import type { Lancamento, Partida } from './types.js'
 
 export class LancamentoService {
@@ -144,7 +144,7 @@ export class LancamentoService {
             tenantId,
             empresaId,
             competencia,
-            data: new Date(),
+            data: nowBR(),
             historico: `DAS Simples Nacional ${competencia}`,
             partidas: [
               { conta: '6.1.1.01', descricao: 'Simples Nacional (DAS)', valor: valorDAS.toString(), tipo: 'DEBITO' },

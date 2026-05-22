@@ -36,7 +36,7 @@ export class StorageService {
     contentType: string,
     metadata?: Record<string, string>
   ): Promise<UploadResult> {
-    const hash = sha256(data.toString('base64'))
+    const hash = sha256(data)
 
     await this.s3.send(
       new PutObjectCommand({
@@ -135,7 +135,7 @@ export class StorageService {
   async verificarIntegridade(s3Key: string, hashEsperado: string): Promise<boolean> {
     try {
       const { data } = await this.download(s3Key)
-      const hashAtual = sha256(data.toString('base64'))
+      const hashAtual = sha256(data)
       return hashAtual === hashEsperado
     } catch {
       return false

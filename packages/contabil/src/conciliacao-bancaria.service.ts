@@ -1,6 +1,6 @@
 import { getPrismaClient, TransacaoBancaria, DocumentoFiscal } from '@saas-contabil/database'
 import { AuditService } from '@saas-contabil/audit'
-import { Decimal, parsePeriodo } from '@saas-contabil/shared'
+import { Decimal, parsePeriodo, differenceInCalendarDays } from '@saas-contabil/shared'
 
 export class ConciliacaoBancariaService {
   private db = getPrismaClient()
@@ -51,9 +51,7 @@ export class ConciliacaoBancariaService {
 
       if (!valorTx.minus(valorDoc).abs().lte(new Decimal('0.02'))) continue
 
-      const diffDias = Math.abs(
-        (tx.data.getTime() - doc.dataEmissao.getTime()) / (1000 * 60 * 60 * 24)
-      )
+      const diffDias = Math.abs(differenceInCalendarDays(tx.data, doc.dataEmissao))
 
       if (diffDias <= TOLERANCIA_DIAS) return doc
     }
