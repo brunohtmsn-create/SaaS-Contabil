@@ -5,9 +5,13 @@ import { AuditChainVerifier } from '@saas-contabil/audit'
 export async function auditRoutes(app: FastifyInstance) {
   app.get('/eventos', async (request) => {
     const { tenantId } = request.user as any
-    const { cnpj, limit } = request.query as { cnpj?: string; limit?: string }
+    const { cnpj, entidadeId, limit } = request.query as { cnpj?: string; entidadeId?: string; limit?: string }
     const audit = new AuditService()
-    return audit.buscarEventos(tenantId, cnpj, limit ? Number(limit) : 100)
+    const eventos = await audit.buscarEventos(tenantId, cnpj, limit ? Number(limit) : 100)
+    if (entidadeId) {
+      return eventos.filter((e: any) => e.entidadeId === entidadeId)
+    }
+    return eventos
   })
 
   app.get('/pendentes-revisao', async (request) => {

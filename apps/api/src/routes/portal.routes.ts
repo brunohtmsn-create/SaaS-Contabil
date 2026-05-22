@@ -40,4 +40,62 @@ export async function portalRoutes(app: FastifyInstance) {
       take: 50,
     })
   })
+
+  app.get('/status/:empresaId', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId } = request.params as { empresaId: string }
+
+    const jobs = await db.portalJob.findMany({
+      where: { tenantId, empresaId },
+      orderBy: { criadoEm: 'desc' },
+      take: 100,
+    })
+
+    const PORTAIS = [
+      { portal: 'SEFAZ_FEDERAL', label: 'SEFAZ Federal (NF-e/NFC-e)' },
+      { portal: 'SIMPLES_NACIONAL', label: 'Portal Simples Nacional (PGDAS)' },
+      { portal: 'ECAC', label: 'e-CAC (Receita Federal)' },
+      { portal: 'SEFAZ_ESTADUAL', label: 'SEFAZ Estadual (DIFAL/GNRE)' },
+      { portal: 'PREFEITURA', label: 'Prefeitura (NFS-e)' },
+    ]
+
+    return PORTAIS.map(({ portal, label }) => {
+      const ultimoJob = jobs.find((j: any) => j.portal === portal)
+      return {
+        portal,
+        label,
+        status: ultimoJob
+          ? ultimoJob.status === 'CONCLUIDO' ? 'OK'
+          : ultimoJob.status === 'FALHOU' ? 'ERRO'
+          : ultimoJob.status === 'PROCESSANDO' ? 'PROCESSANDO'
+          : 'PENDENTE'
+          : 'PENDENTE',
+        ultimaVerificacao: ultimoJob?.atualizadoEm ?? null,
+        mensagem: ultimoJob?.erro ?? null,
+      }
+    })
+  })
+
+  app.post('/ecac/sincronizar/:empresaId', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId } = request.params as { empresaId: string }
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) throw new Error('Empresa não encontrada')
+
+    const credencial = await db.credencial.findFirst({
+      where: { tenantId, empresaId, tipo: 'PROCURACAO_ECAC', status: 'ATIVO' },
+    })
+
+    const job = await portalQueue.add('portal-job', {
+      tenantId,
+      empresaId,
+      cnpj: empresa.cnpj,
+      portal: 'ECAC',
+      operacao: 'SINCRONIZAR_DEBITOS',
+      credencialId: credencial?.id,
+    }, { attempts: 3, backoff: { type: 'exponential', delay: 2000 } })
+
+    return { jobId: job.id, status: 'AGUARDANDO' }
+  })
 }

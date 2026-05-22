@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { FechamentoPanel } from '@/components/empresa/FechamentoPanel'
 import { DocumentosPanel } from '@/components/empresa/DocumentosPanel'
 import { ApuracoesPanel } from '@/components/empresa/ApuracoesPanel'
+import { EmpresaAuditoriaPanel } from '@/components/empresa/EmpresaAuditoriaPanel'
 
 export default function EmpresaDetailPage({ params }: { params: { id: string } }) {
   const qc = useQueryClient()
@@ -74,6 +75,9 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
       )}
       {tab === 'fechamento' && (
         <FechamentoPanel empresaId={params.id} competencia={competencia} />
+      )}
+      {tab === 'auditoria' && (
+        <EmpresaAuditoriaPanel empresaId={params.id} />
       )}
     </div>
   )

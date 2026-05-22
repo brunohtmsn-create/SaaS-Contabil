@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
-import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
+import { parsePeriodo } from '@saas-contabil/shared'
 
 export async function documentoRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
@@ -11,9 +11,9 @@ export async function documentoRoutes(app: FastifyInstance) {
 
     const where: any = { tenantId }
     if (empresaId) where.empresaId = empresaId
-    if (competencia) where.dataCompetencia = {
-      gte: new Date(`${competencia}-01`),
-      lte: new Date(`${competencia}-31`),
+    if (competencia) {
+      const { inicio, fim } = parsePeriodo(competencia)
+      where.dataCompetencia = { gte: inicio, lte: fim }
     }
     if (tipo) where.tipo = tipo
     if (status) where.status = status
@@ -43,8 +43,7 @@ export async function documentoRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
     const { empresaId, competencia } = request.params as any
 
-    const inicio = new Date(`${competencia}-01`)
-    const fim = new Date(`${competencia}-31`)
+    const { inicio, fim } = parsePeriodo(competencia)
 
     const [total, porTipo, porStatus] = await Promise.all([
       db.documentoFiscal.count({ where: { tenantId, empresaId, dataCompetencia: { gte: inicio, lte: fim } } }),
