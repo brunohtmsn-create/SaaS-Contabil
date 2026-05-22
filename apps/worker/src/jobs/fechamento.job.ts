@@ -1,7 +1,7 @@
 import { Job } from 'bullmq'
 import { ConciliationService } from '@saas-contabil/conciliation'
-import { PGDASService, DifalService, GNREService, DeSTDAService, EFDReinfService } from '@saas-contabil/fiscal'
-import { LancamentoService, DepreciacaoService, ConciliacaoBancariaService } from '@saas-contabil/contabil'
+import { PGDASService, DifalService, GNREService, DeSTDAService, EFDReinfService, FGTSDigitalService } from '@saas-contabil/fiscal'
+import { LancamentoService, DepreciacaoService, ConciliacaoBancariaService, OpenFinanceService } from '@saas-contabil/contabil'
 import { AuditService } from '@saas-contabil/audit'
 import { NotificationService } from '@saas-contabil/notifications'
 import { getPrismaClient } from '@saas-contabil/database'
@@ -16,6 +16,8 @@ const reinf = new EFDReinfService()
 const lancamento = new LancamentoService()
 const depreciacao = new DepreciacaoService()
 const bancaria = new ConciliacaoBancariaService()
+const fgts = new FGTSDigitalService()
+const openFinance = new OpenFinanceService()
 const audit = new AuditService()
 const notificacao = new NotificationService()
 const db = getPrismaClient()
@@ -84,9 +86,13 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
     await depreciacao.calcular(tenantId, empresaId, competencia)
     await job.updateProgress(90)
 
-    await job.log('FASE 9: Conciliação bancária...')
+    await job.log('FASE 9: Sincronizando Open Finance e conciliação bancária...')
+    await openFinance.sincronizarContas(tenantId, empresaId)
     await bancaria.conciliar(tenantId, empresaId, competencia)
     await job.updateProgress(95)
+
+    await job.log('FASE 10: Apurando FGTS Digital...')
+    await fgts.apurar(tenantId, empresaId, competencia)
 
     await auditJob('FECHAMENTO_CONCLUIDO', { competencia, jobId: job.id })
 

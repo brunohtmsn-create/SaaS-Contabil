@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
-import { LancamentoService, DepreciacaoService, ECDService } from '@saas-contabil/contabil'
+import { LancamentoService, DepreciacaoService, ECDService, OpenFinanceService } from '@saas-contabil/contabil'
 
 const params = z.object({ empresaId: z.string().uuid(), competencia: z.string().regex(/^\d{4}-\d{2}$/) })
 
@@ -39,6 +39,28 @@ export async function contabilRoutes(app: FastifyInstance) {
     const { empresaId, ano } = request.params as { empresaId: string; ano: string }
     const service = new ECDService()
     return service.gerar(tenantId, empresaId, Number(ano))
+  })
+
+  app.post('/open-finance/sincronizar/:empresaId', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId } = request.params as { empresaId: string }
+    const service = new OpenFinanceService()
+    const count = await service.sincronizarContas(tenantId, empresaId)
+    return { transacoesImportadas: count }
+  })
+
+  app.get('/transacoes/:empresaId', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId } = request.params as { empresaId: string }
+    const { competencia } = request.query as { competencia?: string }
+
+    const where: any = { tenantId, empresaId }
+    if (competencia) {
+      const { inicio, fim } = (await import('@saas-contabil/shared')).parsePeriodo(competencia)
+      where.data = { gte: inicio, lte: fim }
+    }
+
+    return db.transacaoBancaria.findMany({ where, orderBy: { data: 'desc' }, take: 200 })
   })
 
   app.get('/bens/:empresaId', async (request) => {
