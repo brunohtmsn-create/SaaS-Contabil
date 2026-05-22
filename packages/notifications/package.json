@@ -1,0 +1,17 @@
+{
+  "name": "@saas-contabil/notifications",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "dependencies": {
+    "@saas-contabil/shared": "workspace:*",
+    "@saas-contabil/database": "workspace:*",
+    "@saas-contabil/audit": "workspace:*",
+    "nodemailer": "^6.9.13",
+    "axios": "^1.6.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/nodemailer": "^6.4.14"
+  }
+}
