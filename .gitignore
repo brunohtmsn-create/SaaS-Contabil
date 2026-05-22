@@ -9,3 +9,4 @@ dist/
 *.crt
 coverage/
 .turbo/
+pnpm-lock.yaml
