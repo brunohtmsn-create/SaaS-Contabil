@@ -70,4 +70,56 @@ export class ScraperOrchestrator {
     const tomadas = await this.nfsePortalNacional.fetchTomadas(cnpj, periodo)
     return { emitidas, tomadas }
   }
+
+  /**
+   * Captura NFS-e de uma prefeitura específica pelo código IBGE.
+   * Lança erro se o código IBGE não tiver adapter registrado.
+   */
+  async capturarNFSePrefeitura(
+    cnpj: string,
+    competencia: string,
+    ibge: string,
+    credencial: Credential
+  ): Promise<{ emitidas: DocumentoRaw[]; tomadas: DocumentoRaw[] }> {
+    const adapter = this.prefeituras.get(ibge)
+    if (!adapter) {
+      throw new Error(
+        `ScraperOrchestrator: nenhum adapter registrado para IBGE ${ibge}. ` +
+          `Prefeituras disponíveis: ${[...this.prefeituras.keys()].join(', ')}`
+      )
+    }
+
+    const periodo = parsePeriodo(competencia)
+    await adapter.authenticate(credencial)
+
+    const [emitidas, tomadas] = await Promise.allSettled([
+      adapter.fetchEmitidas(cnpj, periodo),
+      adapter.fetchTomadas(cnpj, periodo),
+    ])
+
+    return {
+      emitidas: emitidas.status === 'fulfilled' ? emitidas.value : [],
+      tomadas: tomadas.status === 'fulfilled' ? tomadas.value : [],
+    }
+  }
+
+  /**
+   * Executa healthCheck em todos os adapters de prefeitura registrados.
+   * Retorna um mapa IBGE → boolean indicando disponibilidade do portal.
+   */
+  async healthCheckPrefeituras(): Promise<Map<string, boolean>> {
+    const results = new Map<string, boolean>()
+
+    await Promise.all(
+      [...this.prefeituras.entries()].map(async ([ibge, adapter]) => {
+        try {
+          results.set(ibge, await adapter.healthCheck())
+        } catch {
+          results.set(ibge, false)
+        }
+      })
+    )
+
+    return results
+  }
 }
