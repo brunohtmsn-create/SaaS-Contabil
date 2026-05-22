@@ -44,7 +44,7 @@ export default function PortaisPage() {
 
   const { data: portaisStatus = [], isLoading } = useQuery<PortalStatus[]>({
     queryKey: ['portais-status', empresaId],
-    queryFn: () => api.get(`/portal/status/${empresaId}`).then((r) => r.data),
+    queryFn: () => api.get(`/portais/status/${empresaId}`).then((r) => r.data),
     enabled: !!empresaId,
     refetchInterval: 15000,
   })
@@ -60,7 +60,7 @@ export default function PortaisPage() {
   })
 
   const sincronizarECAC = useMutation({
-    mutationFn: () => api.post(`/portal/ecac/sincronizar/${empresaId}`),
+    mutationFn: () => api.post(`/portais/ecac/sincronizar/${empresaId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['portais-status', empresaId] }),
   })
 

@@ -12,6 +12,7 @@ import { auditRoutes } from './routes/audit.routes.js'
 import { fechamentoRoutes } from './routes/fechamento.routes.js'
 import { credencialRoutes } from './routes/credencial.routes.js'
 import { dashboardRoutes } from './routes/dashboard.routes.js'
+import { relatorioRoutes } from './routes/relatorio.routes.js'
 
 const app = Fastify({
   logger: {
@@ -50,6 +51,7 @@ await app.register(auditRoutes, { prefix: '/auditoria' })
 await app.register(fechamentoRoutes, { prefix: '/fechamento' })
 await app.register(credencialRoutes, { prefix: '/credenciais' })
 await app.register(dashboardRoutes, { prefix: '/dashboard' })
+await app.register(relatorioRoutes, { prefix: '/relatorios' })
 
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))
 
