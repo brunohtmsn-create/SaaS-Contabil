@@ -42,6 +42,17 @@ app.addHook('onRequest', async (request, reply) => {
   }
 })
 
+app.setErrorHandler((error, _request, reply) => {
+  if (error.validation) {
+    return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.validation })
+  }
+  const statusCode = error.statusCode ?? 500
+  if (statusCode >= 500) {
+    app.log.error(error)
+  }
+  reply.code(statusCode).send({ error: error.message ?? 'Erro interno do servidor' })
+})
+
 await app.register(authRoutes, { prefix: '/auth' })
 await app.register(empresaRoutes, { prefix: '/empresas' })
 await app.register(documentoRoutes, { prefix: '/documentos' })
