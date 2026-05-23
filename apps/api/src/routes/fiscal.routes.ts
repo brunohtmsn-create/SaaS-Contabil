@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
-import { PGDASService, DifalService, GNREService, DeSTDAService, DCTFWebService, ESocialService, MonitoramentoSNService } from '@saas-contabil/fiscal'
+import { PGDASService, DifalService, GNREService, DeSTDAService, DCTFWebService, ESocialService, MonitoramentoSNService, FatorRService } from '@saas-contabil/fiscal'
 
 const params = z.object({ empresaId: z.string().uuid(), competencia: z.string().regex(/^\d{4}-\d{2}$/) })
 
@@ -112,12 +112,13 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
   app.get('/obrigacoes', async (request) => {
     const { tenantId } = request.user as any
-    const { mes, status } = request.query as { mes?: string; status?: string }
+    const { mes, competencia, status } = request.query as { mes?: string; competencia?: string; status?: string }
 
     const where: any = { tenantId }
     if (status) where.status = status
-    if (mes) {
-      const { inicio, fim } = (await import('@saas-contabil/shared')).parsePeriodo(mes)
+    const periodo = competencia ?? mes
+    if (periodo) {
+      const { inicio, fim } = (await import('@saas-contabil/shared')).parsePeriodo(periodo)
       where.vencimento = { gte: inicio, lte: fim }
     }
 
@@ -126,6 +127,28 @@ export async function fiscalRoutes(app: FastifyInstance) {
       include: { empresa: { select: { cnpj: true, razaoSocial: true } } },
       orderBy: { vencimento: 'asc' },
     })
+  })
+
+  app.post('/obrigacoes/calendario/:empresaId/:ano', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, ano } = request.params as { empresaId: string; ano: string }
+
+    const service = new MonitoramentoSNService()
+    return service.gerarCalendarioAnual(tenantId, empresaId, Number(ano))
+  })
+
+  app.get('/fator-r/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new FatorRService()
+    const resultado = await service.calcular(tenantId, empresaId, competencia)
+    return {
+      empresaId,
+      competencia,
+      fatorR: resultado.fatorR.toFixed(2),
+      anexo: resultado.anexo,
+    }
   })
 
   app.post('/esocial/:empresaId/:competencia', async (request) => {
