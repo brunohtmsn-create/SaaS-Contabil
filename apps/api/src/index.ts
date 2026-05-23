@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
+import websocket from '@fastify/websocket'
 import IORedis from 'ioredis'
 import { getPrismaClient } from '@saas-contabil/database'
 import { authRoutes } from './routes/auth.routes.js'
@@ -15,6 +16,7 @@ import { fechamentoRoutes } from './routes/fechamento.routes.js'
 import { credencialRoutes } from './routes/credencial.routes.js'
 import { dashboardRoutes } from './routes/dashboard.routes.js'
 import { relatorioRoutes } from './routes/relatorio.routes.js'
+import { wsRoutes } from './routes/ws.routes.js'
 
 const app = Fastify({
   logger: {
@@ -65,6 +67,8 @@ await app.register(fechamentoRoutes, { prefix: '/fechamento' })
 await app.register(credencialRoutes, { prefix: '/credenciais' })
 await app.register(dashboardRoutes, { prefix: '/dashboard' })
 await app.register(relatorioRoutes, { prefix: '/relatorios' })
+await app.register(websocket)
+await app.register(wsRoutes, { prefix: '/ws' })
 
 app.get('/health', async (_request, reply) => {
   const db = getPrismaClient()

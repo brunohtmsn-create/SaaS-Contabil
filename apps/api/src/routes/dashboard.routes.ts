@@ -49,6 +49,34 @@ export async function dashboardRoutes(app: FastifyInstance) {
     return docs
   })
 
+  app.get('/volume', async (request) => {
+    const { tenantId } = request.user as any
+
+    const meses: { competencia: string; label: string; inicio: Date; fim: Date }[] = []
+    const now = nowBR()
+    for (let i = 5; i >= 0; i--) {
+      const d = subMeses(now, i)
+      const comp = formatCompetencia(d)
+      const { inicio, fim } = parsePeriodo(comp)
+      meses.push({ competencia: comp, label: comp.slice(5) + '/' + comp.slice(2, 4), inicio, fim })
+    }
+
+    const resultado = await Promise.all(
+      meses.map(async ({ label, inicio, fim }) => {
+        const [nfe, nfce, nfse] = await Promise.all([
+          db.documentoFiscal.count({ where: { tenantId, tipo: 'NFE', dataCompetencia: { gte: inicio, lte: fim } } }),
+          db.documentoFiscal.count({ where: { tenantId, tipo: 'NFCE', dataCompetencia: { gte: inicio, lte: fim } } }),
+          db.documentoFiscal.count({
+            where: { tenantId, tipo: { in: ['NFSE_EMITIDA', 'NFSE_TOMADA'] }, dataCompetencia: { gte: inicio, lte: fim } },
+          }),
+        ])
+        return { mes: label, nfe, nfce, nfse }
+      }),
+    )
+
+    return resultado
+  })
+
   app.get('/alertas', async (request) => {
     const { tenantId } = request.user as any
 

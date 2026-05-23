@@ -25,6 +25,9 @@ const mockDb = {
   documentoFiscal: {
     aggregate: vi.fn(),
   },
+  lancamentoContabil: {
+    findMany: vi.fn(),
+  },
 }
 
 vi.mock('@saas-contabil/database', () => ({
@@ -40,6 +43,7 @@ import { FatorRService } from '../fator-r.service.js'
 beforeEach(() => {
   vi.clearAllMocks()
   mockDb.documentoFiscal.aggregate.mockResolvedValue({ _sum: { valorTotal: null } })
+  mockDb.lancamentoContabil.findMany.mockResolvedValue([])
 })
 
 // ---------------------------------------------------------------------------
@@ -139,17 +143,32 @@ describe('FatorR — fórmula pura (folha / receita_bruta × 100)', () => {
 // ---------------------------------------------------------------------------
 
 describe('FatorRService — calcular() com mock do DB', () => {
-  it('RB 12m = R$1M → Fator R = 0% (folha hardcoded = 0 na implementação atual)', async () => {
+  it('RB 12m = R$1M, sem lancamentos de folha → Fator R = 0%', async () => {
     mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
       _sum: { valorTotal: '1000000' },
     })
+    // lancamentoContabil.findMany retorna [] por padrão no beforeEach
 
     const service = new FatorRService()
     const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
 
-    // Na implementação atual folha12m = 0 (stub), então fatorR = 0
     expect(resultado.fatorR.toFixed(2)).toBe('0.00')
     expect(resultado.anexo).toBe('V')
+  })
+
+  it('RB 12m = R$1M, folha R$280k via lancamentos → Fator R = 28%, Anexo III', async () => {
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
+      _sum: { valorTotal: '1000000' },
+    })
+    mockDb.lancamentoContabil.findMany.mockResolvedValueOnce([
+      { partidas: [{ conta: '6.1.1', valor: '280000', tipo: 'DEBITO' }] },
+    ])
+
+    const service = new FatorRService()
+    const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
+
+    expect(resultado.fatorR.toFixed(2)).toBe('28.00')
+    expect(resultado.anexo).toBe('III')
   })
 
   it('RB 12m = null (sem documentos) → Fator R = 0%', async () => {
