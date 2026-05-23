@@ -4,6 +4,9 @@ import { PGDASService, DifalService, GNREService, DeSTDAService, EFDReinfService
 import { LancamentoService, DepreciacaoService, ConciliacaoBancariaService, OpenFinanceService } from '@saas-contabil/contabil'
 import { AuditService } from '@saas-contabil/audit'
 import { NotificationService } from '@saas-contabil/notifications'
+import { CredentialService } from '@saas-contabil/credentials'
+import { ScraperOrchestrator } from '@saas-contabil/scraper'
+import { NormalizerService } from '@saas-contabil/normalizer'
 import { getPrismaClient } from '@saas-contabil/database'
 import { parsePeriodo } from '@saas-contabil/shared'
 
@@ -20,6 +23,9 @@ const fgts = new FGTSDigitalService()
 const openFinance = new OpenFinanceService()
 const audit = new AuditService()
 const notificacao = new NotificationService()
+const credentialService = new CredentialService()
+const scraper = new ScraperOrchestrator()
+const normalizer = new NormalizerService()
 const db = getPrismaClient()
 
 type FechamentoJobData = {
@@ -43,7 +49,32 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
   try {
     await job.updateProgress(5)
 
-    await job.log('FASE 2: Normalizando documentos...')
+    // FASE 1: Captura de documentos via scrapers SEFAZ + Portal Nacional
+    await job.log('FASE 1: Capturando documentos fiscais...')
+    let capturadosTotal = 0
+    if (job.data.credencialId) {
+      try {
+        const credencial = await credentialService.retrieve(job.data.credencialId, tenantId)
+        const docs = await scraper.capturarTodos(cnpj, competencia, credencial)
+        const todosRaw = [...docs.nfe, ...docs.nfce, ...docs.nfseEmitidas, ...docs.nfseTomadas]
+        capturadosTotal = todosRaw.length
+        await job.log(`FASE 1: ${capturadosTotal} documento(s) capturados (NF-e:${docs.nfe.length} NFC-e:${docs.nfce.length} NFSe:${docs.nfseEmitidas.length + docs.nfseTomadas.length})`)
+
+        // FASE 2: Normalização e deduplicação
+        await job.log('FASE 2: Normalizando e deduplicando documentos...')
+        let novos = 0
+        for (const raw of todosRaw) {
+          const salvo = await normalizer.normalizar(raw, tenantId, empresaId)
+          if (salvo) novos++
+        }
+        await job.log(`FASE 2: ${novos} documento(s) novos persistidos (${capturadosTotal - novos} duplicatas ignoradas)`)
+      } catch (scraperErr) {
+        await job.log(`FASE 1: Falha no scraper — ${String(scraperErr)} — continuando com documentos existentes`)
+      }
+    } else {
+      await job.log('FASE 1: Sem credencial configurada — usando documentos já importados')
+    }
+
     await job.updateProgress(20)
 
     await job.log('FASE 3: Conciliando documentos...')
