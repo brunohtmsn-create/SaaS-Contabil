@@ -29,7 +29,7 @@
     "@saas-contabil/scraper": "workspace:*",
     "@saas-contabil/shared": "workspace:*",
     "@saas-contabil/storage": "workspace:*",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "bullmq": "^5.12.0",
     "date-fns": "^3.6.0",
     "decimal.js": "^10.4.3",
