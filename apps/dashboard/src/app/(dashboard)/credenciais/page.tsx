@@ -51,6 +51,8 @@ export default function CredenciaisPage() {
     refetchInterval: 30000,
   })
 
+  const [erro, setErro] = useState<string | null>(null)
+
   const { data: empresas = [] } = useQuery<{ id: string; razaoSocial: string; cnpj: string }[]>({
     queryKey: ['empresas-lista'],
     queryFn: () => api.get('/empresas').then((r) => r.data),
@@ -59,6 +61,44 @@ export default function CredenciaisPage() {
   const revogar = useMutation({
     mutationFn: (id: string) => api.delete(`/credenciais/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['credenciais'] }),
+  })
+
+  const isCertificado = nova.tipo === 'CERTIFICADO_A1' || nova.tipo === 'CERTIFICADO_A3'
+
+  const salvar = useMutation({
+    mutationFn: async () => {
+      const empresa = empresas.find((e) => e.id === nova.empresaId)
+      if (!empresa) throw new Error('Selecione uma empresa')
+      if (isCertificado && !nova.arquivo) throw new Error('Selecione o arquivo .pfx do certificado')
+      if (!isCertificado && !nova.senha) throw new Error('Informe a senha')
+
+      if (isCertificado) {
+        const form = new FormData()
+        form.append('empresaId', nova.empresaId)
+        form.append('cnpj', empresa.cnpj)
+        form.append('tipo', nova.tipo)
+        if (nova.validade) form.append('validade', nova.validade)
+        form.append('escopos', JSON.stringify([]))
+        form.append('arquivo', nova.arquivo!)
+        return api.post('/credenciais', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      }
+
+      return api.post('/credenciais', {
+        empresaId: nova.empresaId,
+        cnpj: empresa.cnpj,
+        tipo: nova.tipo,
+        senha: nova.senha,
+        validade: nova.validade || undefined,
+        escopos: [],
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['credenciais'] })
+      setShowForm(false)
+      setErro(null)
+      setNova({ empresaId: '', tipo: 'CERTIFICADO_A1', senha: '', validade: '', arquivo: null })
+    },
+    onError: (e: any) => setErro(e.response?.data?.error ?? e.message ?? 'Erro ao salvar'),
   })
 
   const vencendoCount = credenciais.filter((c) => {
@@ -141,16 +181,29 @@ export default function CredenciaisPage() {
                 <option value="SENHA_SIMPLES">Senha Simples Nacional</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Senha / PIN</label>
-              <input
-                type="password"
-                value={nova.senha}
-                onChange={(e) => setNova((n) => ({ ...n, senha: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="Será criptografada com AES-256-GCM"
-              />
-            </div>
+            {isCertificado ? (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Arquivo .pfx</label>
+                <input
+                  type="file"
+                  accept=".pfx,.p12"
+                  onChange={(e) => setNova((n) => ({ ...n, arquivo: e.target.files?.[0] ?? null }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">Criptografado com AES-256-GCM no servidor</p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Senha / PIN</label>
+                <input
+                  type="password"
+                  value={nova.senha}
+                  onChange={(e) => setNova((n) => ({ ...n, senha: e.target.value }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Será criptografada com AES-256-GCM"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">Validade</label>
               <input
@@ -161,16 +214,23 @@ export default function CredenciaisPage() {
               />
             </div>
           </div>
+          {erro && (
+            <p className="text-xs text-red-600 mt-3 font-medium">{erro}</p>
+          )}
           <div className="flex gap-2 mt-4">
             <button
-              onClick={() => setShowForm(false)}
+              onClick={() => salvar.mutate()}
+              disabled={salvar.isPending}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {salvar.isPending ? 'Salvando...' : 'Salvar Credencial'}
+            </button>
+            <button
+              onClick={() => { setShowForm(false); setErro(null) }}
               className="border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-50"
             >
               Cancelar
             </button>
-            <p className="text-xs text-slate-400 self-center ml-2">
-              ⚠️ Upload de certificados deve ser feito via API segura — use a CLI ou integração direta.
-            </p>
           </div>
         </div>
       )}

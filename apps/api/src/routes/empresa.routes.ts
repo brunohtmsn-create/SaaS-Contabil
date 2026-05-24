@@ -19,10 +19,10 @@ export async function empresaRoutes(app: FastifyInstance) {
 
   app.get('/', async (request) => {
     const { tenantId } = request.user as any
-    return db.empresaCliente.findMany({
-      where: { tenantId, ativa: true },
-      orderBy: { razaoSocial: 'asc' },
-    })
+    const { incluiInativas } = request.query as { incluiInativas?: string }
+    const where: any = { tenantId }
+    if (incluiInativas !== 'true') where.ativa = true
+    return db.empresaCliente.findMany({ where, orderBy: { razaoSocial: 'asc' } })
   })
 
   app.get('/:id', async (request, reply) => {
@@ -53,7 +53,19 @@ export async function empresaRoutes(app: FastifyInstance) {
     const empresa = await db.empresaCliente.findFirst({ where: { id, tenantId } })
     if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
 
-    return db.empresaCliente.update({ where: { id }, data })
+    // tenantId no where garante isolamento multi-tenant
+    return db.empresaCliente.update({ where: { id, tenantId }, data })
+  })
+
+  app.delete('/:id', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { id } = request.params as { id: string }
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    await db.empresaCliente.update({ where: { id, tenantId }, data: { ativa: false } })
+    return { success: true }
   })
 
   app.get('/:id/alertas', async (request) => {
