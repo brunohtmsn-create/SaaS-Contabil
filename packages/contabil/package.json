@@ -14,7 +14,7 @@
     "@saas-contabil/audit": "workspace:*",
     "@saas-contabil/storage": "workspace:*",
     "decimal.js": "^10.4.3",
-    "date-fns": "^3.6.0"
+    "date-fns": "^4.3.0"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
