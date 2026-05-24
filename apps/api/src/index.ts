@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
+import multipart from '@fastify/multipart'
 import websocket from '@fastify/websocket'
 import IORedis from 'ioredis'
 import { getPrismaClient } from '@saas-contabil/database'
@@ -67,6 +68,7 @@ await app.register(fechamentoRoutes, { prefix: '/fechamento' })
 await app.register(credencialRoutes, { prefix: '/credenciais' })
 await app.register(dashboardRoutes, { prefix: '/dashboard' })
 await app.register(relatorioRoutes, { prefix: '/relatorios' })
+await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }) // 5 MB max
 await app.register(websocket)
 await app.register(wsRoutes, { prefix: '/ws' })
 
