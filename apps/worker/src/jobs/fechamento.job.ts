@@ -85,9 +85,9 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
     ])
     await job.updateProgress(40)
 
-    const { inicio } = parsePeriodo(competencia)
+    const { inicio, fim } = parsePeriodo(competencia)
     const pendentes = await db.documentoFiscal.count({
-      where: { tenantId, empresaId, dataCompetencia: { gte: inicio }, status: 'PENDENTE_REVISAO' },
+      where: { tenantId, empresaId, dataCompetencia: { gte: inicio, lte: fim }, status: 'PENDENTE_REVISAO' },
     })
 
     if (pendentes > 0) {

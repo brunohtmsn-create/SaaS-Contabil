@@ -15,7 +15,12 @@ export async function credencialRoutes(app: FastifyInstance) {
     }
     return db.credencial.findMany({
       where: { tenantId },
-      include: { empresa: { select: { razaoSocial: true, cnpj: true } } },
+      select: {
+        id: true, tenantId: true, empresaId: true, cnpj: true, tipo: true,
+        validade: true, status: true, escopos: true, criadoPor: true,
+        ultimoUso: true, ultimoResultado: true, criadoEm: true, atualizadoEm: true,
+        empresa: { select: { razaoSocial: true, cnpj: true } },
+      },
       orderBy: { criadoEm: 'desc' },
     })
   })

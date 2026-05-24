@@ -83,6 +83,22 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
     const { empresaId, competencia } = params.parse(request.params)
 
+    // PGDAS → transmitir SOMENTE após conciliação completa do período (CLAUDE.md regra 11)
+    const { parsePeriodo: pp } = await import('@saas-contabil/shared')
+    const { inicio, fim } = pp(competencia)
+    const pendentes = await db.documentoFiscal.count({
+      where: {
+        tenantId, empresaId,
+        dataCompetencia: { gte: inicio, lte: fim },
+        status: { in: ['PENDENTE_REVISAO', 'NORMALIZADO', 'CAPTURADO', 'EM_CONCILIACAO'] },
+      },
+    })
+    if (pendentes > 0) {
+      return reply.code(422).send({
+        error: `Existem ${pendentes} documentos não conciliados — conclua a conciliação antes de transmitir o PGDAS`,
+      })
+    }
+
     const apuracao = await db.apuracaoFiscal.findFirst({
       where: { tenantId, empresaId, competencia, tipo: 'PGDAS' },
     })

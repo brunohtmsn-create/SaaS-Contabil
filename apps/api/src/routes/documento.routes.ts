@@ -9,7 +9,23 @@ import IORedis from 'ioredis'
 import { XMLParser } from 'fast-xml-parser'
 import { Decimal } from 'decimal.js'
 
-const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' })
+// processEntities: false previne ataques XML bomb (billion-laughs)
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  processEntities: false,
+  stopNodes: ['*.xmlContent'],
+})
+
+// Sanitiza chaves S3 geradas a partir de conteúdo externo (chaveAcesso vem do XML)
+// Remove qualquer sequência que atravesse diretórios ou insira caracteres inválidos.
+function sanitizeS3Segment(value: string): string {
+  return value
+    .replace(/\.\.\//g, '')   // path traversal
+    .replace(/\.\//g, '')
+    .replace(/[^A-Za-z0-9_\-]/g, '') // só alfanumérico, hífen, underscore
+    .slice(0, 100)                    // limita tamanho
+}
 
 function parseNFeXML(xml: string, cnpjEmpresa: string) {
   const parsed = xmlParser.parse(xml)
@@ -28,7 +44,9 @@ function parseNFeXML(xml: string, cnpjEmpresa: string) {
   const cnpjEmp = limparCNPJ(cnpjEmpresa)
 
   const tipo = ide?.mod === 65 ? 'NFCE' : 'NFE'
-  const chaveAcesso = nfeProc.protNFe?.infProt?.chNFe ?? nfe['@_Id']?.replace('NFe', '')
+  // sanitize: chaveAcesso vem do XML do usuário e será usada em chave S3
+  const chaveAcessoRaw = nfeProc.protNFe?.infProt?.chNFe ?? nfe['@_Id']?.replace('NFe', '')
+  const chaveAcesso = chaveAcessoRaw ? sanitizeS3Segment(String(chaveAcessoRaw)) : undefined
 
   return {
     tipo,
@@ -65,6 +83,11 @@ function parseNFSeXML(xml: string) {
   const prest = comp.PrestadorServico ?? comp.Prestador ?? {}
   const tom = comp.TomadorServico ?? comp.Tomador ?? {}
 
+  // Corrige precedência: `?? (x === '1' ? a : b)` em vez de `?? x === '1' ? a : b`
+  const issRetidoStr = serv?.Valores?.ValorIssRetido
+    ?? (serv?.Valores?.IssRetido === '1' ? serv?.Valores?.ValorIss : '0')
+    ?? '0'
+
   return {
     tipo: 'NFSE_EMITIDA' as const,
     numero: String(comp.Numero ?? comp.NumeroNfse ?? ''),
@@ -76,7 +99,7 @@ function parseNFSeXML(xml: string) {
     valorTotal: new Decimal(String(serv?.Valores?.ValorServicos ?? comp.ValorServicos ?? '0')),
     valorServicos: new Decimal(String(serv?.Valores?.ValorServicos ?? '0')),
     valorIss: new Decimal(String(serv?.Valores?.ValorIss ?? '0')),
-    valorIssRetido: new Decimal(String(serv?.Valores?.ValorIssRetido ?? serv?.Valores?.IssRetido === '1' ? serv?.Valores?.ValorIss : '0')),
+    valorIssRetido: new Decimal(String(issRetidoStr)),
     valorIrrf: new Decimal(String(serv?.Valores?.ValorIr ?? '0')),
     valorInss: new Decimal(String(serv?.Valores?.ValorInss ?? '0')),
     aliquotaIss: serv?.Valores?.Aliquota ? new Decimal(String(serv.Valores.Aliquota)) : undefined,
@@ -120,6 +143,12 @@ export async function documentoRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Campos obrigatórios: empresaId (campo) e xml (arquivo)' })
     }
 
+    // Valida empresaId como UUID para evitar injeção
+    const uuidSchema = z.string().uuid()
+    if (!uuidSchema.safeParse(empresaId).success) {
+      return reply.code(400).send({ error: 'empresaId inválido' })
+    }
+
     const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
     if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
 
@@ -151,16 +180,19 @@ export async function documentoRoutes(app: FastifyInstance) {
         }
       } else {
         const raw = docRaw as ReturnType<typeof parseNFSeXML>
-        xmlS3Key = S3KeyBuilder.xmlNFSe(empresa.cnpj, competencia, raw.numero, raw.municipioIBGE ?? '0000000')
+        const ibge = sanitizeS3Segment(raw.municipioIBGE ?? '0000000')
+        xmlS3Key = S3KeyBuilder.xmlNFSe(empresa.cnpj, competencia, raw.numero, ibge || '0000000')
       }
 
       if (xmlS3Key) {
         await storage.upload(xmlS3Key, xmlBuffer, 'application/xml', {
-          tenantId, empresaId, fonte: 'UPLOAD_MANUAL', usuario: usuarioId,
+          tenantId, empresaId, fonte: 'UPLOAD_MANUAL', usuario: String(usuarioId ?? ''),
         })
       }
-    } catch {
-      // S3 offline em dev não deve bloquear o import
+    } catch (err) {
+      // S3 offline em dev não deve bloquear o import; loga para diagnóstico
+      app.log.warn({ err, xmlS3Key }, 'Upload S3 falhou — documento salvo sem xmlS3Key')
+      xmlS3Key = undefined
     }
 
     const docNormalizado = await normalizer.normalizar(
@@ -222,17 +254,20 @@ export async function documentoRoutes(app: FastifyInstance) {
     if (tipo) where.tipo = tipo
     if (status) where.status = status
 
+    const safePage = Math.max(1, Number(page) || 1)
+    const safeLimit = Math.min(200, Math.max(1, Number(limit) || 50))
+
     const [docs, total] = await Promise.all([
       db.documentoFiscal.findMany({
         where,
         orderBy: { dataEmissao: 'desc' },
-        take: Number(limit),
-        skip: (Number(page) - 1) * Number(limit),
+        take: safeLimit,
+        skip: (safePage - 1) * safeLimit,
       }),
       db.documentoFiscal.count({ where }),
     ])
 
-    return { data: docs, total, page: Number(page), limit: Number(limit) }
+    return { data: docs, total, page: safePage, limit: safeLimit }
   })
 
   // -------------------------------------------------------------------------
@@ -248,24 +283,23 @@ export async function documentoRoutes(app: FastifyInstance) {
 
   // -------------------------------------------------------------------------
   // PATCH /documentos/:id/status — aprovar ou rejeitar (conciliação manual)
+  // Usa DIVERGENTE para rejeição (valor válido no enum StatusDocumento do Prisma)
   // -------------------------------------------------------------------------
   app.patch('/:id/status', async (request, reply) => {
     const { tenantId } = request.user as any
     const { id } = request.params as { id: string }
-    const { status, motivo } = z.object({
-      status: z.enum(['CONCILIADO', 'REJEITADO', 'PENDENTE']),
-      motivo: z.string().optional(),
+    const { status } = z.object({
+      // REJEITADO → DIVERGENTE (enum real do Prisma); PENDENTE → PENDENTE_REVISAO
+      status: z.enum(['CONCILIADO', 'DIVERGENTE', 'PENDENTE_REVISAO']),
     }).parse(request.body)
 
     const doc = await db.documentoFiscal.findFirst({ where: { id, tenantId } })
     if (!doc) return reply.code(404).send({ error: 'Documento não encontrado' })
 
+    // tenantId no where da atualização garante isolamento multi-tenant
     const updated = await db.documentoFiscal.update({
-      where: { id },
-      data: {
-        status: status as any,
-        observacoes: motivo ?? null,
-      },
+      where: { id, tenantId },
+      data: { status: status as any },
     })
 
     return updated

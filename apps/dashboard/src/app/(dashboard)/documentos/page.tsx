@@ -25,7 +25,7 @@ const STATUS_COR: Record<string, string> = {
   PENDENTE_REVISAO: 'bg-yellow-100 text-yellow-700',
   NORMALIZADO: 'bg-slate-100 text-slate-600',
   PENDENTE: 'bg-slate-100 text-slate-600',
-  REJEITADO: 'bg-red-100 text-red-700',
+  DIVERGENTE: 'bg-red-100 text-red-700',
   CANCELADO: 'bg-gray-100 text-gray-500',
 }
 
@@ -260,7 +260,7 @@ export default function DocumentosPage() {
             <option value="CONCILIADO">Conciliado</option>
             <option value="NORMALIZADO">Normalizado</option>
             <option value="PENDENTE_REVISAO">Pendente revisão</option>
-            <option value="REJEITADO">Rejeitado</option>
+            <option value="DIVERGENTE">Divergente</option>
           </select>
         </div>
 
@@ -314,7 +314,7 @@ export default function DocumentosPage() {
                           Aprovar
                         </button>
                         <button
-                          onClick={() => atualizarStatus.mutate({ id: doc.id, status: 'REJEITADO' })}
+                          onClick={() => atualizarStatus.mutate({ id: doc.id, status: 'DIVERGENTE' })}
                           className="text-xs bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded"
                         >
                           Rejeitar

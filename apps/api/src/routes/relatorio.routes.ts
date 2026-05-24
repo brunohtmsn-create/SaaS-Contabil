@@ -47,6 +47,7 @@ export async function relatorioRoutes(app: FastifyInstance) {
   app.get('/historico', async (request) => {
     const { tenantId } = request.user as any
     const { limit = '12' } = request.query as { limit?: string }
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 12))
 
     const alertas = await db.alerta.findMany({
       where: {
@@ -55,7 +56,7 @@ export async function relatorioRoutes(app: FastifyInstance) {
         dados: { path: ['tipo'], equals: 'RELATORIO_CONSOLIDADO' },
       },
       orderBy: { criadoEm: 'desc' },
-      take: Number(limit),
+      take: safeLimit,
     })
 
     return alertas.map((a) => {
