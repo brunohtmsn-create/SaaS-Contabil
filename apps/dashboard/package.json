@@ -19,7 +19,7 @@
     "axios": "^1.7.2",
     "decimal.js": "^10.4.3",
     "date-fns": "^3.6.0",
-    "lucide-react": "^0.408.0",
+    "lucide-react": "^0.577.0",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.4.0"
   },
