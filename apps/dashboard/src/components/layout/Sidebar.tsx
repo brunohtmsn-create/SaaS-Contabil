@@ -16,6 +16,7 @@ const navItems = [
   { href: '/auditoria', label: 'Auditoria', icon: '🔍' },
   { href: '/relatorios', label: 'Relatórios', icon: '📊' },
   { href: '/credenciais', label: 'Credenciais', icon: '🔐' },
+  { href: '/configuracoes', label: 'Configurações', icon: '⚙️' },
 ]
 
 export function Sidebar() {

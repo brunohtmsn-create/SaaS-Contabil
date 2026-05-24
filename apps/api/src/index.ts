@@ -18,6 +18,7 @@ import { credencialRoutes } from './routes/credencial.routes.js'
 import { dashboardRoutes } from './routes/dashboard.routes.js'
 import { relatorioRoutes } from './routes/relatorio.routes.js'
 import { wsRoutes } from './routes/ws.routes.js'
+import { configuracoesRoutes } from './routes/configuracoes.routes.js'
 
 // Recusa iniciar sem segredos obrigatórios em produção
 if (process.env['NODE_ENV'] === 'production') {
@@ -87,6 +88,7 @@ await app.register(fechamentoRoutes, { prefix: '/fechamento' })
 await app.register(credencialRoutes, { prefix: '/credenciais' })
 await app.register(dashboardRoutes, { prefix: '/dashboard' })
 await app.register(relatorioRoutes, { prefix: '/relatorios' })
+await app.register(configuracoesRoutes, { prefix: '/configuracoes' })
 await app.register(wsRoutes, { prefix: '/ws' })
 
 app.get('/health', async (_request, reply) => {
