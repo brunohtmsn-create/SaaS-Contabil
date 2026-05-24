@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { formatBRL } from '@saas-contabil/shared'
 
 type Apuracao = {
   id: string
@@ -15,119 +14,165 @@ type Apuracao = {
   empresa?: { cnpj: string; razaoSocial: string }
 }
 
+type HistoricoItem = {
+  id: string
+  competencia: string
+  empresasCount: number
+  geradoEm: string
+  lido: boolean
+}
+
+const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+
 export default function RelatoriosPage() {
+  const qc = useQueryClient()
   const [competencia, setCompetencia] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
+  const [baixando, setBaixando] = useState(false)
 
   const { data: apuracoes = [], isLoading } = useQuery<Apuracao[]>({
     queryKey: ['apuracoes-consolidadas', competencia],
     queryFn: () => api.get(`/fiscal/apuracoes?competencia=${competencia}`).then((r) => r.data),
   })
 
+  const { data: historico = [] } = useQuery<HistoricoItem[]>({
+    queryKey: ['relatorios-historico'],
+    queryFn: () => api.get('/relatorios/historico?limit=12').then((r) => r.data),
+  })
+
   const gerarRelatorio = useMutation({
     mutationFn: () => api.post(`/relatorios/consolidado/${competencia}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['relatorios-historico'] }),
   })
+
+  async function baixarCSV() {
+    setBaixando(true)
+    try {
+      const { data } = await api.get(`/relatorios/consolidado/${competencia}`)
+      window.open(data.url, '_blank')
+    } catch {
+      alert('Relatório ainda não gerado. Clique em "Gerar CSV" primeiro.')
+    } finally {
+      setBaixando(false)
+    }
+  }
 
   const pgdasApuracoes = apuracoes.filter((a) => a.tipo === 'PGDAS')
   const totalDAS = pgdasApuracoes.reduce((acc, a) => {
-    const dados = a.dados as any
-    return acc + Number(dados?.valorDAS ?? 0)
+    const d = a.dados as any
+    return acc + Number(d?.valorDAS ?? d?.valorDas ?? 0)
   }, 0)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
-          <p className="text-gray-500 text-sm mt-1">Consolidado mensal de apurações</p>
+          <h1 className="text-2xl font-bold text-slate-900">Relatórios</h1>
+          <p className="text-slate-500 text-sm mt-1">Consolidado mensal de apurações</p>
         </div>
         <div className="flex items-center gap-3">
           <input
             type="month"
             value={competencia}
             onChange={(e) => setCompetencia(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
           />
+          <button
+            onClick={baixarCSV}
+            disabled={baixando}
+            className="border border-slate-300 hover:border-slate-400 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          >
+            {baixando ? 'Abrindo...' : 'Baixar CSV'}
+          </button>
           <button
             onClick={() => gerarRelatorio.mutate()}
             disabled={gerarRelatorio.isPending}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {gerarRelatorio.isPending ? 'Gerando...' : 'Exportar CSV'}
+            {gerarRelatorio.isPending ? 'Gerando...' : 'Gerar CSV'}
           </button>
         </div>
       </div>
 
+      {gerarRelatorio.isSuccess && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+          Relatório enfileirado com sucesso. Clique em "Baixar CSV" em alguns instantes.
+        </div>
+      )}
+
       {/* KPIs do mês */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-gray-500">Empresas apuradas</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{pgdasApuracoes.length}</p>
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Empresas com PGDAS</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{pgdasApuracoes.length}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-gray-500">Total DAS — {competencia}</p>
-          <p className="text-3xl font-bold text-blue-600 mt-1">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalDAS)}
-          </p>
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Total DAS — {competencia}</p>
+          <p className="text-3xl font-bold text-blue-600 mt-1">{fmt.format(totalDAS)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-sm text-gray-500">Apurações totais</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{apuracoes.length}</p>
-          <p className="text-xs text-gray-400 mt-1">PGDAS + DIFAL + EFD-Reinf</p>
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Apurações no período</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{apuracoes.length}</p>
+          <p className="text-xs text-slate-400 mt-1">PGDAS + DIFAL + EFD-Reinf + outros</p>
         </div>
       </div>
 
-      {/* Tabela */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">PGDAS — {competencia}</h2>
+      {/* Tabela PGDAS */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-100">
+          <h2 className="font-semibold text-slate-900">PGDAS — {competencia}</h2>
         </div>
 
         {isLoading ? (
-          <div className="p-8 text-center text-gray-400">Carregando...</div>
+          <div className="p-8 text-center text-slate-400">Carregando...</div>
         ) : pgdasApuracoes.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">
-            Nenhuma apuração encontrada para {competencia}
+          <div className="p-8 text-center text-slate-400">
+            Nenhuma apuração PGDAS encontrada para {competencia}
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
               <tr>
-                <th className="px-4 py-3 text-left">Empresa</th>
-                <th className="px-4 py-3 text-right">Receita Bruta</th>
+                <th className="px-4 py-3 text-left">Empresa / CNPJ</th>
+                <th className="px-4 py-3 text-right">RB Mensal</th>
                 <th className="px-4 py-3 text-right">RB 12 Meses</th>
-                <th className="px-4 py-3 text-right">Alíquota Efetiva</th>
+                <th className="px-4 py-3 text-right">Alíquota</th>
                 <th className="px-4 py-3 text-right">Valor DAS</th>
                 <th className="px-4 py-3 text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100">
               {pgdasApuracoes.map((ap) => {
                 const d = ap.dados as any
                 return (
-                  <tr key={ap.id} className="hover:bg-gray-50">
+                  <tr key={ap.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{d?.cnpj ?? '—'}</p>
+                      <p className="font-medium text-slate-900 font-mono text-xs">
+                        {ap.empresa?.cnpj ?? d?.cnpj ?? '—'}
+                      </p>
+                      {ap.empresa?.razaoSocial && (
+                        <p className="text-xs text-slate-400">{ap.empresa.razaoSocial}</p>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-700">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(d?.receitaBrutaTotal ?? 0))}
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {fmt.format(Number(d?.receitaBrutaTotal ?? 0))}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-700">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(d?.receitaBruta12Meses ?? 0))}
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {fmt.format(Number(d?.receitaBruta12Meses ?? 0))}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-700">
+                    <td className="px-4 py-3 text-right text-slate-700">
                       {Number(d?.aliquotaEfetiva ?? 0).toFixed(2)}%
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-blue-600">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(d?.valorDAS ?? 0))}
+                      {fmt.format(Number(d?.valorDAS ?? d?.valorDas ?? 0))}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
                         ap.status === 'TRANSMITIDO' ? 'bg-green-100 text-green-700' :
                         ap.status === 'CALCULADO' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-600'
+                        'bg-slate-100 text-slate-600'
                       }`}>
                         {ap.status}
                       </span>
@@ -136,19 +181,69 @@ export default function RelatoriosPage() {
                 )
               })}
             </tbody>
-            <tfoot className="bg-gray-50 font-semibold">
+            <tfoot className="bg-slate-50 font-semibold border-t border-slate-200">
               <tr>
-                <td className="px-4 py-3 text-gray-700">Total</td>
+                <td className="px-4 py-3 text-slate-700">Total</td>
                 <td colSpan={3} />
-                <td className="px-4 py-3 text-right text-blue-700">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalDAS)}
-                </td>
+                <td className="px-4 py-3 text-right text-blue-700">{fmt.format(totalDAS)}</td>
                 <td />
               </tr>
             </tfoot>
           </table>
         )}
       </div>
+
+      {/* Histórico de relatórios gerados */}
+      {historico.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-100">
+            <h2 className="font-semibold text-slate-900">Histórico de relatórios gerados</h2>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Competência</th>
+                <th className="px-4 py-3 text-right">Empresas</th>
+                <th className="px-4 py-3 text-left">Gerado em</th>
+                <th className="px-4 py-3 text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {historico.map((h) => (
+                <tr key={h.id} className={`hover:bg-slate-50 ${!h.lido ? 'bg-blue-50/30' : ''}`}>
+                  <td className="px-4 py-3 font-medium text-slate-900">
+                    {h.competencia}
+                    {!h.lido && (
+                      <span className="ml-2 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full">novo</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">{h.empresasCount}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">
+                    {h.geradoEm ? new Date(h.geradoEm).toLocaleString('pt-BR') : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { data } = await api.get(`/relatorios/consolidado/${h.competencia}`)
+                          window.open(data.url, '_blank')
+                          await api.patch(`/relatorios/historico/${h.id}/lido`)
+                          qc.invalidateQueries({ queryKey: ['relatorios-historico'] })
+                        } catch {
+                          alert('Não foi possível obter o download.')
+                        }
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Baixar CSV
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
