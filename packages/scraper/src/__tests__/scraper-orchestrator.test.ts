@@ -73,6 +73,24 @@ vi.mock('@saas-contabil/shared', () => ({
     fim: new Date('2025-01-31'),
     competencia: comp,
   })),
+  formatDate: vi.fn((d: Date) => d.toISOString().slice(0, 10)),
+  nowBR: vi.fn(() => new Date()),
+}))
+
+// Impede que adapters não mockados puxem @saas-contabil/storage
+// → @saas-contabil/database → @prisma/client (não gerado no CI)
+vi.mock('@saas-contabil/storage', () => ({
+  StorageService: vi.fn().mockImplementation(() => ({
+    upload: vi.fn().mockResolvedValue(undefined),
+    download: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+    exists: vi.fn().mockResolvedValue(false),
+    delete: vi.fn().mockResolvedValue(undefined),
+  })),
+  S3KeyBuilder: {
+    erroScreenshot: vi.fn((_cnpj: string, _ctx: string) => 'mock/error-screenshot.png'),
+    nfseXml: vi.fn(() => 'mock/nfse.xml'),
+    nfsePdf: vi.fn(() => 'mock/nfse.pdf'),
+  },
 }))
 
 import { ScraperOrchestrator } from '../scraper-orchestrator.js'
