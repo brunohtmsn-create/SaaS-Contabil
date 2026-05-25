@@ -296,11 +296,11 @@ describe('ScraperOrchestrator — healthCheckPrefeituras()', () => {
     expect(result.get('3304557')).toBe(true)
   })
 
-  it('retorna mapa com 3 entradas (uma por prefeitura registrada)', async () => {
+  it('retorna mapa com uma entrada por prefeitura registrada', async () => {
     const orch = new ScraperOrchestrator()
     const result = await orch.healthCheckPrefeituras()
 
-    expect(result.size).toBe(3)
+    expect(result.size).toBe(31)
   })
 
   it('adapter retorna false → mapa preserva false', async () => {
