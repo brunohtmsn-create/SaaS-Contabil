@@ -124,7 +124,9 @@ export default function EmpresasPage() {
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
           >
             {REGIMES.map((r) => (
-              <option key={r} value={r}>{r === 'TODOS' ? 'Todos os regimes' : REGIME_LABEL[r]}</option>
+              <option key={r} value={r}>
+                {r === 'TODOS' ? 'Todos os regimes' : REGIME_LABEL[r]}
+              </option>
             ))}
           </select>
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
@@ -137,7 +139,9 @@ export default function EmpresasPage() {
             Apenas ativas
           </label>
           {filtradas.length !== empresas.length && (
-            <span className="text-xs text-slate-400">{filtradas.length} de {empresas.length}</span>
+            <span className="text-xs text-slate-400">
+              {filtradas.length} de {empresas.length}
+            </span>
           )}
         </div>
 
@@ -153,12 +157,24 @@ export default function EmpresasPage() {
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">CNPJ</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Razão Social</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Regime</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">UF / Município</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ações</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  CNPJ
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Razão Social
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Regime
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  UF / Município
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -172,7 +188,9 @@ export default function EmpresasPage() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${REGIME_COR[empresa.regime] ?? 'bg-slate-100 text-slate-600'}`}>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${REGIME_COR[empresa.regime] ?? 'bg-slate-100 text-slate-600'}`}
+                    >
                       {REGIME_LABEL[empresa.regime] ?? empresa.regime}
                     </span>
                   </td>
@@ -182,7 +200,9 @@ export default function EmpresasPage() {
                     {empresa.municipio}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${empresa.ativa ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${empresa.ativa ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}
+                    >
                       {empresa.ativa ? 'Ativa' : 'Inativa'}
                     </span>
                   </td>

@@ -17,8 +17,8 @@ export type OpenFinanceConta = {
 
 export type OpenFinanceTransacao = {
   id: string
-  data: string        // ISO date
-  valor: string       // Decimal string, negativo = débito
+  data: string // ISO date
+  valor: string // Decimal string, negativo = débito
   descricao: string
   tipo: 'CREDIT' | 'DEBIT'
   categoria?: string
@@ -53,11 +53,7 @@ const DESCRICOES_DEBITO = [
   'TRANSFERENCIA REALIZADA',
 ]
 
-function gerarTransacoesMock(
-  contaId: string,
-  inicio: Date,
-  fim: Date,
-): OpenFinanceTransacao[] {
+function gerarTransacoesMock(contaId: string, inicio: Date, fim: Date): OpenFinanceTransacao[] {
   const qtd = Math.floor(Math.random() * 6) + 5 // 5 a 10 transações
   const transacoes: OpenFinanceTransacao[] = []
   const diffMs = fim.getTime() - inicio.getTime()
@@ -100,7 +96,7 @@ export class OpenFinanceService {
     tenantId: string,
     empresaId: string,
     conta: OpenFinanceConta,
-    periodo: { inicio: Date; fim: Date },
+    periodo: { inicio: Date; fim: Date }
   ): Promise<number> {
     const empresa = await this.db.empresaCliente.findUnique({
       where: { id: empresaId },
@@ -191,9 +187,7 @@ export class OpenFinanceService {
     const contas = await this.listarContas(tenantId, empresaId)
 
     const resultados = await Promise.allSettled(
-      contas.map((conta) =>
-        this.importarExtrato(tenantId, empresaId, conta, { inicio, fim }),
-      ),
+      contas.map((conta) => this.importarExtrato(tenantId, empresaId, conta, { inicio, fim }))
     )
 
     let totalImportadas = 0
@@ -210,16 +204,13 @@ export class OpenFinanceService {
 
     console.log(
       `[OpenFinanceService] Sincronização concluída — tenant=${tenantId} empresa=${empresaId} ` +
-        `contas=${contas.length} importadas=${totalImportadas} erros=${erros}`,
+        `contas=${contas.length} importadas=${totalImportadas} erros=${erros}`
     )
   }
 
   // ─── Private helpers ───────────────────────────────────────────────────────
 
-  private async listarContas(
-    tenantId: string,
-    empresaId: string,
-  ): Promise<OpenFinanceConta[]> {
+  private async listarContas(tenantId: string, empresaId: string): Promise<OpenFinanceConta[]> {
     if (!this.apiUrl) {
       // Mock: retorna uma conta corrente genérica para desenvolvimento
       return [
@@ -233,14 +224,11 @@ export class OpenFinanceService {
       ]
     }
 
-    const response = await axios.get<{ contas: OpenFinanceConta[] }>(
-      `${this.apiUrl}/contas`,
-      {
-        params: { tenantId, empresaId },
-        headers: { Authorization: `Bearer ${process.env['OPEN_FINANCE_TOKEN'] ?? ''}` },
-        timeout: 15_000,
-      },
-    )
+    const response = await axios.get<{ contas: OpenFinanceConta[] }>(`${this.apiUrl}/contas`, {
+      params: { tenantId, empresaId },
+      headers: { Authorization: `Bearer ${process.env['OPEN_FINANCE_TOKEN'] ?? ''}` },
+      timeout: 15_000,
+    })
 
     return response.data.contas
   }
@@ -256,12 +244,12 @@ export class OpenFinanceService {
       `${this.apiUrl}/contas/${conta.id}/transacoes`,
       {
         params: {
-          dataInicio: formatDate(periodo.inicio, "yyyy-MM-dd"),
-          dataFim: formatDate(periodo.fim, "yyyy-MM-dd"),
+          dataInicio: formatDate(periodo.inicio, 'yyyy-MM-dd'),
+          dataFim: formatDate(periodo.fim, 'yyyy-MM-dd'),
         },
         headers: { Authorization: `Bearer ${process.env['OPEN_FINANCE_TOKEN'] ?? ''}` },
         timeout: 30_000,
-      },
+      }
     )
 
     return response.data.transacoes

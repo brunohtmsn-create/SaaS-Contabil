@@ -8,7 +8,8 @@ export class NFeSefazAdapter extends BasePLaywrightAdapter {
   fonte = 'SEFAZ_FEDERAL'
 
   private readonly SEFAZ_URL = 'https://www.nfe.fazenda.gov.br'
-  private readonly WS_URL = 'https://www.nfe.fazenda.gov.br/NfeDistribuicaoDFe/NfeDistribuicaoDFe.asmx'
+  private readonly WS_URL =
+    'https://www.nfe.fazenda.gov.br/NfeDistribuicaoDFe/NfeDistribuicaoDFe.asmx'
 
   async authenticate(cred: Credential): Promise<Session> {
     return {
@@ -27,7 +28,8 @@ export class NFeSefazAdapter extends BasePLaywrightAdapter {
         const response = await axios.post(this.WS_URL, envelope, {
           headers: {
             'Content-Type': 'text/xml; charset=utf-8',
-            'SOAPAction': 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse',
+            SOAPAction:
+              'http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse',
           },
           timeout: 60000,
         })

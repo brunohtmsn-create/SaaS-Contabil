@@ -26,7 +26,9 @@ export function AlertasPanel({ alertas }: { alertas: Alerta[] }) {
           alertas.slice(0, 8).map((alerta) => (
             <div key={alerta.id} className="px-6 py-4">
               <div className="flex items-start gap-3">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 mt-0.5 ${tipoColor[alerta.tipo] ?? 'bg-slate-100 text-slate-600'}`}>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 mt-0.5 ${tipoColor[alerta.tipo] ?? 'bg-slate-100 text-slate-600'}`}
+                >
                   {alerta.tipo.replace(/_/g, ' ')}
                 </span>
               </div>

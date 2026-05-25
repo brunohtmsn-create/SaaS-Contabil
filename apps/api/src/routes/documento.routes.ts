@@ -21,10 +21,10 @@ const xmlParser = new XMLParser({
 // Remove qualquer sequência que atravesse diretórios ou insira caracteres inválidos.
 function sanitizeS3Segment(value: string): string {
   return value
-    .replace(/\.\.\//g, '')   // path traversal
+    .replace(/\.\.\//g, '') // path traversal
     .replace(/\.\//g, '')
     .replace(/[^A-Za-z0-9_\-]/g, '') // só alfanumérico, hífen, underscore
-    .slice(0, 100)                    // limita tamanho
+    .slice(0, 100) // limita tamanho
 }
 
 function parseNFeXML(xml: string, cnpjEmpresa: string) {
@@ -84,18 +84,25 @@ function parseNFSeXML(xml: string) {
   const tom = comp.TomadorServico ?? comp.Tomador ?? {}
 
   // Corrige precedência: `?? (x === '1' ? a : b)` em vez de `?? x === '1' ? a : b`
-  const issRetidoStr = serv?.Valores?.ValorIssRetido
-    ?? (serv?.Valores?.IssRetido === '1' ? serv?.Valores?.ValorIss : '0')
-    ?? '0'
+  const issRetidoStr =
+    serv?.Valores?.ValorIssRetido ??
+    (serv?.Valores?.IssRetido === '1' ? serv?.Valores?.ValorIss : '0') ??
+    '0'
 
   return {
     tipo: 'NFSE_EMITIDA' as const,
     numero: String(comp.Numero ?? comp.NumeroNfse ?? ''),
     dataEmissao: new Date(String(comp.DataEmissao ?? '')),
-    cnpjEmitente: limparCNPJ(String(prest?.IdentificacaoPrestador?.CpfCnpj?.Cnpj ?? prest?.Cnpj ?? '')),
+    cnpjEmitente: limparCNPJ(
+      String(prest?.IdentificacaoPrestador?.CpfCnpj?.Cnpj ?? prest?.Cnpj ?? '')
+    ),
     nomeEmitente: String(prest?.RazaoSocial ?? ''),
-    cnpjDestinatario: limparCNPJ(String(tom?.IdentificacaoTomador?.CpfCnpj?.Cnpj ?? tom?.Cnpj ?? '')),
-    municipioIBGE: String(comp.CodigoMunicipio ?? prest?.IdentificacaoPrestador?.CpfCnpj?.CodigoMunicipio ?? ''),
+    cnpjDestinatario: limparCNPJ(
+      String(tom?.IdentificacaoTomador?.CpfCnpj?.Cnpj ?? tom?.Cnpj ?? '')
+    ),
+    municipioIBGE: String(
+      comp.CodigoMunicipio ?? prest?.IdentificacaoPrestador?.CpfCnpj?.CodigoMunicipio ?? ''
+    ),
     valorTotal: new Decimal(String(serv?.Valores?.ValorServicos ?? comp.ValorServicos ?? '0')),
     valorServicos: new Decimal(String(serv?.Valores?.ValorServicos ?? '0')),
     valorIss: new Decimal(String(serv?.Valores?.ValorIss ?? '0')),
@@ -112,7 +119,9 @@ export async function documentoRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
   const normalizer = new NormalizerService()
   const storage = new StorageService()
-  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null })
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+  })
   const scraperQueue = new Queue('scraper', { connection: redis })
 
   // -------------------------------------------------------------------------
@@ -140,7 +149,9 @@ export async function documentoRoutes(app: FastifyInstance) {
     }
 
     if (!empresaId || !xmlBuffer) {
-      return reply.code(400).send({ error: 'Campos obrigatórios: empresaId (campo) e xml (arquivo)' })
+      return reply
+        .code(400)
+        .send({ error: 'Campos obrigatórios: empresaId (campo) e xml (arquivo)' })
     }
 
     // Valida empresaId como UUID para evitar injeção
@@ -174,9 +185,10 @@ export async function documentoRoutes(app: FastifyInstance) {
       if (tipo === 'NFE' || tipo === 'NFCE') {
         const raw = docRaw as ReturnType<typeof parseNFeXML>
         if (raw.chaveAcesso) {
-          xmlS3Key = tipo === 'NFCE'
-            ? S3KeyBuilder.xmlNFCeEmitida(empresa.cnpj, competencia, raw.chaveAcesso)
-            : S3KeyBuilder.xmlNFeEmitida(empresa.cnpj, competencia, raw.chaveAcesso)
+          xmlS3Key =
+            tipo === 'NFCE'
+              ? S3KeyBuilder.xmlNFCeEmitida(empresa.cnpj, competencia, raw.chaveAcesso)
+              : S3KeyBuilder.xmlNFeEmitida(empresa.cnpj, competencia, raw.chaveAcesso)
         }
       } else {
         const raw = docRaw as ReturnType<typeof parseNFSeXML>
@@ -186,7 +198,10 @@ export async function documentoRoutes(app: FastifyInstance) {
 
       if (xmlS3Key) {
         await storage.upload(xmlS3Key, xmlBuffer, 'application/xml', {
-          tenantId, empresaId, fonte: 'UPLOAD_MANUAL', usuario: String(usuarioId ?? ''),
+          tenantId,
+          empresaId,
+          fonte: 'UPLOAD_MANUAL',
+          usuario: String(usuarioId ?? ''),
         })
       }
     } catch (err) {
@@ -202,7 +217,9 @@ export async function documentoRoutes(app: FastifyInstance) {
     )
 
     if (!docNormalizado) {
-      return reply.code(409).send({ error: 'Documento duplicado — já existe com esta chave de acesso' })
+      return reply
+        .code(409)
+        .send({ error: 'Documento duplicado — já existe com esta chave de acesso' })
     }
 
     return reply.code(201).send(docNormalizado)
@@ -213,10 +230,12 @@ export async function documentoRoutes(app: FastifyInstance) {
   // -------------------------------------------------------------------------
   app.post('/capturar/:empresaId/:competencia', async (request, reply) => {
     const { tenantId } = request.user as any
-    const { empresaId, competencia } = z.object({
-      empresaId: z.string().uuid(),
-      competencia: z.string().regex(/^\d{4}-\d{2}$/),
-    }).parse(request.params)
+    const { empresaId, competencia } = z
+      .object({
+        empresaId: z.string().uuid(),
+        competencia: z.string().regex(/^\d{4}-\d{2}$/),
+      })
+      .parse(request.params)
 
     const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
     if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
@@ -224,16 +243,21 @@ export async function documentoRoutes(app: FastifyInstance) {
     const credencial = await db.credencial.findFirst({
       where: { tenantId, empresaId, status: 'ATIVO' },
     })
-    if (!credencial) return reply.code(400).send({ error: 'Nenhuma credencial ativa para esta empresa' })
+    if (!credencial)
+      return reply.code(400).send({ error: 'Nenhuma credencial ativa para esta empresa' })
 
-    const job = await scraperQueue.add('scraper-job', {
-      tenantId,
-      empresaId,
-      cnpj: empresa.cnpj,
-      competencia,
-      credencialId: credencial.id,
-      tipo: 'TODOS',
-    }, { attempts: 3, backoff: { type: 'exponential', delay: 3000 } })
+    const job = await scraperQueue.add(
+      'scraper-job',
+      {
+        tenantId,
+        empresaId,
+        cnpj: empresa.cnpj,
+        competencia,
+        credencialId: credencial.id,
+        tipo: 'TODOS',
+      },
+      { attempts: 3, backoff: { type: 'exponential', delay: 3000 } }
+    )
 
     return { jobId: job.id, status: 'AGUARDANDO', cnpj: empresa.cnpj, competencia }
   })
@@ -288,10 +312,12 @@ export async function documentoRoutes(app: FastifyInstance) {
   app.patch('/:id/status', async (request, reply) => {
     const { tenantId } = request.user as any
     const { id } = request.params as { id: string }
-    const { status } = z.object({
-      // REJEITADO → DIVERGENTE (enum real do Prisma); PENDENTE → PENDENTE_REVISAO
-      status: z.enum(['CONCILIADO', 'DIVERGENTE', 'PENDENTE_REVISAO']),
-    }).parse(request.body)
+    const { status } = z
+      .object({
+        // REJEITADO → DIVERGENTE (enum real do Prisma); PENDENTE → PENDENTE_REVISAO
+        status: z.enum(['CONCILIADO', 'DIVERGENTE', 'PENDENTE_REVISAO']),
+      })
+      .parse(request.body)
 
     const doc = await db.documentoFiscal.findFirst({ where: { id, tenantId } })
     if (!doc) return reply.code(404).send({ error: 'Documento não encontrado' })
@@ -315,7 +341,9 @@ export async function documentoRoutes(app: FastifyInstance) {
     const { inicio, fim } = parsePeriodo(competencia)
 
     const [total, porTipo, porStatus] = await Promise.all([
-      db.documentoFiscal.count({ where: { tenantId, empresaId, dataCompetencia: { gte: inicio, lte: fim } } }),
+      db.documentoFiscal.count({
+        where: { tenantId, empresaId, dataCompetencia: { gte: inicio, lte: fim } },
+      }),
       db.documentoFiscal.groupBy({
         by: ['tipo'],
         where: { tenantId, empresaId, dataCompetencia: { gte: inicio, lte: fim } },

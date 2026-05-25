@@ -233,8 +233,13 @@ describe('CredentialService — store()', () => {
     mockDb.credencial.create.mockResolvedValueOnce({ id: 'cred-1' })
     const service = new CredentialService()
     await service.store({
-      tenantId: 't-1', empresaId: 'e-1', cnpj: '11111111000111',
-      tipo: 'CERTIFICADO_A1', rawData: Buffer.from('x'), escopos: [], criadoPor: 'u-1',
+      tenantId: 't-1',
+      empresaId: 'e-1',
+      cnpj: '11111111000111',
+      tipo: 'CERTIFICADO_A1',
+      rawData: Buffer.from('x'),
+      escopos: [],
+      criadoPor: 'u-1',
     })
     const callData = mockDb.credencial.create.mock.calls[0][0].data
     expect(callData.status).toBe('ATIVO')
@@ -248,9 +253,16 @@ describe('CredentialService — retrieve()', () => {
     const { encrypted, iv, tag } = encrypt(dadoOriginal, key)
 
     mockDb.credencial.findFirst.mockResolvedValueOnce({
-      id: 'cred-1', tenantId: 'tenant-1', cnpj: '11111111000111',
-      tipo: 'CERTIFICADO_A1', encryptedData: encrypted, iv, authTag: tag,
-      validade: null, escopos: [], status: 'ATIVO',
+      id: 'cred-1',
+      tenantId: 'tenant-1',
+      cnpj: '11111111000111',
+      tipo: 'CERTIFICADO_A1',
+      encryptedData: encrypted,
+      iv,
+      authTag: tag,
+      validade: null,
+      escopos: [],
+      status: 'ATIVO',
     })
     mockDb.credencial.update.mockResolvedValueOnce({})
 
@@ -267,7 +279,8 @@ describe('CredentialService — retrieve()', () => {
 
   it('credencial VENCIDO → lança erro', async () => {
     mockDb.credencial.findFirst.mockResolvedValueOnce({
-      id: 'cred-1', status: 'VENCIDO',
+      id: 'cred-1',
+      status: 'VENCIDO',
     })
     const service = new CredentialService()
     await expect(service.retrieve('cred-1', 'tenant-1')).rejects.toThrow('vencida')
@@ -275,7 +288,8 @@ describe('CredentialService — retrieve()', () => {
 
   it('credencial REVOGADO → lança erro', async () => {
     mockDb.credencial.findFirst.mockResolvedValueOnce({
-      id: 'cred-1', status: 'REVOGADO',
+      id: 'cred-1',
+      status: 'REVOGADO',
     })
     const service = new CredentialService()
     await expect(service.retrieve('cred-1', 'tenant-1')).rejects.toThrow('revogada')
@@ -285,9 +299,16 @@ describe('CredentialService — retrieve()', () => {
     const key = deriveKey(SERVICE_MASTER_KEY, 'tenant-1')
     const { encrypted, iv, tag } = encrypt(Buffer.from('data'), key)
     mockDb.credencial.findFirst.mockResolvedValueOnce({
-      id: 'cred-1', tenantId: 'tenant-1', cnpj: '11111111000111',
-      tipo: 'CERTIFICADO_A1', encryptedData: encrypted, iv, authTag: tag,
-      validade: null, escopos: [], status: 'ATIVO',
+      id: 'cred-1',
+      tenantId: 'tenant-1',
+      cnpj: '11111111000111',
+      tipo: 'CERTIFICADO_A1',
+      encryptedData: encrypted,
+      iv,
+      authTag: tag,
+      validade: null,
+      escopos: [],
+      status: 'ATIVO',
     })
     mockDb.credencial.update.mockResolvedValueOnce({})
     const service = new CredentialService()

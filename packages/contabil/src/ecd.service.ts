@@ -37,7 +37,9 @@ export class ECDService {
 
       for (const partida of partidas) {
         const valor = new Decimal(partida.valor).toFixed(2)
-        linhas.push(`|I250|${dataStr}|${lanc.id}|${partida.conta}|${valor}|${partida.tipo === 'DEBITO' ? 'D' : 'C'}|`)
+        linhas.push(
+          `|I250|${dataStr}|${lanc.id}|${partida.conta}|${valor}|${partida.tipo === 'DEBITO' ? 'D' : 'C'}|`
+        )
       }
     }
 
@@ -52,16 +54,34 @@ export class ECDService {
     await this.storage.upload(s3Key, Buffer.from(conteudo, 'utf8'), 'text/plain')
 
     await this.db.apuracaoFiscal.upsert({
-      where: { tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia: `${ano}`, tipo: 'ECD' } },
+      where: {
+        tenantId_empresaId_competencia_tipo: {
+          tenantId,
+          empresaId,
+          competencia: `${ano}`,
+          tipo: 'ECD',
+        },
+      },
       update: { dados: { s3Key, linhas: linhas.length } as any, status: 'CALCULADO' },
-      create: { tenantId, empresaId, competencia: `${ano}`, tipo: 'ECD', dados: { s3Key, linhas: linhas.length } as any, status: 'CALCULADO' },
+      create: {
+        tenantId,
+        empresaId,
+        competencia: `${ano}`,
+        tipo: 'ECD',
+        dados: { s3Key, linhas: linhas.length } as any,
+        status: 'CALCULADO',
+      },
     })
 
     await this.audit.registrar({
-      tenantId, cnpj: empresa.cnpj,
-      entidadeTipo: 'APURACAO_FISCAL', entidadeId: empresaId,
-      evento: 'ECD_GERADA', estadoNovo: { s3Key, ano, totalLancamentos: lancamentos.length },
-      responsavel: 'sistema', responsavelTipo: 'SISTEMA',
+      tenantId,
+      cnpj: empresa.cnpj,
+      entidadeTipo: 'APURACAO_FISCAL',
+      entidadeId: empresaId,
+      evento: 'ECD_GERADA',
+      estadoNovo: { s3Key, ano, totalLancamentos: lancamentos.length },
+      responsavel: 'sistema',
+      responsavelTipo: 'SISTEMA',
     })
 
     return {

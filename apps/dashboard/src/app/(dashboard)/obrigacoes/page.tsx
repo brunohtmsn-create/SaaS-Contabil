@@ -71,7 +71,11 @@ function statusBadge(status: StatusObrigacao) {
       return <span className={`${base} bg-yellow-100 text-yellow-700`}>Pendente</span>
     case 'PAGA':
     case 'TRANSMITIDA':
-      return <span className={`${base} bg-green-100 text-green-700`}>{status === 'PAGA' ? 'Paga' : 'Transmitida'}</span>
+      return (
+        <span className={`${base} bg-green-100 text-green-700`}>
+          {status === 'PAGA' ? 'Paga' : 'Transmitida'}
+        </span>
+      )
     case 'DISPENSADA':
       return <span className={`${base} bg-slate-100 text-slate-600`}>Dispensada</span>
     case 'ERRO':
@@ -84,8 +88,18 @@ function statusBadge(status: StatusObrigacao) {
 function formatCompetencia(value: string): string {
   const [year, month] = value.split('-')
   const months = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
   ]
   return `${months[Number(month) - 1]} ${year}`
 }
@@ -117,9 +131,7 @@ function nextMonth(ym: string): string {
 
 export default function ObrigacoesPage() {
   const queryClient = useQueryClient()
-  const [competencia, setCompetencia] = useState<string>(
-    () => new Date().toISOString().slice(0, 7)
-  )
+  const [competencia, setCompetencia] = useState<string>(() => new Date().toISOString().slice(0, 7))
   const [statusFiltro, setStatusFiltro] = useState<StatusObrigacao | 'TODAS'>('TODAS')
   const [calendarioEmpresaId, setCalendarioEmpresaId] = useState<string>('')
 
@@ -207,9 +219,7 @@ export default function ObrigacoesPage() {
         </select>
         <button
           disabled={!calendarioEmpresaId || gerarCalendario.isPending}
-          onClick={() =>
-            gerarCalendario.mutate({ empresaId: calendarioEmpresaId, ano: anoAtual })
-          }
+          onClick={() => gerarCalendario.mutate({ empresaId: calendarioEmpresaId, ano: anoAtual })}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {gerarCalendario.isPending ? (
@@ -285,14 +295,14 @@ export default function ObrigacoesPage() {
               </tr>
             ) : (
               obrigacoesOrdenadas.map((obr) => {
-                const vencida =
-                  obr.status === 'PENDENTE' &&
-                  new Date(obr.vencimento) < new Date()
+                const vencida = obr.status === 'PENDENTE' && new Date(obr.vencimento) < new Date()
 
                 return (
                   <tr key={obr.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">{obr.empresa?.razaoSocial ?? '—'}</div>
+                      <div className="font-medium text-slate-800">
+                        {obr.empresa?.razaoSocial ?? '—'}
+                      </div>
                       <div className="text-xs text-slate-400 font-mono mt-0.5">
                         {obr.empresa?.cnpj ?? ''}
                       </div>
@@ -302,12 +312,12 @@ export default function ObrigacoesPage() {
                         {obr.tipo.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className={`px-6 py-4 ${vencida ? 'text-red-600 font-semibold' : 'text-slate-700'}`}>
+                    <td
+                      className={`px-6 py-4 ${vencida ? 'text-red-600 font-semibold' : 'text-slate-700'}`}
+                    >
                       {formatDate(obr.vencimento)}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      {statusBadge(obr.status)}
-                    </td>
+                    <td className="px-6 py-4 text-center">{statusBadge(obr.status)}</td>
                     <td className="px-6 py-4 text-right font-mono text-slate-700">
                       {formatMoney(obr.valor)}
                     </td>
@@ -329,7 +339,8 @@ export default function ObrigacoesPage() {
 
         {obrigacoesOrdenadas.length > 0 && (
           <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500">
-            {obrigacoesOrdenadas.length} obrigação{obrigacoesOrdenadas.length !== 1 ? 'ões' : ''} encontrada{obrigacoesOrdenadas.length !== 1 ? 's' : ''}
+            {obrigacoesOrdenadas.length} obrigação{obrigacoesOrdenadas.length !== 1 ? 'ões' : ''}{' '}
+            encontrada{obrigacoesOrdenadas.length !== 1 ? 's' : ''}
           </div>
         )}
       </div>

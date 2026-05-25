@@ -42,17 +42,19 @@ vi.mock('../whatsapp.service.js', () => ({
   WhatsAppService: Object.assign(
     vi.fn().mockImplementation(() => mockWhatsApp),
     {
-      mensagemVencimento: vi.fn((empresa: string, obrigacao: string, vencimento: string) =>
-        `⚠️ *${obrigacao}* de ${empresa} vence em ${vencimento}.`
+      mensagemVencimento: vi.fn(
+        (empresa: string, obrigacao: string, vencimento: string) =>
+          `⚠️ *${obrigacao}* de ${empresa} vence em ${vencimento}.`
       ),
-      mensagemFechamento: vi.fn((empresa: string, competencia: string) =>
-        `✅ Fechamento de ${empresa} (${competencia}) concluído.`
+      mensagemFechamento: vi.fn(
+        (empresa: string, competencia: string) =>
+          `✅ Fechamento de ${empresa} (${competencia}) concluído.`
       ),
-      mensagemDivergencia: vi.fn((empresa: string, score: number) =>
-        `🔍 Divergência em ${empresa} (score: ${score}).`
+      mensagemDivergencia: vi.fn(
+        (empresa: string, score: number) => `🔍 Divergência em ${empresa} (score: ${score}).`
       ),
-      mensagemExclusaoSN: vi.fn((empresa: string) =>
-        `🚨 ${empresa} em risco de exclusão do Simples Nacional.`
+      mensagemExclusaoSN: vi.fn(
+        (empresa: string) => `🚨 ${empresa} em risco de exclusão do Simples Nacional.`
       ),
     }
   ),
@@ -250,7 +252,8 @@ describe('NotificationService — notificarTenant()', () => {
     mockDb.usuario.findMany.mockResolvedValueOnce([])
     const service = new NotificationService()
     await service.notificarTenant('t-1', 'FECHAMENTO_CONCLUIDO', {
-      empresa: 'Acme', competencia: '2025-01',
+      empresa: 'Acme',
+      competencia: '2025-01',
     })
     expect(mockEmail.enviarFechamentoConcluido).not.toHaveBeenCalled()
   })
@@ -262,7 +265,8 @@ describe('NotificationService — notificarTenant()', () => {
     ])
     const service = new NotificationService()
     await service.notificarTenant('t-1', 'FECHAMENTO_CONCLUIDO', {
-      empresa: 'Acme', competencia: '2025-01',
+      empresa: 'Acme',
+      competencia: '2025-01',
     })
     expect(mockEmail.enviarFechamentoConcluido).toHaveBeenCalledTimes(2)
   })
@@ -270,7 +274,9 @@ describe('NotificationService — notificarTenant()', () => {
   it('busca usuários filtrando por tenantId e ativo=true', async () => {
     const service = new NotificationService()
     await service.notificarTenant('t-abc', 'SCRAPER_ERRO', {
-      empresa: 'X', portal: 'SEFAZ', detalhe: 'Timeout',
+      empresa: 'X',
+      portal: 'SEFAZ',
+      detalhe: 'Timeout',
     })
     const callArgs = mockDb.usuario.findMany.mock.calls[0][0]
     expect(callArgs.where.tenantId).toBe('t-abc')

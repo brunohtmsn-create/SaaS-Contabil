@@ -34,10 +34,14 @@ function formatBRL(value: unknown): string {
 function statusBadge(status: string) {
   const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold'
   switch (status) {
-    case 'TRANSMITIDO': return <span className={`${base} bg-green-100 text-green-700`}>Transmitido</span>
-    case 'CALCULADO':   return <span className={`${base} bg-blue-100 text-blue-700`}>Calculado</span>
-    case 'ERRO':        return <span className={`${base} bg-red-100 text-red-700`}>Erro</span>
-    default:            return <span className={`${base} bg-slate-100 text-slate-500`}>Pendente</span>
+    case 'TRANSMITIDO':
+      return <span className={`${base} bg-green-100 text-green-700`}>Transmitido</span>
+    case 'CALCULADO':
+      return <span className={`${base} bg-blue-100 text-blue-700`}>Calculado</span>
+    case 'ERRO':
+      return <span className={`${base} bg-red-100 text-red-700`}>Erro</span>
+    default:
+      return <span className={`${base} bg-slate-100 text-slate-500`}>Pendente</span>
   }
 }
 
@@ -130,14 +134,30 @@ export default function FiscalPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Empresa</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">CNPJ</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">Fator R</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">PGDAS</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">Valor DAS</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">DIFAL</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">DeSTDA</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">Ações</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                Empresa
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                CNPJ
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                Fator R
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                PGDAS
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                Valor DAS
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                DIFAL
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                DeSTDA
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -148,7 +168,8 @@ export default function FiscalPage() {
               const dados = pgdas?.dados as any
               const fatorR = dados?.fatorR != null ? `${Number(dados.fatorR).toFixed(1)}%` : '—'
               const anexo = dados?.faixaAnexo ? `Anexo ${dados.faixaAnexo}` : null
-              const isPending = apurarPGDAS.isPending && (apurarPGDAS.variables as any)?.empresaId === emp.id
+              const isPending =
+                apurarPGDAS.isPending && (apurarPGDAS.variables as any)?.empresaId === emp.id
 
               return (
                 <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
@@ -158,9 +179,7 @@ export default function FiscalPage() {
                     {pgdas ? (
                       <div>
                         <span className="font-mono text-sm">{fatorR}</span>
-                        {anexo && (
-                          <span className="ml-1 text-xs text-slate-400">({anexo})</span>
-                        )}
+                        {anexo && <span className="ml-1 text-xs text-slate-400">({anexo})</span>}
                       </div>
                     ) : (
                       <span className="text-slate-300">—</span>
@@ -170,13 +189,21 @@ export default function FiscalPage() {
                     {pgdas ? statusBadge(pgdas.status) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-6 py-4 text-right font-mono">
-                    {dados?.valorDAS ? formatBRL(dados.valorDAS) : <span className="text-slate-300">—</span>}
+                    {dados?.valorDAS ? (
+                      formatBRL(dados.valorDAS)
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {difal ? statusBadge(difal.status) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    {destda ? statusBadge(destda.status) : <span className="text-slate-300">—</span>}
+                    {destda ? (
+                      statusBadge(destda.status)
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
@@ -186,7 +213,11 @@ export default function FiscalPage() {
                           disabled={isPending}
                           className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
                         >
-                          {isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                          {isPending ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Play className="w-3 h-3" />
+                          )}
                           Apurar
                         </button>
                       )}

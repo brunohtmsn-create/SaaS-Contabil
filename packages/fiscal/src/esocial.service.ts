@@ -51,7 +51,7 @@ async function buscarEmpregados(
   tenantId: string,
   empresaId: string,
   inicio: Date,
-  fim: Date,
+  fim: Date
 ): Promise<EmpregadoSimulado[]> {
   // Busca transações bancárias do tipo folha de pagamento (DEBITO com "FOLHA" ou "SALARIO" na descrição)
   const transacoes = await db.transacaoBancaria.findMany({
@@ -79,7 +79,7 @@ function gerarXmlS1200(
   cnpj: string,
   competencia: string,
   empregados: EmpregadoSimulado[],
-  geradoEm: string,
+  geradoEm: string
 ): string {
   const eventos = empregados
     .map((emp, idx) => {
@@ -171,11 +171,7 @@ ${eventos}
 </eSocial>`
 }
 
-function gerarXmlS1210(
-  cnpj: string,
-  competencia: string,
-  empregados: EmpregadoSimulado[],
-): string {
+function gerarXmlS1210(cnpj: string, competencia: string, empregados: EmpregadoSimulado[]): string {
   const eventos = empregados
     .map((emp, idx) => {
       const vrSalario = emp.salario.toFixed(2)
@@ -240,7 +236,7 @@ function gerarXmlS1299(
   competencia: string,
   empregados: EmpregadoSimulado[],
   totalInss: Decimal,
-  totalFgts: Decimal,
+  totalFgts: Decimal
 ): string {
   const qtdTrab = empregados.length
   const totalSalarios = empregados
@@ -361,11 +357,11 @@ export class ESocialService {
 
     const totalInss = empregados.reduce(
       (acc, e) => acc.plus(calcularInss(e.salario)),
-      new Decimal(0),
+      new Decimal(0)
     )
     const totalFgts = empregados.reduce(
       (acc, e) => acc.plus(e.salario.times(new Decimal('0.08'))),
-      new Decimal(0),
+      new Decimal(0)
     )
 
     const xml = gerarXmlS1299(empresa.cnpj, competencia, empregados, totalInss, totalFgts)
@@ -424,7 +420,7 @@ export class ESocialService {
   async processar(
     tenantId: string,
     empresaId: string,
-    competencia: string,
+    competencia: string
   ): Promise<{ s1200: string; s1210: string; s1299: string }> {
     const s1200 = await this.gerarS1200(tenantId, empresaId, competencia)
     const s1210 = await this.gerarS1210(tenantId, empresaId, competencia)

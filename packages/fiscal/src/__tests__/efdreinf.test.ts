@@ -237,9 +237,7 @@ describe('DeSTDAService — gerar()', () => {
   it('empresa não encontrada → lança erro', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
     const service = new DeSTDAService()
-    await expect(service.gerar('t-1', 'emp-x', '2025-01')).rejects.toThrow(
-      'Empresa não encontrada'
-    )
+    await expect(service.gerar('t-1', 'emp-x', '2025-01')).rejects.toThrow('Empresa não encontrada')
   })
 
   it('arquivo gerado contém linha 0000 com CNPJ da empresa', async () => {
@@ -294,9 +292,7 @@ describe('GNREService — gerar()', () => {
   it('empresa não encontrada → lança erro', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
     const service = new GNREService()
-    await expect(service.gerar('t-1', 'emp-x', '2025-01')).rejects.toThrow(
-      'Empresa não encontrada'
-    )
+    await expect(service.gerar('t-1', 'emp-x', '2025-01')).rejects.toThrow('Empresa não encontrada')
   })
 
   it('sem documentos com DIFAL → retorna array vazio e não faz upsert', async () => {

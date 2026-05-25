@@ -19,7 +19,10 @@ export class DepreciacaoService {
       const valorResidual = new Decimal(bem.valorResidual.toString())
       const vidaUtilMeses = bem.vidaUtil * 12
 
-      const depreciacaoMensal = valorAquisicao.minus(valorResidual).div(vidaUtilMeses).toDecimalPlaces(2)
+      const depreciacaoMensal = valorAquisicao
+        .minus(valorResidual)
+        .div(vidaUtilMeses)
+        .toDecimalPlaces(2)
 
       if (depreciacaoMensal.lte(0)) continue
 
@@ -31,8 +34,18 @@ export class DepreciacaoService {
           data: nowBR(),
           historico: `Depreciação — ${bem.descricao}`,
           partidas: [
-            { conta: '6.1.5.01', descricao: 'Depreciação do período', valor: depreciacaoMensal.toString(), tipo: 'DEBITO' },
-            { conta: '1.2.1.02', descricao: 'Depreciação acumulada', valor: depreciacaoMensal.toString(), tipo: 'CREDITO' },
+            {
+              conta: '6.1.5.01',
+              descricao: 'Depreciação do período',
+              valor: depreciacaoMensal.toString(),
+              tipo: 'DEBITO',
+            },
+            {
+              conta: '1.2.1.02',
+              descricao: 'Depreciação acumulada',
+              valor: depreciacaoMensal.toString(),
+              tipo: 'CREDITO',
+            },
           ] as any,
         },
       })

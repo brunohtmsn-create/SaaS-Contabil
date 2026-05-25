@@ -1,6 +1,12 @@
 import { getPrismaClient } from '@saas-contabil/database'
 import { AuditService } from '@saas-contabil/audit'
-import { Decimal, parsePeriodo, TABELA_SIMPLES_NACIONAL, LIMITES_SIMPLES_NACIONAL, competencias12Meses } from '@saas-contabil/shared'
+import {
+  Decimal,
+  parsePeriodo,
+  TABELA_SIMPLES_NACIONAL,
+  LIMITES_SIMPLES_NACIONAL,
+  competencias12Meses,
+} from '@saas-contabil/shared'
 import type { ReceitaSegregada, ResultadoPGDAS } from './types.js'
 import { FatorRService } from './fator-r.service.js'
 
@@ -125,7 +131,11 @@ export class PGDASService {
     }
   }
 
-  private async calcularRB12Meses(tenantId: string, empresaId: string, competencia: string): Promise<Decimal> {
+  private async calcularRB12Meses(
+    tenantId: string,
+    empresaId: string,
+    competencia: string
+  ): Promise<Decimal> {
     const competencias = competencias12Meses(competencia)
     const primeiro = competencias[0]
     const { inicio } = parsePeriodo(primeiro ?? competencia)
@@ -160,13 +170,20 @@ export class PGDASService {
     return tabela.find((f) => rb12.gte(f.limiteInferior) && rb12.lte(f.limiteSuperior))
   }
 
-  private async verificarSublimites(tenantId: string, empresaId: string, cnpj: string, rb12: Decimal): Promise<void> {
+  private async verificarSublimites(
+    tenantId: string,
+    empresaId: string,
+    cnpj: string,
+    rb12: Decimal
+  ): Promise<void> {
     if (rb12.gte(LIMITES_SIMPLES_NACIONAL.alertaPreventivo)) {
       await this.db.alerta.create({
         data: {
           tenantId,
           empresaId,
-          tipo: rb12.gte(LIMITES_SIMPLES_NACIONAL.limiteExclusao) ? 'RISCO_EXCLUSAO_SN' : 'SUBLIMITE_ESTADUAL',
+          tipo: rb12.gte(LIMITES_SIMPLES_NACIONAL.limiteExclusao)
+            ? 'RISCO_EXCLUSAO_SN'
+            : 'SUBLIMITE_ESTADUAL',
           mensagem: `Receita bruta 12 meses: R$ ${rb12.toFixed(2)} — ${rb12.gte(LIMITES_SIMPLES_NACIONAL.limiteExclusao) ? 'RISCO DE EXCLUSÃO DO SIMPLES' : 'Atenção ao sublimite estadual'}`,
           dados: { rb12: rb12.toFixed(2), cnpj },
         },

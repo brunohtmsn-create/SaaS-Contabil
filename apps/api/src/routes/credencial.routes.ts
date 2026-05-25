@@ -4,16 +4,32 @@ import { CredentialService } from '@saas-contabil/credentials'
 import { getPrismaClient } from '@saas-contabil/database'
 
 const SAFE_SELECT = {
-  id: true, tenantId: true, empresaId: true, cnpj: true, tipo: true,
-  validade: true, status: true, escopos: true, criadoPor: true,
-  ultimoUso: true, ultimoResultado: true, criadoEm: true, atualizadoEm: true,
+  id: true,
+  tenantId: true,
+  empresaId: true,
+  cnpj: true,
+  tipo: true,
+  validade: true,
+  status: true,
+  escopos: true,
+  criadoPor: true,
+  ultimoUso: true,
+  ultimoResultado: true,
+  criadoEm: true,
+  atualizadoEm: true,
   empresa: { select: { razaoSocial: true, cnpj: true } },
 } as const
 
 const storeBodySchema = z.object({
   empresaId: z.string().uuid(),
   cnpj: z.string().length(14),
-  tipo: z.enum(['CERTIFICADO_A1', 'CERTIFICADO_A3', 'PROCURACAO_ECAC', 'SENHA_PREFEITURA', 'SENHA_SIMPLES']),
+  tipo: z.enum([
+    'CERTIFICADO_A1',
+    'CERTIFICADO_A3',
+    'PROCURACAO_ECAC',
+    'SENHA_PREFEITURA',
+    'SENHA_SIMPLES',
+  ]),
   validade: z.string().optional(),
   escopos: z.array(z.string()).default([]),
   senha: z.string().optional(),
@@ -65,7 +81,9 @@ export async function credencialRoutes(app: FastifyInstance) {
       const { empresaId, cnpj, tipo, validade, escopos } = parsed.data
 
       const cred = await credService.store({
-        tenantId, empresaId, cnpj,
+        tenantId,
+        empresaId,
+        cnpj,
         tipo: tipo as any,
         rawData: fileBuffer,
         validade: validade ? new Date(validade) : undefined,
@@ -82,10 +100,13 @@ export async function credencialRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.message })
     const { empresaId, cnpj, tipo, validade, escopos, senha } = parsed.data
 
-    if (!senha) return reply.code(400).send({ error: 'Campo senha obrigatório para este tipo de credencial' })
+    if (!senha)
+      return reply.code(400).send({ error: 'Campo senha obrigatório para este tipo de credencial' })
 
     const cred = await credService.store({
-      tenantId, empresaId, cnpj,
+      tenantId,
+      empresaId,
+      cnpj,
       tipo: tipo as any,
       rawData: Buffer.from(senha, 'utf-8'),
       validade: validade ? new Date(validade) : undefined,

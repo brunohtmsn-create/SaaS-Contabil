@@ -9,7 +9,7 @@ import { Decimal } from '@saas-contabil/shared'
 
 type RelatorioJobData = {
   tenantId: string
-  competencia: string  // formato 'YYYY-MM'
+  competencia: string // formato 'YYYY-MM'
 }
 
 type LinhaRelatorio = {
@@ -81,7 +81,9 @@ function calcularAliquotaEfetiva(valorDas: Decimal, rbTotal: Decimal): string {
 export async function gerarRelatorioMensal(job: Job<RelatorioJobData>): Promise<void> {
   const { tenantId, competencia } = job.data
 
-  await job.log(`[RelatorioJob] Iniciando relatório consolidado — tenant=${tenantId} competencia=${competencia}`)
+  await job.log(
+    `[RelatorioJob] Iniciando relatório consolidado — tenant=${tenantId} competencia=${competencia}`
+  )
   await job.updateProgress(5)
 
   // 1. Busca todas as empresas ativas do tenant
@@ -187,7 +189,7 @@ export async function gerarRelatorioMensal(job: Job<RelatorioJobData>): Promise<
       data: {
         tenantId,
         empresaId: primeiraEmpresa.id,
-        tipo: 'PGDAS_PENDENTE',   // tipo genérico de notificação disponível no enum
+        tipo: 'PGDAS_PENDENTE', // tipo genérico de notificação disponível no enum
         mensagem: `Relatório consolidado de ${competencia} disponível para download.`,
         dados: {
           competencia,
@@ -216,6 +218,6 @@ export async function gerarRelatorioMensal(job: Job<RelatorioJobData>): Promise<
   await job.updateProgress(100)
   await job.log(
     `[RelatorioJob] Concluído — tenant=${tenantId} competencia=${competencia} ` +
-      `empresas=${empresas.length} s3Key=${s3Key}`,
+      `empresas=${empresas.length} s3Key=${s3Key}`
   )
 }

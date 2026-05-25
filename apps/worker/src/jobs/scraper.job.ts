@@ -52,5 +52,7 @@ export async function scraperJob(job: Job<ScraperJobData>): Promise<void> {
     if (result) normalizados++
   }
 
-  await job.log(`Normalizados ${normalizados} documentos (${documentos.length - normalizados} duplicatas ignoradas)`)
+  await job.log(
+    `Normalizados ${normalizados} documentos (${documentos.length - normalizados} duplicatas ignoradas)`
+  )
 }

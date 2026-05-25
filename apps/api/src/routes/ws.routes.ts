@@ -3,7 +3,9 @@ import { Queue, QueueEvents } from 'bullmq'
 import IORedis from 'ioredis'
 
 export async function wsRoutes(app: FastifyInstance) {
-  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null })
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+  })
   const fechamentoQueue = new Queue('fechamento', { connection: redis })
 
   // WS: status em tempo real do job de fechamento
@@ -12,7 +14,9 @@ export async function wsRoutes(app: FastifyInstance) {
     const { jobId } = request.params as { jobId: string }
 
     const queueEvents = new QueueEvents('fechamento', {
-      connection: new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null }),
+      connection: new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+        maxRetriesPerRequest: null,
+      }),
     })
 
     const send = (data: object) => {

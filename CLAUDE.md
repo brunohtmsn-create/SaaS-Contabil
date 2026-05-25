@@ -1,4 +1,5 @@
 # CLAUDE.md — SaaS Contábil Automatizado
+
 ## Guia de desenvolvimento para o Claude Code
 
 ---
@@ -139,22 +140,22 @@ pnpm --filter @saas-contabil/worker tsx src/jobs/scraper.job.ts
 
 ## Módulos e Responsabilidades
 
-| Pacote | Responsabilidade |
-|--------|-----------------|
-| `shared` | Tipos TS, `Decimal`, `date-fns-tz`, constantes fiscais, `sha256` |
-| `database` | `PrismaClient` singleton, schema completo, seed |
-| `credentials` | Store/retrieve AES-256-GCM, detecção de vencimento, revogação |
-| `audit` | `registrar()` append-only com hash chain, `verificar()` integridade |
-| `storage` | Upload/download S3, `S3KeyBuilder` para chaves organizadas |
-| `scraper` | Adapters Playwright + axios para SEFAZ, Portal Nacional, Prefeituras |
-| `normalizer` | `NormalizerService` (upsert com chaveUnica), `DeduplicatorService` |
-| `conciliation` | Score-based matching, bloqueio em score < 80, alertas automáticos |
-| `fiscal` | PGDAS, DIFAL, GNRE, DeSTDA, EFD-Reinf, FatorR, monitoramento SN |
-| `contabil` | Lançamentos por CFOP, depreciação linear, ECD SPED, conc. bancária |
-| `portals` | e-CAC, Simples Nacional, SEFAZ estadual via Playwright |
-| `api` | Fastify REST, JWT, Zod, BullMQ dispatch, multi-tenant |
-| `worker` | BullMQ processors: fechamento, scraper, fiscal, portal |
-| `dashboard` | Next.js 14, React Query, Recharts, Zustand auth store |
+| Pacote         | Responsabilidade                                                     |
+| -------------- | -------------------------------------------------------------------- |
+| `shared`       | Tipos TS, `Decimal`, `date-fns-tz`, constantes fiscais, `sha256`     |
+| `database`     | `PrismaClient` singleton, schema completo, seed                      |
+| `credentials`  | Store/retrieve AES-256-GCM, detecção de vencimento, revogação        |
+| `audit`        | `registrar()` append-only com hash chain, `verificar()` integridade  |
+| `storage`      | Upload/download S3, `S3KeyBuilder` para chaves organizadas           |
+| `scraper`      | Adapters Playwright + axios para SEFAZ, Portal Nacional, Prefeituras |
+| `normalizer`   | `NormalizerService` (upsert com chaveUnica), `DeduplicatorService`   |
+| `conciliation` | Score-based matching, bloqueio em score < 80, alertas automáticos    |
+| `fiscal`       | PGDAS, DIFAL, GNRE, DeSTDA, EFD-Reinf, FatorR, monitoramento SN      |
+| `contabil`     | Lançamentos por CFOP, depreciação linear, ECD SPED, conc. bancária   |
+| `portals`      | e-CAC, Simples Nacional, SEFAZ estadual via Playwright               |
+| `api`          | Fastify REST, JWT, Zod, BullMQ dispatch, multi-tenant                |
+| `worker`       | BullMQ processors: fechamento, scraper, fiscal, portal               |
+| `dashboard`    | Next.js 14, React Query, Recharts, Zustand auth store                |
 
 ---
 
@@ -192,16 +193,16 @@ NEXT_PUBLIC_API_URL=http://localhost:3000
 
 ## Calendário de Vencimentos (alertas automáticos)
 
-| Obrigação | Dia | Regime |
-|-----------|-----|--------|
-| DAS Simples Nacional | 20 | SN |
-| DARF DCTFWeb | 20 | SN/LP/LR |
-| FGTS Digital | 20 | Todos |
-| EFD-Reinf | 15 | SN/LP/LR |
-| DCTFWeb | 15 | SN/LP/LR |
-| DeSTDA | 28 | SN |
-| DASN/DEFIS | 31/03 anual | SN |
-| ECD | 30/06 anual | LP/LR |
+| Obrigação            | Dia         | Regime   |
+| -------------------- | ----------- | -------- |
+| DAS Simples Nacional | 20          | SN       |
+| DARF DCTFWeb         | 20          | SN/LP/LR |
+| FGTS Digital         | 20          | Todos    |
+| EFD-Reinf            | 15          | SN/LP/LR |
+| DCTFWeb              | 15          | SN/LP/LR |
+| DeSTDA               | 28          | SN       |
+| DASN/DEFIS           | 31/03 anual | SN       |
+| ECD                  | 30/06 anual | LP/LR    |
 
 ---
 

@@ -1,4 +1,10 @@
-import { getPrismaClient, AuditEvent, TipoEventoAudit, EntidadeAuditavel, TipoResponsavel } from '@saas-contabil/database'
+import {
+  getPrismaClient,
+  AuditEvent,
+  TipoEventoAudit,
+  EntidadeAuditavel,
+  TipoResponsavel,
+} from '@saas-contabil/database'
 import { sha256, nowBR } from '@saas-contabil/shared'
 
 type RegistrarEventoInput = {

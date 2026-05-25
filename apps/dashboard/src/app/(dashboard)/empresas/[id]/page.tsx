@@ -20,7 +20,8 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
 
   const iniciarFechamento = useMutation({
     mutationFn: () => api.post(`/fechamento/run/${params.id}/${competencia}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fechamento-status', params.id, competencia] }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['fechamento-status', params.id, competencia] }),
   })
 
   return (
@@ -67,18 +68,10 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
         ))}
       </div>
 
-      {tab === 'documentos' && (
-        <DocumentosPanel empresaId={params.id} competencia={competencia} />
-      )}
-      {tab === 'fiscal' && (
-        <ApuracoesPanel empresaId={params.id} competencia={competencia} />
-      )}
-      {tab === 'fechamento' && (
-        <FechamentoPanel empresaId={params.id} competencia={competencia} />
-      )}
-      {tab === 'auditoria' && (
-        <EmpresaAuditoriaPanel empresaId={params.id} />
-      )}
+      {tab === 'documentos' && <DocumentosPanel empresaId={params.id} competencia={competencia} />}
+      {tab === 'fiscal' && <ApuracoesPanel empresaId={params.id} competencia={competencia} />}
+      {tab === 'fechamento' && <FechamentoPanel empresaId={params.id} competencia={competencia} />}
+      {tab === 'auditoria' && <EmpresaAuditoriaPanel empresaId={params.id} />}
     </div>
   )
 }

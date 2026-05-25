@@ -63,7 +63,7 @@ function calcularDifalPuro(
   base: Decimal,
   aliquotaInterestadual: Decimal,
   aliquotaInterna: Decimal,
-  ufDestino: string,
+  ufDestino: string
 ) {
   const difal = base.times(aliquotaInterna.minus(aliquotaInterestadual)).div(100).toDecimalPlaces(2)
   const percentualFundo = FUNDO_POBREZA[ufDestino] ?? new Decimal(0)
@@ -385,7 +385,8 @@ describe('DifalService — calcular() com documento mockado', () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
 
     const service = new DifalService()
-    await expect(service.calcular('tenant-1', 'emp-inexistente', '2025-01'))
-      .rejects.toThrow('Empresa não encontrada')
+    await expect(service.calcular('tenant-1', 'emp-inexistente', '2025-01')).rejects.toThrow(
+      'Empresa não encontrada'
+    )
   })
 })

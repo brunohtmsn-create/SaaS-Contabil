@@ -94,26 +94,52 @@ describe('PortalOrchestrator — roteamento de operações', () => {
     const orch = new PortalOrchestrator()
     await orch.executar(makeJob('ECAC', 'CONSULTA_SITUACAO'), CRED_BUF)
     expect(mockEcac.consultarSituacaoFiscal).toHaveBeenCalledTimes(1)
-    expect(mockEcac.consultarSituacaoFiscal).toHaveBeenCalledWith('t-1', 'emp-1', '11111111000111', CRED_BUF)
+    expect(mockEcac.consultarSituacaoFiscal).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      CRED_BUF
+    )
   })
 
   it('ECAC:CERTIDAO → chama baixarCertidao com competencia', async () => {
     const orch = new PortalOrchestrator()
     await orch.executar(makeJob('ECAC', 'CERTIDAO', { competencia: '2025-01' }), CRED_BUF)
-    expect(mockEcac.baixarCertidao).toHaveBeenCalledWith('t-1', 'emp-1', '11111111000111', CRED_BUF, '2025-01')
+    expect(mockEcac.baixarCertidao).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      CRED_BUF,
+      '2025-01'
+    )
   })
 
   it('ECAC:CERTIDAO sem competencia → passa string vazia', async () => {
     const orch = new PortalOrchestrator()
     await orch.executar(makeJob('ECAC', 'CERTIDAO'), CRED_BUF)
-    expect(mockEcac.baixarCertidao).toHaveBeenCalledWith('t-1', 'emp-1', '11111111000111', CRED_BUF, '')
+    expect(mockEcac.baixarCertidao).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      CRED_BUF,
+      ''
+    )
   })
 
   it('SIMPLES_NACIONAL:TRANSMITIR_PGDAS → chama transmitirPGDAS', async () => {
     const dados = { receita: '10000' }
     const orch = new PortalOrchestrator()
-    await orch.executar(makeJob('SIMPLES_NACIONAL', 'TRANSMITIR_PGDAS', { competencia: '2025-01', dados }), CRED_BUF)
-    expect(mockSimples.transmitirPGDAS).toHaveBeenCalledWith('t-1', 'emp-1', '11111111000111', '2025-01', dados)
+    await orch.executar(
+      makeJob('SIMPLES_NACIONAL', 'TRANSMITIR_PGDAS', { competencia: '2025-01', dados }),
+      CRED_BUF
+    )
+    expect(mockSimples.transmitirPGDAS).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      '2025-01',
+      dados
+    )
   })
 
   it('operação desconhecida → lança erro com nome da operação', async () => {
@@ -151,7 +177,9 @@ describe('PortalOrchestrator — persistência portalJob', () => {
   it('falha → atualiza job para ERRO', async () => {
     mockEcac.consultarSituacaoFiscal.mockRejectedValueOnce(new Error('timeout'))
     const orch = new PortalOrchestrator()
-    await expect(orch.executar(makeJob('ECAC', 'CONSULTA_SITUACAO'), CRED_BUF)).rejects.toThrow('timeout')
+    await expect(orch.executar(makeJob('ECAC', 'CONSULTA_SITUACAO'), CRED_BUF)).rejects.toThrow(
+      'timeout'
+    )
     const updateData = mockDb.portalJob.update.mock.calls[0][0].data
     expect(updateData.status).toBe('ERRO')
   })
@@ -159,7 +187,9 @@ describe('PortalOrchestrator — persistência portalJob', () => {
   it('falha → propaga o erro original', async () => {
     mockEcac.consultarSituacaoFiscal.mockRejectedValueOnce(new Error('CAPTCHA falhou'))
     const orch = new PortalOrchestrator()
-    await expect(orch.executar(makeJob('ECAC', 'CONSULTA_SITUACAO'), CRED_BUF)).rejects.toThrow('CAPTCHA falhou')
+    await expect(orch.executar(makeJob('ECAC', 'CONSULTA_SITUACAO'), CRED_BUF)).rejects.toThrow(
+      'CAPTCHA falhou'
+    )
   })
 
   it('cria job com tenantId e empresaId corretos', async () => {

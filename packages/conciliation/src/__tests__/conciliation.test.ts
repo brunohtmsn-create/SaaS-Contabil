@@ -61,13 +61,15 @@ import type { ResultadoConciliacao } from '../types.js'
 // Helper: cria um DocumentoFiscal mínimo para testes
 // ---------------------------------------------------------------------------
 
-function makeDoc(overrides: Partial<{
-  id: string
-  cnpjEmitente: string
-  valorTotal: Decimal
-  dataCompetencia: Date
-  numero: string
-}> = {}) {
+function makeDoc(
+  overrides: Partial<{
+    id: string
+    cnpjEmitente: string
+    valorTotal: Decimal
+    dataCompetencia: Date
+    numero: string
+  }> = {}
+) {
   return {
     id: overrides.id ?? 'doc-001',
     tenantId: 'tenant-abc',
@@ -366,7 +368,11 @@ describe('ConciliationService — conciliarNFSeTomadas()', () => {
   })
 
   it('Um documento válido → retorna um resultado com status', async () => {
-    const doc = makeDoc({ id: 'doc-999', cnpjEmitente: '11111111000191', valorTotal: new Decimal('800') })
+    const doc = makeDoc({
+      id: 'doc-999',
+      cnpjEmitente: '11111111000191',
+      valorTotal: new Decimal('800'),
+    })
     mockDocumentoFiscal.findMany.mockResolvedValue([doc])
     mockDocumentoFiscal.update.mockResolvedValue({ ...doc, status: 'CONCILIADO' })
 
@@ -381,7 +387,11 @@ describe('ConciliationService — conciliarNFSeTomadas()', () => {
   })
 
   it('Documento conciliado → chama db.documentoFiscal.update para persistir status', async () => {
-    const doc = makeDoc({ id: 'doc-888', cnpjEmitente: '11111111000191', valorTotal: new Decimal('500') })
+    const doc = makeDoc({
+      id: 'doc-888',
+      cnpjEmitente: '11111111000191',
+      valorTotal: new Decimal('500'),
+    })
     mockDocumentoFiscal.findMany.mockResolvedValue([doc])
     mockDocumentoFiscal.update.mockResolvedValue({ ...doc })
 

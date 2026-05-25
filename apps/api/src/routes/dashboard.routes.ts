@@ -64,14 +64,22 @@ export async function dashboardRoutes(app: FastifyInstance) {
     const resultado = await Promise.all(
       meses.map(async ({ label, inicio, fim }) => {
         const [nfe, nfce, nfse] = await Promise.all([
-          db.documentoFiscal.count({ where: { tenantId, tipo: 'NFE', dataCompetencia: { gte: inicio, lte: fim } } }),
-          db.documentoFiscal.count({ where: { tenantId, tipo: 'NFCE', dataCompetencia: { gte: inicio, lte: fim } } }),
           db.documentoFiscal.count({
-            where: { tenantId, tipo: { in: ['NFSE_EMITIDA', 'NFSE_TOMADA'] }, dataCompetencia: { gte: inicio, lte: fim } },
+            where: { tenantId, tipo: 'NFE', dataCompetencia: { gte: inicio, lte: fim } },
+          }),
+          db.documentoFiscal.count({
+            where: { tenantId, tipo: 'NFCE', dataCompetencia: { gte: inicio, lte: fim } },
+          }),
+          db.documentoFiscal.count({
+            where: {
+              tenantId,
+              tipo: { in: ['NFSE_EMITIDA', 'NFSE_TOMADA'] },
+              dataCompetencia: { gte: inicio, lte: fim },
+            },
           }),
         ])
         return { mes: label, nfe, nfce, nfse }
-      }),
+      })
     )
 
     return resultado

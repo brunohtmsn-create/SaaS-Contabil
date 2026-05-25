@@ -38,14 +38,14 @@ describe('parsePeriodo()', () => {
 
     // date-fns startOfMonth/endOfMonth trabalham com o valor local da data
     expect(inicio.getFullYear()).toBe(2024)
-    expect(inicio.getMonth()).toBe(2)   // 0-indexed → março
+    expect(inicio.getMonth()).toBe(2) // 0-indexed → março
     expect(inicio.getDate()).toBe(1)
     expect(inicio.getHours()).toBe(0)
     expect(inicio.getMinutes()).toBe(0)
     expect(inicio.getSeconds()).toBe(0)
 
     expect(fim.getFullYear()).toBe(2024)
-    expect(fim.getMonth()).toBe(2)      // 0-indexed → março
+    expect(fim.getMonth()).toBe(2) // 0-indexed → março
     expect(fim.getDate()).toBe(31)
     expect(fim.getHours()).toBe(23)
     expect(fim.getMinutes()).toBe(59)
@@ -55,7 +55,7 @@ describe('parsePeriodo()', () => {
   it("fim de fevereiro em ano bissexto: '2024-02' termina no dia 29", () => {
     const { fim } = parsePeriodo('2024-02')
     expect(fim.getDate()).toBe(29)
-    expect(fim.getMonth()).toBe(1)      // 0-indexed → fevereiro
+    expect(fim.getMonth()).toBe(1) // 0-indexed → fevereiro
   })
 
   it("fim de fevereiro em ano não bissexto: '2023-02' termina no dia 28", () => {
@@ -65,7 +65,7 @@ describe('parsePeriodo()', () => {
 
   it("'2024-12': início dia 1, fim dia 31 de dezembro", () => {
     const { inicio, fim } = parsePeriodo('2024-12')
-    expect(inicio.getMonth()).toBe(11)  // 0-indexed → dezembro
+    expect(inicio.getMonth()).toBe(11) // 0-indexed → dezembro
     expect(inicio.getDate()).toBe(1)
     expect(fim.getMonth()).toBe(11)
     expect(fim.getDate()).toBe(31)
@@ -174,7 +174,7 @@ describe('nowBR()', () => {
     // o timestamp em ms será deslocado do UTC pelo offset de Sao Paulo (-3h ou -2h)
     // mas deve permanecer dentro de um intervalo razoável em relação ao now
     expect(d.getTime()).toBeGreaterThan(before - 5 * 60 * 60 * 1000)
-    expect(d.getTime()).toBeLessThan(after  + 5 * 60 * 60 * 1000)
+    expect(d.getTime()).toBeLessThan(after + 5 * 60 * 60 * 1000)
   })
 })
 
@@ -263,7 +263,7 @@ describe('addDays()', () => {
     const base = new Date('2024-03-01T12:00:00.000Z')
     const result = addDays(base, 7)
     expect(result.getUTCFullYear()).toBe(2024)
-    expect(result.getUTCMonth()).toBe(2)    // 0-indexed → março
+    expect(result.getUTCMonth()).toBe(2) // 0-indexed → março
     expect(result.getUTCDate()).toBe(8)
   })
 
@@ -276,7 +276,7 @@ describe('addDays()', () => {
   it('adicionar dias atravessa meses corretamente (31 mar + 1 = 1 abr)', () => {
     const base = new Date('2024-03-31T12:00:00.000Z')
     const result = addDays(base, 1)
-    expect(result.getUTCMonth()).toBe(3)    // 0-indexed → abril
+    expect(result.getUTCMonth()).toBe(3) // 0-indexed → abril
     expect(result.getUTCDate()).toBe(1)
   })
 
@@ -311,7 +311,7 @@ describe('differenceInCalendarDays()', () => {
 
   it('diferença entre 2024-01-01 e 2024-12-31 = 365 (ano bissexto)', () => {
     const start = new Date('2024-01-01T12:00:00.000Z')
-    const end   = new Date('2024-12-31T12:00:00.000Z')
+    const end = new Date('2024-12-31T12:00:00.000Z')
     expect(differenceInCalendarDays(end, start)).toBe(365)
   })
 })

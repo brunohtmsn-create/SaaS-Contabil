@@ -1,9 +1,21 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
-import { PGDASService, DifalService, GNREService, DeSTDAService, DCTFWebService, ESocialService, MonitoramentoSNService, FatorRService } from '@saas-contabil/fiscal'
+import {
+  PGDASService,
+  DifalService,
+  GNREService,
+  DeSTDAService,
+  DCTFWebService,
+  ESocialService,
+  MonitoramentoSNService,
+  FatorRService,
+} from '@saas-contabil/fiscal'
 
-const params = z.object({ empresaId: z.string().uuid(), competencia: z.string().regex(/^\d{4}-\d{2}$/) })
+const params = z.object({
+  empresaId: z.string().uuid(),
+  competencia: z.string().regex(/^\d{4}-\d{2}$/),
+})
 
 export async function fiscalRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
@@ -88,7 +100,8 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const { inicio, fim } = pp(competencia)
     const pendentes = await db.documentoFiscal.count({
       where: {
-        tenantId, empresaId,
+        tenantId,
+        empresaId,
         dataCompetencia: { gte: inicio, lte: fim },
         status: { in: ['PENDENTE_REVISAO', 'NORMALIZADO', 'CAPTURADO', 'EM_CONCILIACAO'] },
       },
@@ -128,7 +141,11 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
   app.get('/obrigacoes', async (request) => {
     const { tenantId } = request.user as any
-    const { mes, competencia, status } = request.query as { mes?: string; competencia?: string; status?: string }
+    const { mes, competencia, status } = request.query as {
+      mes?: string
+      competencia?: string
+      status?: string
+    }
 
     const where: any = { tenantId }
     if (status) where.status = status
@@ -189,6 +206,10 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const { ano } = request.query as { ano?: string }
 
     const service = new MonitoramentoSNService()
-    return service.gerarCalendarioAnual(tenantId, empresaId, Number(ano ?? new Date().getFullYear()))
+    return service.gerarCalendarioAnual(
+      tenantId,
+      empresaId,
+      Number(ano ?? new Date().getFullYear())
+    )
   })
 }

@@ -17,7 +17,9 @@ export class DeSTDAService {
     })
 
     const lines: string[] = []
-    lines.push(`|0000|${competencia.replace('-', '')}|${empresa.cnpj}|${empresa.razaoSocial}|${empresa.uf}|1|`)
+    lines.push(
+      `|0000|${competencia.replace('-', '')}|${empresa.cnpj}|${empresa.razaoSocial}|${empresa.uf}|1|`
+    )
     lines.push(`|0001|1|`)
 
     if (apuracaoDifal?.dados) {
@@ -33,16 +35,29 @@ export class DeSTDAService {
     const content = lines.join('\r\n')
 
     await this.db.apuracaoFiscal.upsert({
-      where: { tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia, tipo: 'DESTDA' } },
+      where: {
+        tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia, tipo: 'DESTDA' },
+      },
       update: { dados: { content } as any, status: 'CALCULADO' },
-      create: { tenantId, empresaId, competencia, tipo: 'DESTDA', dados: { content } as any, status: 'CALCULADO' },
+      create: {
+        tenantId,
+        empresaId,
+        competencia,
+        tipo: 'DESTDA',
+        dados: { content } as any,
+        status: 'CALCULADO',
+      },
     })
 
     await this.audit.registrar({
-      tenantId, cnpj: empresa.cnpj,
-      entidadeTipo: 'APURACAO_FISCAL', entidadeId: empresaId,
-      evento: 'DESTDA_GERADO', estadoNovo: { competencia, linhas: lines.length },
-      responsavel: 'sistema', responsavelTipo: 'SISTEMA',
+      tenantId,
+      cnpj: empresa.cnpj,
+      entidadeTipo: 'APURACAO_FISCAL',
+      entidadeId: empresaId,
+      evento: 'DESTDA_GERADO',
+      estadoNovo: { competencia, linhas: lines.length },
+      responsavel: 'sistema',
+      responsavelTipo: 'SISTEMA',
     })
 
     return content

@@ -22,7 +22,7 @@ import { Decimal } from 'decimal.js'
 function calcularDepreciacaoMensal(
   valorAquisicao: Decimal,
   valorResidual: Decimal,
-  vidaUtilAnos: number,
+  vidaUtilAnos: number
 ): Decimal {
   const vidaUtilMeses = vidaUtilAnos * 12
   if (vidaUtilMeses <= 0) return new Decimal(0)
@@ -127,11 +127,16 @@ describe('DepreciacaoService — calcular() com mock do DB', () => {
   it('empresa não encontrada → lança erro', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
     const service = new DepreciacaoService()
-    await expect(service.calcular('t-1', 'emp-1', '2025-01')).rejects.toThrow('Empresa não encontrada')
+    await expect(service.calcular('t-1', 'emp-1', '2025-01')).rejects.toThrow(
+      'Empresa não encontrada'
+    )
   })
 
   it('empresa sem bens ativos → nenhum lançamento gerado', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.bemAtivo.findMany.mockResolvedValueOnce([])
     const service = new DepreciacaoService()
     await service.calcular('t-1', 'emp-1', '2025-01')
@@ -139,7 +144,10 @@ describe('DepreciacaoService — calcular() com mock do DB', () => {
   })
 
   it('1 bem ativo → gera 1 lançamento contábil de depreciação', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.bemAtivo.findMany.mockResolvedValueOnce([
       {
         id: 'bem-1',
@@ -156,9 +164,19 @@ describe('DepreciacaoService — calcular() com mock do DB', () => {
   })
 
   it('lançamento contém partida DEBITO em conta 6.1.5.01 (Depreciação do período)', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.bemAtivo.findMany.mockResolvedValueOnce([
-      { id: 'bem-1', descricao: 'Veículo', valorAquisicao: '50000', valorResidual: '5000', vidaUtil: 5, status: 'ATIVO' },
+      {
+        id: 'bem-1',
+        descricao: 'Veículo',
+        valorAquisicao: '50000',
+        valorResidual: '5000',
+        vidaUtil: 5,
+        status: 'ATIVO',
+      },
     ])
     const service = new DepreciacaoService()
     await service.calcular('t-1', 'emp-1', '2025-01')
@@ -170,9 +188,19 @@ describe('DepreciacaoService — calcular() com mock do DB', () => {
   })
 
   it('lançamento contém partida CREDITO em conta 1.2.1.02 (Depreciação acumulada)', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.bemAtivo.findMany.mockResolvedValueOnce([
-      { id: 'bem-1', descricao: 'Veículo', valorAquisicao: '50000', valorResidual: '5000', vidaUtil: 5, status: 'ATIVO' },
+      {
+        id: 'bem-1',
+        descricao: 'Veículo',
+        valorAquisicao: '50000',
+        valorResidual: '5000',
+        vidaUtil: 5,
+        status: 'ATIVO',
+      },
     ])
     const service = new DepreciacaoService()
     await service.calcular('t-1', 'emp-1', '2025-01')
@@ -183,10 +211,27 @@ describe('DepreciacaoService — calcular() com mock do DB', () => {
   })
 
   it('2 bens ativos → gera 2 lançamentos independentes', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.bemAtivo.findMany.mockResolvedValueOnce([
-      { id: 'bem-1', descricao: 'Computador', valorAquisicao: '6000', valorResidual: '0', vidaUtil: 5, status: 'ATIVO' },
-      { id: 'bem-2', descricao: 'Veículo', valorAquisicao: '50000', valorResidual: '5000', vidaUtil: 5, status: 'ATIVO' },
+      {
+        id: 'bem-1',
+        descricao: 'Computador',
+        valorAquisicao: '6000',
+        valorResidual: '0',
+        vidaUtil: 5,
+        status: 'ATIVO',
+      },
+      {
+        id: 'bem-2',
+        descricao: 'Veículo',
+        valorAquisicao: '50000',
+        valorResidual: '5000',
+        vidaUtil: 5,
+        status: 'ATIVO',
+      },
     ])
     const service = new DepreciacaoService()
     await service.calcular('t-1', 'emp-1', '2025-01')
@@ -194,9 +239,19 @@ describe('DepreciacaoService — calcular() com mock do DB', () => {
   })
 
   it('historico do lançamento inclui descrição do bem', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.bemAtivo.findMany.mockResolvedValueOnce([
-      { id: 'bem-1', descricao: 'Servidor Dell PowerEdge', valorAquisicao: '24000', valorResidual: '0', vidaUtil: 4, status: 'ATIVO' },
+      {
+        id: 'bem-1',
+        descricao: 'Servidor Dell PowerEdge',
+        valorAquisicao: '24000',
+        valorResidual: '0',
+        vidaUtil: 4,
+        status: 'ATIVO',
+      },
     ])
     const service = new DepreciacaoService()
     await service.calcular('t-1', 'emp-1', '2025-01')
@@ -205,7 +260,10 @@ describe('DepreciacaoService — calcular() com mock do DB', () => {
   })
 
   it('filtra somente bens com status ATIVO (query correta)', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.bemAtivo.findMany.mockResolvedValueOnce([])
     const service = new DepreciacaoService()
     await service.calcular('t-1', 'emp-1', '2025-01')

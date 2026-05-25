@@ -39,7 +39,8 @@ const SEL = {
   BTN_CONSULTAR: '#btnConsultar, button[id*="Consultar"], input[value="Consultar"]',
 
   // Tabela de resultados
-  GRID_ROWS: 'table.gridNFSe tbody tr, table[id*="gridNotas"] tr.gridRow, table[id*="Grid"] tbody tr',
+  GRID_ROWS:
+    'table.gridNFSe tbody tr, table[id*="gridNotas"] tr.gridRow, table[id*="Grid"] tbody tr',
   BTN_XML: 'a[title*="XML"], a[href*="xml"], a[onclick*="xml"]',
   BTN_PDF: 'a[title*="PDF"], a[href*="pdf"], a[href*="danfse"], a[title*="Imprimir"]',
 
@@ -50,10 +51,7 @@ const SEL = {
   CAPTCHA_FRAME: 'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
 } as const
 
-export class Prefeitura3304557Adapter
-  extends BasePLaywrightAdapter
-  implements PrefeituraAdapter
-{
+export class Prefeitura3304557Adapter extends BasePLaywrightAdapter implements PrefeituraAdapter {
   tipo = 'NFSE_EMITIDA'
   fonte = 'PREFEITURA_RJ'
   municipio = 'Rio de Janeiro'
@@ -121,9 +119,7 @@ export class Prefeitura3304557Adapter
 
         // Coletar cookies da sessão
         const cookies = await page.context().cookies()
-        const cookieStr = cookies
-          .map((c) => `${c.name}=${c.value}`)
-          .join('; ')
+        const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
         return {
           cookies: cookieStr,
@@ -161,10 +157,10 @@ export class Prefeitura3304557Adapter
       this.withPage(async (page) => {
         await this.garantirSessao(page, cnpj, 'emitidas')
 
-        await page.goto(
-          `${BASE_URL}/cgife/nfse/prestador/consultarnfse.aspx`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/cgife/nfse/prestador/consultarnfse.aspx`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroConsulta(page, cnpj, periodo, 'rj-emitidas')
 
@@ -182,10 +178,10 @@ export class Prefeitura3304557Adapter
       this.withPage(async (page) => {
         await this.garantirSessao(page, cnpj, 'tomadas')
 
-        await page.goto(
-          `${BASE_URL}/cgife/nfse/tomador/consultarnfse.aspx`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/cgife/nfse/tomador/consultarnfse.aspx`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroConsulta(page, cnpj, periodo, 'rj-tomadas')
 

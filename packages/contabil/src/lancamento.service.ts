@@ -7,7 +7,11 @@ export class LancamentoService {
   private db = getPrismaClient()
   private audit = new AuditService()
 
-  async gerarLancamentos(tenantId: string, empresaId: string, competencia: string): Promise<Lancamento[]> {
+  async gerarLancamentos(
+    tenantId: string,
+    empresaId: string,
+    competencia: string
+  ): Promise<Lancamento[]> {
     const empresa = await this.db.empresaCliente.findUnique({ where: { id: empresaId } })
     if (!empresa) throw new Error('Empresa não encontrada')
 
@@ -72,8 +76,18 @@ export class LancamentoService {
           return {
             historico: `Compra NF-e ${doc.numero} — ${doc.nomeEmitente}`,
             partidas: [
-              { conta: contaCfop?.debito ?? '1.1.3.01', descricao: 'Estoque/Despesa', valor: valorProdutos, tipo: 'DEBITO' },
-              { conta: '1.1.5.01', descricao: 'ICMS a recuperar', valor: valorIcms, tipo: 'DEBITO' },
+              {
+                conta: contaCfop?.debito ?? '1.1.3.01',
+                descricao: 'Estoque/Despesa',
+                valor: valorProdutos,
+                tipo: 'DEBITO',
+              },
+              {
+                conta: '1.1.5.01',
+                descricao: 'ICMS a recuperar',
+                valor: valorIcms,
+                tipo: 'DEBITO',
+              },
               { conta: '2.1.1.01', descricao: 'Fornecedores', valor: valorTotal, tipo: 'CREDITO' },
             ],
           }
@@ -82,7 +96,12 @@ export class LancamentoService {
           historico: `Venda NF-e ${doc.numero}`,
           partidas: [
             { conta: '1.1.2.01', descricao: 'Clientes', valor: valorTotal, tipo: 'DEBITO' },
-            { conta: '3.1.1.01', descricao: 'Receita de vendas', valor: valorProdutos, tipo: 'CREDITO' },
+            {
+              conta: '3.1.1.01',
+              descricao: 'Receita de vendas',
+              valor: valorProdutos,
+              tipo: 'CREDITO',
+            },
             { conta: '2.1.4.01', descricao: 'ICMS a recolher', valor: valorIcms, tipo: 'CREDITO' },
           ],
         }
@@ -93,7 +112,12 @@ export class LancamentoService {
           historico: `Venda NFC-e ${doc.numero} — consumidor`,
           partidas: [
             { conta: '1.1.2.01', descricao: 'Caixa/PDV', valor: valorTotal, tipo: 'DEBITO' },
-            { conta: '3.1.1.01', descricao: 'Receita de vendas', valor: valorProdutos, tipo: 'CREDITO' },
+            {
+              conta: '3.1.1.01',
+              descricao: 'Receita de vendas',
+              valor: valorProdutos,
+              tipo: 'CREDITO',
+            },
             { conta: '2.1.4.01', descricao: 'ICMS a recolher', valor: valorIcms, tipo: 'CREDITO' },
           ],
         }
@@ -103,9 +127,28 @@ export class LancamentoService {
         return {
           historico: `Serviço tomado NFSe ${doc.numero} — ${doc.nomeEmitente}`,
           partidas: [
-            { conta: '4.1.2.01', descricao: 'Despesa de serviços', valor: valorServicos, tipo: 'DEBITO' },
-            { conta: '2.1.1.02', descricao: 'Fornecedores de serviço', valor: valorTotal, tipo: 'CREDITO' },
-            ...(valorIssRetido.gt(0) ? [{ conta: '2.1.4.03', descricao: 'ISS retido a recolher', valor: valorIssRetido, tipo: 'CREDITO' as const }] : []),
+            {
+              conta: '4.1.2.01',
+              descricao: 'Despesa de serviços',
+              valor: valorServicos,
+              tipo: 'DEBITO',
+            },
+            {
+              conta: '2.1.1.02',
+              descricao: 'Fornecedores de serviço',
+              valor: valorTotal,
+              tipo: 'CREDITO',
+            },
+            ...(valorIssRetido.gt(0)
+              ? [
+                  {
+                    conta: '2.1.4.03',
+                    descricao: 'ISS retido a recolher',
+                    valor: valorIssRetido,
+                    tipo: 'CREDITO' as const,
+                  },
+                ]
+              : []),
           ],
         }
       }
@@ -115,8 +158,22 @@ export class LancamentoService {
           historico: `Serviço prestado NFSe ${doc.numero}`,
           partidas: [
             { conta: '1.1.2.02', descricao: 'Clientes', valor: valorTotal, tipo: 'DEBITO' },
-            { conta: '3.1.2.01', descricao: 'Receita de serviços', valor: valorServicos, tipo: 'CREDITO' },
-            ...(valorIss.gt(0) ? [{ conta: '2.1.4.04', descricao: 'ISS a recolher', valor: valorIss, tipo: 'CREDITO' as const }] : []),
+            {
+              conta: '3.1.2.01',
+              descricao: 'Receita de serviços',
+              valor: valorServicos,
+              tipo: 'CREDITO',
+            },
+            ...(valorIss.gt(0)
+              ? [
+                  {
+                    conta: '2.1.4.04',
+                    descricao: 'ISS a recolher',
+                    valor: valorIss,
+                    tipo: 'CREDITO' as const,
+                  },
+                ]
+              : []),
           ],
         }
       }
@@ -147,8 +204,18 @@ export class LancamentoService {
             data: nowBR(),
             historico: `DAS Simples Nacional ${competencia}`,
             partidas: [
-              { conta: '6.1.1.01', descricao: 'Simples Nacional (DAS)', valor: valorDAS.toString(), tipo: 'DEBITO' },
-              { conta: '2.1.4.05', descricao: 'Simples Nacional a recolher', valor: valorDAS.toString(), tipo: 'CREDITO' },
+              {
+                conta: '6.1.1.01',
+                descricao: 'Simples Nacional (DAS)',
+                valor: valorDAS.toString(),
+                tipo: 'DEBITO',
+              },
+              {
+                conta: '2.1.4.05',
+                descricao: 'Simples Nacional a recolher',
+                valor: valorDAS.toString(),
+                tipo: 'CREDITO',
+              },
             ] as any,
           },
         })

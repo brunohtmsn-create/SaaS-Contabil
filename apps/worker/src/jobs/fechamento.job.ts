@@ -1,7 +1,19 @@
 import { Job } from 'bullmq'
 import { ConciliationService } from '@saas-contabil/conciliation'
-import { PGDASService, DifalService, GNREService, DeSTDAService, EFDReinfService, FGTSDigitalService } from '@saas-contabil/fiscal'
-import { LancamentoService, DepreciacaoService, ConciliacaoBancariaService, OpenFinanceService } from '@saas-contabil/contabil'
+import {
+  PGDASService,
+  DifalService,
+  GNREService,
+  DeSTDAService,
+  EFDReinfService,
+  FGTSDigitalService,
+} from '@saas-contabil/fiscal'
+import {
+  LancamentoService,
+  DepreciacaoService,
+  ConciliacaoBancariaService,
+  OpenFinanceService,
+} from '@saas-contabil/contabil'
 import { AuditService } from '@saas-contabil/audit'
 import { NotificationService } from '@saas-contabil/notifications'
 import { CredentialService } from '@saas-contabil/credentials'
@@ -42,7 +54,16 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
   const { tenantId, empresaId, cnpj, competencia } = job.data
 
   const auditJob = (evento: Parameters<typeof audit.registrar>[0]['evento'], estadoNovo: unknown) =>
-    audit.registrar({ tenantId, cnpj, entidadeTipo: 'APURACAO_FISCAL', entidadeId: empresaId, evento, estadoNovo, ...AUDIT_SISTEMA, jobId: job.id })
+    audit.registrar({
+      tenantId,
+      cnpj,
+      entidadeTipo: 'APURACAO_FISCAL',
+      entidadeId: empresaId,
+      evento,
+      estadoNovo,
+      ...AUDIT_SISTEMA,
+      jobId: job.id,
+    })
 
   await auditJob('FECHAMENTO_INICIADO', { competencia, jobId: job.id })
 
@@ -58,7 +79,9 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
         const docs = await scraper.capturarTodos(cnpj, competencia, credencial)
         const todosRaw = [...docs.nfe, ...docs.nfce, ...docs.nfseEmitidas, ...docs.nfseTomadas]
         capturadosTotal = todosRaw.length
-        await job.log(`FASE 1: ${capturadosTotal} documento(s) capturados (NF-e:${docs.nfe.length} NFC-e:${docs.nfce.length} NFSe:${docs.nfseEmitidas.length + docs.nfseTomadas.length})`)
+        await job.log(
+          `FASE 1: ${capturadosTotal} documento(s) capturados (NF-e:${docs.nfe.length} NFC-e:${docs.nfce.length} NFSe:${docs.nfseEmitidas.length + docs.nfseTomadas.length})`
+        )
 
         // FASE 2: Normalização e deduplicação
         await job.log('FASE 2: Normalizando e deduplicando documentos...')
@@ -67,9 +90,13 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
           const salvo = await normalizer.normalizar(raw, tenantId, empresaId)
           if (salvo) novos++
         }
-        await job.log(`FASE 2: ${novos} documento(s) novos persistidos (${capturadosTotal - novos} duplicatas ignoradas)`)
+        await job.log(
+          `FASE 2: ${novos} documento(s) novos persistidos (${capturadosTotal - novos} duplicatas ignoradas)`
+        )
       } catch (scraperErr) {
-        await job.log(`FASE 1: Falha no scraper — ${String(scraperErr)} — continuando com documentos existentes`)
+        await job.log(
+          `FASE 1: Falha no scraper — ${String(scraperErr)} — continuando com documentos existentes`
+        )
       }
     } else {
       await job.log('FASE 1: Sem credencial configurada — usando documentos já importados')
@@ -87,7 +114,12 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
 
     const { inicio, fim } = parsePeriodo(competencia)
     const pendentes = await db.documentoFiscal.count({
-      where: { tenantId, empresaId, dataCompetencia: { gte: inicio, lte: fim }, status: 'PENDENTE_REVISAO' },
+      where: {
+        tenantId,
+        empresaId,
+        dataCompetencia: { gte: inicio, lte: fim },
+        status: 'PENDENTE_REVISAO',
+      },
     })
 
     if (pendentes > 0) {

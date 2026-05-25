@@ -44,11 +44,14 @@ export class EcacPortal {
         })
 
         await this.audit.registrar({
-          tenantId, cnpj,
-          entidadeTipo: 'PORTAL_JOB', entidadeId: empresaId,
+          tenantId,
+          cnpj,
+          entidadeTipo: 'PORTAL_JOB',
+          entidadeId: empresaId,
           evento: 'PORTAL_ACESSO_REALIZADO',
           estadoNovo: { portal: 'ECAC', operacao: 'CONSULTA_SITUACAO' },
-          responsavel: 'sistema', responsavelTipo: 'SISTEMA',
+          responsavel: 'sistema',
+          responsavelTipo: 'SISTEMA',
         })
 
         return { situacao: 'REGULAR', pendencias: [] }
@@ -60,11 +63,14 @@ export class EcacPortal {
         }
 
         await this.audit.registrar({
-          tenantId, cnpj,
-          entidadeTipo: 'PORTAL_JOB', entidadeId: empresaId,
+          tenantId,
+          cnpj,
+          entidadeTipo: 'PORTAL_JOB',
+          entidadeId: empresaId,
           evento: 'PORTAL_ACESSO_FALHOU',
           estadoNovo: { portal: 'ECAC', erro: String(err) },
-          responsavel: 'sistema', responsavelTipo: 'SISTEMA',
+          responsavel: 'sistema',
+          responsavelTipo: 'SISTEMA',
         })
 
         throw err
@@ -83,11 +89,14 @@ export class EcacPortal {
   ): Promise<string> {
     return this.withRetry(async () => {
       await this.audit.registrar({
-        tenantId, cnpj,
-        entidadeTipo: 'PORTAL_JOB', entidadeId: empresaId,
+        tenantId,
+        cnpj,
+        entidadeTipo: 'PORTAL_JOB',
+        entidadeId: empresaId,
         evento: 'CERTIDAO_BAIXADA',
         estadoNovo: { portal: 'ECAC', tipo: 'CND', competencia },
-        responsavel: 'sistema', responsavelTipo: 'SISTEMA',
+        responsavel: 'sistema',
+        responsavelTipo: 'SISTEMA',
       })
 
       return `portais/ecac-certidao-${competencia}.pdf`

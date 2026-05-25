@@ -38,7 +38,11 @@ export default function ContabilPage() {
   const [empresaId, setEmpresaId] = useState('')
   const [showNovoBem, setShowNovoBem] = useState(false)
   const [novoBem, setNovoBem] = useState({
-    descricao: '', dataAquisicao: '', valorAquisicao: '', vidaUtil: '60', valorResidual: '0',
+    descricao: '',
+    dataAquisicao: '',
+    valorAquisicao: '',
+    vidaUtil: '60',
+    valorResidual: '0',
   })
 
   const { data: empresas = [] } = useQuery<EmpresaOption[]>({
@@ -81,7 +85,13 @@ export default function ContabilPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bens', empresaId] })
       setShowNovoBem(false)
-      setNovoBem({ descricao: '', dataAquisicao: '', valorAquisicao: '', vidaUtil: '60', valorResidual: '0' })
+      setNovoBem({
+        descricao: '',
+        dataAquisicao: '',
+        valorAquisicao: '',
+        vidaUtil: '60',
+        valorResidual: '0',
+      })
     },
   })
 
@@ -93,7 +103,9 @@ export default function ContabilPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Contabilidade</h1>
-          <p className="text-slate-500 text-sm mt-1">Lançamentos contábeis, depreciação e bens ativos</p>
+          <p className="text-slate-500 text-sm mt-1">
+            Lançamentos contábeis, depreciação e bens ativos
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <select
@@ -103,7 +115,9 @@ export default function ContabilPage() {
           >
             <option value="">Selecionar empresa...</option>
             {empresas.map((e) => (
-              <option key={e.id} value={e.id}>{e.razaoSocial}</option>
+              <option key={e.id} value={e.id}>
+                {e.razaoSocial}
+              </option>
             ))}
           </select>
           <input
@@ -123,15 +137,21 @@ export default function ContabilPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Valor total lançado</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalLancamentos)}
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+              totalLancamentos
+            )}
           </p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Patrimônio ativo</p>
           <p className="text-2xl font-bold text-slate-900 mt-1">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalBens)}
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+              totalBens
+            )}
           </p>
-          <p className="text-xs text-slate-400 mt-1">{bens.filter((b) => b.status === 'ATIVO').length} bens ativos</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {bens.filter((b) => b.status === 'ATIVO').length} bens ativos
+          </p>
         </div>
       </div>
 
@@ -141,7 +161,9 @@ export default function ContabilPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-6 py-3 text-sm font-medium capitalize transition-colors ${
-              tab === t ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'
+              tab === t
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             {t === 'lancamentos' ? 'Lançamentos Contábeis' : 'Bens do Ativo'}
@@ -174,7 +196,9 @@ export default function ContabilPage() {
           </div>
 
           {!empresaId ? (
-            <div className="p-12 text-center text-slate-400">Selecione uma empresa para ver os lançamentos.</div>
+            <div className="p-12 text-center text-slate-400">
+              Selecione uma empresa para ver os lançamentos.
+            </div>
           ) : loadingLanc ? (
             <div className="p-12 text-center text-slate-400">Carregando...</div>
           ) : lancamentos.length === 0 ? (
@@ -185,11 +209,21 @@ export default function ContabilPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Data</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Histórico</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Débito</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Crédito</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Valor</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Data
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Histórico
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Débito
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Crédito
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                    Valor
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -198,11 +232,16 @@ export default function ContabilPage() {
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {new Date(l.data).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-700 max-w-xs truncate">{l.historico}</td>
+                    <td className="px-4 py-3 text-xs text-slate-700 max-w-xs truncate">
+                      {l.historico}
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">{l.contaDebito}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">{l.contaCredito}</td>
                     <td className="px-4 py-3 text-right font-medium text-slate-800">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(l.valor))}
+                      {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      }).format(Number(l.valor))}
                     </td>
                   </tr>
                 ))}
@@ -240,7 +279,9 @@ export default function ContabilPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Data de Aquisição</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Data de Aquisição
+                  </label>
                   <input
                     type="date"
                     value={novoBem.dataAquisicao}
@@ -249,7 +290,9 @@ export default function ContabilPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Valor de Aquisição (R$)</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Valor de Aquisição (R$)
+                  </label>
                   <input
                     type="number"
                     value={novoBem.valorAquisicao}
@@ -259,7 +302,9 @@ export default function ContabilPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Vida Útil (meses)</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Vida Útil (meses)
+                  </label>
                   <input
                     type="number"
                     value={novoBem.vidaUtil}
@@ -268,7 +313,9 @@ export default function ContabilPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Valor Residual (R$)</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Valor Residual (R$)
+                  </label>
                   <input
                     type="number"
                     value={novoBem.valorResidual}
@@ -306,17 +353,30 @@ export default function ContabilPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Descrição</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Aquisição</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Valor</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Vida Útil</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Dep./Mês</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Descrição
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    Aquisição
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                    Valor
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                    Vida Útil
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                    Dep./Mês
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {bens.map((bem) => {
-                  const depMes = (Number(bem.valorAquisicao) - Number(bem.valorResidual)) / bem.vidaUtil
+                  const depMes =
+                    (Number(bem.valorAquisicao) - Number(bem.valorResidual)) / bem.vidaUtil
                   return (
                     <tr key={bem.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-medium text-slate-900">{bem.descricao}</td>
@@ -324,16 +384,26 @@ export default function ContabilPage() {
                         {new Date(bem.dataAquisicao).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-4 py-3 text-right font-medium">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(bem.valorAquisicao))}
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(Number(bem.valorAquisicao))}
                       </td>
                       <td className="px-4 py-3 text-center text-slate-600">{bem.vidaUtil} meses</td>
                       <td className="px-4 py-3 text-right text-blue-600 font-medium">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(depMes)}
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(depMes)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          bem.status === 'ATIVO' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
-                        }`}>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            bem.status === 'ATIVO'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
                           {bem.status}
                         </span>
                       </td>

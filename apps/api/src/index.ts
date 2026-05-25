@@ -23,8 +23,10 @@ import { configuracoesRoutes } from './routes/configuracoes.routes.js'
 // Recusa iniciar sem segredos obrigatórios em produção
 if (process.env['NODE_ENV'] === 'production') {
   if (!process.env['JWT_SECRET']) throw new Error('JWT_SECRET não definido em produção')
-  if (!process.env['JWT_REFRESH_SECRET']) throw new Error('JWT_REFRESH_SECRET não definido em produção')
-  if (!process.env['CREDENTIALS_MASTER_KEY']) throw new Error('CREDENTIALS_MASTER_KEY não definido em produção')
+  if (!process.env['JWT_REFRESH_SECRET'])
+    throw new Error('JWT_REFRESH_SECRET não definido em produção')
+  if (!process.env['CREDENTIALS_MASTER_KEY'])
+    throw new Error('CREDENTIALS_MASTER_KEY não definido em produção')
 }
 
 const app = Fastify({
@@ -47,7 +49,7 @@ await app.register(jwt, {
 await app.register(multipart, {
   limits: {
     fileSize: 5 * 1024 * 1024, // 5 MB — protege contra DoS por upload gigante
-    files: 50,                  // máx 50 arquivos por request (upload em lote)
+    files: 50, // máx 50 arquivos por request (upload em lote)
     fields: 10,
   },
 })
@@ -93,17 +95,28 @@ await app.register(wsRoutes, { prefix: '/ws' })
 
 app.get('/health', async (_request, reply) => {
   const db = getPrismaClient()
-  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null, lazyConnect: true })
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+  })
 
   const [dbOk, redisOk] = await Promise.all([
     db.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
-    redis.ping().then((r) => r === 'PONG').catch(() => false),
+    redis
+      .ping()
+      .then((r) => r === 'PONG')
+      .catch(() => false),
   ])
   redis.disconnect()
 
   const status = dbOk && redisOk ? 'ok' : 'degraded'
   reply.code(dbOk && redisOk ? 200 : 503)
-  return { status, db: dbOk ? 'ok' : 'error', redis: redisOk ? 'ok' : 'error', timestamp: new Date().toISOString() }
+  return {
+    status,
+    db: dbOk ? 'ok' : 'error',
+    redis: redisOk ? 'ok' : 'error',
+    timestamp: new Date().toISOString(),
+  }
 })
 
 const port = Number(process.env['PORT'] ?? 3000)

@@ -37,7 +37,10 @@ export default function ConfiguracoesPage() {
 
   const atualizarNome = useMutation({
     mutationFn: (nome: string) => api.put('/configuracoes/perfil', { nome }),
-    onSuccess: () => { refetch(); setEditandoNome(false) },
+    onSuccess: () => {
+      refetch()
+      setEditandoNome(false)
+    },
   })
 
   async function handleSenha(e: React.FormEvent) {
@@ -54,7 +57,9 @@ export default function ConfiguracoesPage() {
     try {
       await api.put('/configuracoes/senha', { senhaAtual, novaSenha })
       setSenhaMsg({ ok: true, texto: 'Senha alterada com sucesso' })
-      setSenhaAtual(''); setNovaSenha(''); setConfirmar('')
+      setSenhaAtual('')
+      setNovaSenha('')
+      setConfirmar('')
     } catch (err: any) {
       setSenhaMsg({ ok: false, texto: err.response?.data?.error ?? 'Erro ao alterar senha' })
     }
@@ -65,7 +70,9 @@ export default function ConfiguracoesPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-bold text-slate-900">Configurações</h1>
         <div className="animate-pulse space-y-4">
-          {[1, 2, 3].map((i) => <div key={i} className="h-32 bg-slate-100 rounded-xl" />)}
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 bg-slate-100 rounded-xl" />
+          ))}
         </div>
       </div>
     )
@@ -77,7 +84,9 @@ export default function ConfiguracoesPage() {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Configurações</h1>
-        <p className="text-slate-500 text-sm mt-1">Gerencie seu perfil, tenant e credenciais de acesso</p>
+        <p className="text-slate-500 text-sm mt-1">
+          Gerencie seu perfil, tenant e credenciais de acesso
+        </p>
       </div>
 
       {/* Perfil do usuário */}
@@ -104,26 +113,39 @@ export default function ConfiguracoesPage() {
                 >
                   Salvar
                 </button>
-                <button onClick={() => setEditandoNome(false)} className="text-slate-400 text-xs px-2 py-1.5">
+                <button
+                  onClick={() => setEditandoNome(false)}
+                  className="text-slate-400 text-xs px-2 py-1.5"
+                >
                   Cancelar
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <p className="font-medium text-slate-900 truncate">{usuario?.nome}</p>
-                <button onClick={() => { setEditandoNome(true); setNomeEdit(usuario?.nome ?? '') }}
-                  className="text-xs text-blue-600 hover:text-blue-800">editar</button>
+                <button
+                  onClick={() => {
+                    setEditandoNome(true)
+                    setNomeEdit(usuario?.nome ?? '')
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  editar
+                </button>
               </div>
             )}
             <p className="text-sm text-slate-500 mt-0.5">{usuario?.email}</p>
           </div>
-          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${PERFIL_COR[usuario?.perfil] ?? 'bg-slate-100 text-slate-600'}`}>
+          <span
+            className={`text-xs px-2.5 py-1 rounded-full font-medium ${PERFIL_COR[usuario?.perfil] ?? 'bg-slate-100 text-slate-600'}`}
+          >
             {usuario?.perfil}
           </span>
         </div>
 
         <div className="text-xs text-slate-400">
-          Conta criada em {usuario?.criadoEm ? new Date(usuario.criadoEm).toLocaleDateString('pt-BR') : '—'}
+          Conta criada em{' '}
+          {usuario?.criadoEm ? new Date(usuario.criadoEm).toLocaleDateString('pt-BR') : '—'}
         </div>
       </section>
 
@@ -142,11 +164,15 @@ export default function ConfiguracoesPage() {
           </div>
           <div>
             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Subdomínio</p>
-            <p className="font-mono text-slate-900">{tenant?.subdominio ?? '—'}.saascontabil.com.br</p>
+            <p className="font-mono text-slate-900">
+              {tenant?.subdominio ?? '—'}.saascontabil.com.br
+            </p>
           </div>
           <div>
             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Plano</p>
-            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${PLANO_COR[tenant?.plano] ?? 'bg-slate-100 text-slate-600'}`}>
+            <span
+              className={`text-xs px-2.5 py-1 rounded-full font-medium ${PLANO_COR[tenant?.plano] ?? 'bg-slate-100 text-slate-600'}`}
+            >
               {tenant?.plano ?? '—'}
             </span>
           </div>
@@ -193,7 +219,9 @@ export default function ConfiguracoesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Confirmar nova senha</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Confirmar nova senha
+            </label>
             <input
               type="password"
               value={confirmar}
@@ -206,7 +234,8 @@ export default function ConfiguracoesPage() {
 
           {senhaMsg && (
             <p className={`text-sm ${senhaMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
-              {senhaMsg.ok ? '✓ ' : '✗ '}{senhaMsg.texto}
+              {senhaMsg.ok ? '✓ ' : '✗ '}
+              {senhaMsg.texto}
             </p>
           )}
 
@@ -248,7 +277,10 @@ export default function ConfiguracoesPage() {
       {/* Sair */}
       <div className="flex justify-end pb-6">
         <button
-          onClick={() => { logout(); window.location.href = '/login' }}
+          onClick={() => {
+            logout()
+            window.location.href = '/login'
+          }}
           className="text-sm text-red-600 hover:text-red-800 font-medium"
         >
           Sair da conta

@@ -1,5 +1,11 @@
 import { Job } from 'bullmq'
-import { PGDASService, DifalService, GNREService, DeSTDAService, EFDReinfService } from '@saas-contabil/fiscal'
+import {
+  PGDASService,
+  DifalService,
+  GNREService,
+  DeSTDAService,
+  EFDReinfService,
+} from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
   tenantId: string

@@ -40,19 +40,30 @@ export class PortalOrchestrator {
       switch (`${job.portal}:${job.operacao}`) {
         case 'ECAC:CONSULTA_SITUACAO':
           resultado = await this.ecac.consultarSituacaoFiscal(
-            job.tenantId, job.empresaId, job.cnpj, credencialBuffer
+            job.tenantId,
+            job.empresaId,
+            job.cnpj,
+            credencialBuffer
           )
           break
 
         case 'ECAC:CERTIDAO':
           resultado = await this.ecac.baixarCertidao(
-            job.tenantId, job.empresaId, job.cnpj, credencialBuffer, job.competencia ?? ''
+            job.tenantId,
+            job.empresaId,
+            job.cnpj,
+            credencialBuffer,
+            job.competencia ?? ''
           )
           break
 
         case 'SIMPLES_NACIONAL:TRANSMITIR_PGDAS':
           resultado = await this.simplesnacional.transmitirPGDAS(
-            job.tenantId, job.empresaId, job.cnpj, job.competencia ?? '', job.dados ?? {}
+            job.tenantId,
+            job.empresaId,
+            job.cnpj,
+            job.competencia ?? '',
+            job.dados ?? {}
           )
           break
 

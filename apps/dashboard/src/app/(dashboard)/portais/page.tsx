@@ -81,7 +81,9 @@ export default function PortaisPage() {
           >
             <option value="">Selecionar empresa...</option>
             {empresas.map((e) => (
-              <option key={e.id} value={e.id}>{e.razaoSocial}</option>
+              <option key={e.id} value={e.id}>
+                {e.razaoSocial}
+              </option>
             ))}
           </select>
           <input
@@ -144,7 +146,10 @@ export default function PortaisPage() {
               </div>
             ) : (
               portaisStatus.map((portal) => (
-                <div key={portal.portal} className="bg-white rounded-xl border border-slate-200 p-5">
+                <div
+                  key={portal.portal}
+                  className="bg-white rounded-xl border border-slate-200 p-5"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{PORTAL_ICONS[portal.portal] ?? '🌐'}</span>
@@ -155,16 +160,22 @@ export default function PortaisPage() {
                         )}
                         {portal.ultimaVerificacao && (
                           <p className="text-xs text-slate-400 mt-0.5">
-                            Última verificação: {new Date(portal.ultimaVerificacao).toLocaleString('pt-BR')}
+                            Última verificação:{' '}
+                            {new Date(portal.ultimaVerificacao).toLocaleString('pt-BR')}
                           </p>
                         )}
                       </div>
                     </div>
-                    <span className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COR[portal.status] ?? 'bg-slate-100 text-slate-500'}`}>
-                      {portal.status === 'OK' ? 'Operacional' :
-                       portal.status === 'ERRO' ? 'Com erro' :
-                       portal.status === 'PROCESSANDO' ? 'Processando...' :
-                       'Pendente'}
+                    <span
+                      className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COR[portal.status] ?? 'bg-slate-100 text-slate-500'}`}
+                    >
+                      {portal.status === 'OK'
+                        ? 'Operacional'
+                        : portal.status === 'ERRO'
+                          ? 'Com erro'
+                          : portal.status === 'PROCESSANDO'
+                            ? 'Processando...'
+                            : 'Pendente'}
                     </span>
                   </div>
                 </div>

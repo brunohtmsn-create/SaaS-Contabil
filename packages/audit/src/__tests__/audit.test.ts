@@ -55,29 +55,31 @@ import { AuditChainVerifier } from '../chain-verifier.js'
 // Factory de AuditEvent fictício para uso nos testes
 // ---------------------------------------------------------------------------
 
-function makeAuditEvent(overrides: Partial<{
-  id: string
-  sequencia: bigint
-  tenantId: string
-  cnpj: string | null
-  entidadeTipo: string
-  entidadeId: string
-  evento: string
-  estadoAnterior: unknown
-  estadoNovo: unknown
-  responsavel: string
-  responsavelTipo: string
-  evidencias: string[]
-  score: number | null
-  aprovadoPor: string | null
-  observacao: string | null
-  hashEvento: string
-  hashAnterior: string
-  timestamp: Date
-  ipOrigem: string | null
-  jobId: string | null
-  duracao: number | null
-}> = {}) {
+function makeAuditEvent(
+  overrides: Partial<{
+    id: string
+    sequencia: bigint
+    tenantId: string
+    cnpj: string | null
+    entidadeTipo: string
+    entidadeId: string
+    evento: string
+    estadoAnterior: unknown
+    estadoNovo: unknown
+    responsavel: string
+    responsavelTipo: string
+    evidencias: string[]
+    score: number | null
+    aprovadoPor: string | null
+    observacao: string | null
+    hashEvento: string
+    hashAnterior: string
+    timestamp: Date
+    ipOrigem: string | null
+    jobId: string | null
+    duracao: number | null
+  }> = {}
+) {
   return {
     id: 'evento-id-001',
     sequencia: BigInt(1),
@@ -233,7 +235,10 @@ describe('AuditService — buscarEventos()', () => {
   })
 
   it('retorna eventos do tenant ordenados por sequência decrescente', async () => {
-    const eventos = [makeAuditEvent({ sequencia: BigInt(2) }), makeAuditEvent({ sequencia: BigInt(1) })]
+    const eventos = [
+      makeAuditEvent({ sequencia: BigInt(2) }),
+      makeAuditEvent({ sequencia: BigInt(1) }),
+    ]
     mockDb.auditEvent.findMany.mockResolvedValue(eventos)
 
     const resultado = await service.buscarEventos('tenant-001')
@@ -242,7 +247,7 @@ describe('AuditService — buscarEventos()', () => {
       expect.objectContaining({
         where: { tenantId: 'tenant-001' },
         orderBy: { sequencia: 'desc' },
-      }),
+      })
     )
     expect(resultado).toEqual(eventos)
   })
@@ -255,7 +260,7 @@ describe('AuditService — buscarEventos()', () => {
     expect(mockDb.auditEvent.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { tenantId: 'tenant-001', cnpj: '11.222.333/0001-81' },
-      }),
+      })
     )
   })
 
@@ -264,9 +269,7 @@ describe('AuditService — buscarEventos()', () => {
 
     await service.buscarEventos('tenant-001')
 
-    expect(mockDb.auditEvent.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 100 }),
-    )
+    expect(mockDb.auditEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }))
   })
 
   it('aceita limite customizado', async () => {
@@ -274,9 +277,7 @@ describe('AuditService — buscarEventos()', () => {
 
     await service.buscarEventos('tenant-001', undefined, 25)
 
-    expect(mockDb.auditEvent.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 25 }),
-    )
+    expect(mockDb.auditEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 25 }))
   })
 })
 
@@ -304,7 +305,7 @@ describe('AuditService — buscarPendentesRevisao()', () => {
     expect(mockDb.auditEvent.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { tenantId: 'tenant-001', evento: 'PENDENTE_REVISAO_HUMANA' },
-      }),
+      })
     )
     expect(resultado).toHaveLength(2)
   })
@@ -325,7 +326,7 @@ describe('AuditService — buscarPendentesRevisao()', () => {
     expect(mockDb.auditEvent.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         orderBy: { timestamp: 'asc' },
-      }),
+      })
     )
   })
 })
@@ -367,28 +368,28 @@ describe('AuditService — aprovar()', () => {
     expect(data['aprovadoPor']).toBe('contador@exemplo.com')
     expect(data['responsavel']).toBe('contador@exemplo.com')
     expect(data['responsavelTipo']).toBe('USUARIO')
-    expect((data['estadoAnterior'] as Record<string, unknown>)['eventoAprovado']).toBe('evt-pendente-001')
+    expect((data['estadoAnterior'] as Record<string, unknown>)['eventoAprovado']).toBe(
+      'evt-pendente-001'
+    )
   })
 
   it('lança erro quando evento não é encontrado no banco', async () => {
     mockDb.auditEvent.findFirst.mockResolvedValue(null)
 
     await expect(
-      service.aprovar('evt-inexistente', 'usuario@exemplo.com', 'tenant-001'),
+      service.aprovar('evt-inexistente', 'usuario@exemplo.com', 'tenant-001')
     ).rejects.toThrow('Evento não encontrado')
   })
 
   it('busca evento combinando id + tenantId (isolamento multi-tenant)', async () => {
     mockDb.auditEvent.findFirst.mockResolvedValue(null)
 
-    await expect(
-      service.aprovar('evt-001', 'usuario', 'tenant-isolado'),
-    ).rejects.toThrow()
+    await expect(service.aprovar('evt-001', 'usuario', 'tenant-isolado')).rejects.toThrow()
 
     expect(mockDb.auditEvent.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'evt-001', tenantId: 'tenant-isolado' },
-      }),
+      })
     )
   })
 })
@@ -438,10 +439,9 @@ describe('AuditChainVerifier — verificar()', () => {
       }
       // Usa o mesmo replacer que chain-verifier.ts para serializar BigInt
       const hashEvento = sha256(
-        JSON.stringify(
-          { ...rest, hashAnterior },
-          (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
-        ),
+        JSON.stringify({ ...rest, hashAnterior }, (_key, value) =>
+          typeof value === 'bigint' ? value.toString() : value
+        )
       )
       eventos.push({ ...rest, hashEvento, hashAnterior })
       hashAnterior = hashEvento
@@ -520,7 +520,7 @@ describe('AuditChainVerifier — verificar()', () => {
       expect.objectContaining({
         where: { tenantId: 'tenant-especifico' },
         orderBy: { sequencia: 'asc' },
-      }),
+      })
     )
   })
 

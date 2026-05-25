@@ -1,9 +1,17 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
-import { LancamentoService, DepreciacaoService, ECDService, OpenFinanceService } from '@saas-contabil/contabil'
+import {
+  LancamentoService,
+  DepreciacaoService,
+  ECDService,
+  OpenFinanceService,
+} from '@saas-contabil/contabil'
 
-const params = z.object({ empresaId: z.string().uuid(), competencia: z.string().regex(/^\d{4}-\d{2}$/) })
+const params = z.object({
+  empresaId: z.string().uuid(),
+  competencia: z.string().regex(/^\d{4}-\d{2}$/),
+})
 
 export async function contabilRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
@@ -66,19 +74,24 @@ export async function contabilRoutes(app: FastifyInstance) {
   app.get('/bens/:empresaId', async (request) => {
     const { tenantId } = request.user as any
     const { empresaId } = request.params as { empresaId: string }
-    return db.bemAtivo.findMany({ where: { tenantId, empresaId }, orderBy: { dataAquisicao: 'desc' } })
+    return db.bemAtivo.findMany({
+      where: { tenantId, empresaId },
+      orderBy: { dataAquisicao: 'desc' },
+    })
   })
 
   app.post('/bens/:empresaId', async (request) => {
     const { tenantId } = request.user as any
     const { empresaId } = request.params as { empresaId: string }
-    const body = z.object({
-      descricao: z.string(),
-      dataAquisicao: z.string(),
-      valorAquisicao: z.number(),
-      vidaUtil: z.number().int(),
-      valorResidual: z.number().default(0),
-    }).parse(request.body)
+    const body = z
+      .object({
+        descricao: z.string(),
+        dataAquisicao: z.string(),
+        valorAquisicao: z.number(),
+        vidaUtil: z.number().int(),
+        valorResidual: z.number().default(0),
+      })
+      .parse(request.body)
 
     return db.bemAtivo.create({
       data: {

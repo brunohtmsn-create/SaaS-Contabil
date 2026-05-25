@@ -96,11 +96,26 @@ describe('fiscalJob — roteamento de operações', () => {
 
   it('TODOS → mantém ordem: PGDAS antes de DIFAL', async () => {
     const order: string[] = []
-    mockPGDAS.apurar.mockImplementation(() => { order.push('PGDAS'); return Promise.resolve() })
-    mockDifal.calcular.mockImplementation(() => { order.push('DIFAL'); return Promise.resolve() })
-    mockGNRE.gerar.mockImplementation(() => { order.push('GNRE'); return Promise.resolve() })
-    mockDeSTDA.gerar.mockImplementation(() => { order.push('DESTDA'); return Promise.resolve() })
-    mockEFDReinf.processar.mockImplementation(() => { order.push('EFDREINF'); return Promise.resolve() })
+    mockPGDAS.apurar.mockImplementation(() => {
+      order.push('PGDAS')
+      return Promise.resolve()
+    })
+    mockDifal.calcular.mockImplementation(() => {
+      order.push('DIFAL')
+      return Promise.resolve()
+    })
+    mockGNRE.gerar.mockImplementation(() => {
+      order.push('GNRE')
+      return Promise.resolve()
+    })
+    mockDeSTDA.gerar.mockImplementation(() => {
+      order.push('DESTDA')
+      return Promise.resolve()
+    })
+    mockEFDReinf.processar.mockImplementation(() => {
+      order.push('EFDREINF')
+      return Promise.resolve()
+    })
 
     await fiscalJob(makeJob('TODOS'))
     expect(order).toEqual(['PGDAS', 'DIFAL', 'GNRE', 'DESTDA', 'EFDREINF'])

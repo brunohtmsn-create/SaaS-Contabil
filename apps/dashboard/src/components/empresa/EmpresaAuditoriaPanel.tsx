@@ -43,15 +43,21 @@ export function EmpresaAuditoriaPanel({ empresaId }: Props) {
       {isLoading ? (
         <div className="p-8 text-center text-slate-400">Carregando eventos...</div>
       ) : eventos.length === 0 ? (
-        <div className="p-8 text-center text-slate-400">Nenhum evento de auditoria registrado para esta empresa.</div>
+        <div className="p-8 text-center text-slate-400">
+          Nenhum evento de auditoria registrado para esta empresa.
+        </div>
       ) : (
         <div className="divide-y divide-slate-100">
           {eventos.map((ev) => (
             <div key={ev.id} className="px-6 py-4 hover:bg-slate-50">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span className="font-mono text-xs text-slate-300 w-8 shrink-0">#{ev.sequencia}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded font-mono whitespace-nowrap ${EVENTO_COR[ev.evento] ?? 'bg-slate-100 text-slate-600'}`}>
+                  <span className="font-mono text-xs text-slate-300 w-8 shrink-0">
+                    #{ev.sequencia}
+                  </span>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded font-mono whitespace-nowrap ${EVENTO_COR[ev.evento] ?? 'bg-slate-100 text-slate-600'}`}
+                  >
                     {ev.evento}
                   </span>
                   <span className="text-xs text-slate-500 truncate">
@@ -63,16 +69,18 @@ export function EmpresaAuditoriaPanel({ empresaId }: Props) {
                   {new Date(ev.timestamp).toLocaleString('pt-BR')}
                 </time>
               </div>
-              {ev.estadoNovo && typeof ev.estadoNovo === 'object' && Object.keys(ev.estadoNovo as object).length > 0 && (
-                <details className="mt-2 ml-11">
-                  <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600">
-                    Ver detalhes
-                  </summary>
-                  <pre className="mt-1 text-xs bg-slate-50 rounded p-2 overflow-auto max-h-32 text-slate-600">
-                    {JSON.stringify(ev.estadoNovo, null, 2)}
-                  </pre>
-                </details>
-              )}
+              {ev.estadoNovo &&
+                typeof ev.estadoNovo === 'object' &&
+                Object.keys(ev.estadoNovo as object).length > 0 && (
+                  <details className="mt-2 ml-11">
+                    <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600">
+                      Ver detalhes
+                    </summary>
+                    <pre className="mt-1 text-xs bg-slate-50 rounded p-2 overflow-auto max-h-32 text-slate-600">
+                      {JSON.stringify(ev.estadoNovo, null, 2)}
+                    </pre>
+                  </details>
+                )}
             </div>
           ))}
         </div>

@@ -33,7 +33,11 @@ export async function authRoutes(app: FastifyInstance) {
       { expiresIn: '30d' }
     )
 
-    return { token, refreshToken, usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: usuario.perfil } }
+    return {
+      token,
+      refreshToken,
+      usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: usuario.perfil },
+    }
   })
 
   app.post('/refresh', async (request, reply) => {
@@ -41,7 +45,10 @@ export async function authRoutes(app: FastifyInstance) {
     try {
       const payload = app.jwt.verify(refreshToken) as any
       if (payload.type !== 'refresh') throw new Error('Invalid token type')
-      const newToken = app.jwt.sign({ sub: payload.sub, tenantId: payload.tenantId }, { expiresIn: '8h' })
+      const newToken = app.jwt.sign(
+        { sub: payload.sub, tenantId: payload.tenantId },
+        { expiresIn: '8h' }
+      )
       return { token: newToken }
     } catch {
       return reply.code(401).send({ error: 'Token inválido' })

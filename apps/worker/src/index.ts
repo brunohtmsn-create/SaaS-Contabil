@@ -34,7 +34,7 @@ await queues.monitoramento.add(
   {
     repeat: { pattern: '0 10 * * *' },
     jobId: 'monitoramento:diario',
-  },
+  }
 )
 
 const workers = [
@@ -57,7 +57,9 @@ for (const worker of workers) {
 }
 
 console.log('[Worker] Started — listening to queues:', Object.keys(queues).join(', '))
-console.log('[Worker] Cron job "monitoramento:diario" agendado para 10:00 UTC (07:00 BRT) diariamente')
+console.log(
+  '[Worker] Cron job "monitoramento:diario" agendado para 10:00 UTC (07:00 BRT) diariamente'
+)
 
 process.on('SIGTERM', async () => {
   console.log('[Worker] SIGTERM received, shutting down...')

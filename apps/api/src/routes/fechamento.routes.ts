@@ -6,28 +6,36 @@ import IORedis from 'ioredis'
 
 export async function fechamentoRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
-  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null })
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+  })
   const fechamentoQueue = new Queue('fechamento', { connection: redis })
 
   app.post('/run/:empresaId/:competencia', async (request) => {
     const { tenantId } = request.user as any
-    const { empresaId, competencia } = z.object({
-      empresaId: z.string().uuid(),
-      competencia: z.string().regex(/^\d{4}-\d{2}$/),
-    }).parse(request.params)
+    const { empresaId, competencia } = z
+      .object({
+        empresaId: z.string().uuid(),
+        competencia: z.string().regex(/^\d{4}-\d{2}$/),
+      })
+      .parse(request.params)
 
     const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
     if (!empresa) return { error: 'Empresa não encontrada' }
 
-    const job = await fechamentoQueue.add('fechamento-completo', {
-      tenantId,
-      empresaId,
-      cnpj: empresa.cnpj,
-      competencia,
-    }, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    })
+    const job = await fechamentoQueue.add(
+      'fechamento-completo',
+      {
+        tenantId,
+        empresaId,
+        cnpj: empresa.cnpj,
+        competencia,
+      },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+      }
+    )
 
     return { jobId: job.id, status: 'INICIADO', empresa: empresa.cnpj, competencia }
   })
@@ -56,16 +64,20 @@ export async function fechamentoRoutes(app: FastifyInstance) {
 
     const jobs = await Promise.all(
       empresas.map((empresa) =>
-        fechamentoQueue.add('fechamento-completo', {
-          tenantId,
-          empresaId: empresa.id,
-          cnpj: empresa.cnpj,
-          competencia,
-        }, {
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 2000 },
-          delay: Math.random() * 5000,
-        })
+        fechamentoQueue.add(
+          'fechamento-completo',
+          {
+            tenantId,
+            empresaId: empresa.id,
+            cnpj: empresa.cnpj,
+            competencia,
+          },
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 2000 },
+            delay: Math.random() * 5000,
+          }
+        )
       )
     )
 

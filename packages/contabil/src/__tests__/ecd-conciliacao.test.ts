@@ -95,9 +95,7 @@ function makeLancamento(id: string, conta: string, valor: string, tipo: 'DEBITO'
     data: new Date('2025-01-15'),
     historico: `Lançamento ${id}`,
     competencia: '2025-01',
-    partidas: [
-      { conta, valor, tipo },
-    ],
+    partidas: [{ conta, valor, tipo }],
   }
 }
 

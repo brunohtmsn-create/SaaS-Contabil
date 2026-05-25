@@ -74,13 +74,21 @@ describe('scraperJob — roteamento', () => {
   it('NFE → chama capturarNFe com cnpj, competencia e credencial', async () => {
     const job = makeJob('NFE')
     await scraperJob(job)
-    expect(mockOrchestrator.capturarNFe).toHaveBeenCalledWith('11111111000111', '2025-01', FAKE_CRED)
+    expect(mockOrchestrator.capturarNFe).toHaveBeenCalledWith(
+      '11111111000111',
+      '2025-01',
+      FAKE_CRED
+    )
     expect(mockOrchestrator.capturarNFCe).not.toHaveBeenCalled()
   })
 
   it('NFCE → chama capturarNFCe', async () => {
     await scraperJob(makeJob('NFCE'))
-    expect(mockOrchestrator.capturarNFCe).toHaveBeenCalledWith('11111111000111', '2025-01', FAKE_CRED)
+    expect(mockOrchestrator.capturarNFCe).toHaveBeenCalledWith(
+      '11111111000111',
+      '2025-01',
+      FAKE_CRED
+    )
   })
 
   it('NFSE → chama capturarNFSe e combina emitidas + tomadas', async () => {
@@ -110,9 +118,7 @@ describe('scraperJob — normalização', () => {
   })
 
   it('normalizar retorna null (duplicata) → ainda continua para o próximo', async () => {
-    mockNormalizer.normalizar
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(true)
+    mockNormalizer.normalizar.mockResolvedValueOnce(null).mockResolvedValueOnce(true)
     const job = makeJob('NFE')
     await expect(scraperJob(job)).resolves.not.toThrow()
     expect(mockNormalizer.normalizar).toHaveBeenCalledTimes(2)

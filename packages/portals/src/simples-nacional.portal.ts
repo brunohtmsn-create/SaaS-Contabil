@@ -22,10 +22,13 @@ export class SimplesNacionalPortal {
       const context = await browser.newContext()
       page = await context.newPage()
 
-      await page.goto('https://www8.receita.fazenda.gov.br/SimplesNacional/Aplicacoes/ATSPO/pgmei.app/Default.aspx', {
-        timeout: 30000,
-        waitUntil: 'networkidle',
-      })
+      await page.goto(
+        'https://www8.receita.fazenda.gov.br/SimplesNacional/Aplicacoes/ATSPO/pgmei.app/Default.aspx',
+        {
+          timeout: 30000,
+          waitUntil: 'networkidle',
+        }
+      )
 
       const recibo = `PGDAS-${cnpj}-${competencia}-${Date.now()}`
 
@@ -35,11 +38,14 @@ export class SimplesNacionalPortal {
       })
 
       await this.audit.registrar({
-        tenantId, cnpj,
-        entidadeTipo: 'APURACAO_FISCAL', entidadeId: empresaId,
+        tenantId,
+        cnpj,
+        entidadeTipo: 'APURACAO_FISCAL',
+        entidadeId: empresaId,
         evento: 'PGDAS_TRANSMITIDO',
         estadoNovo: { competencia, recibo },
-        responsavel: 'sistema', responsavelTipo: 'SISTEMA',
+        responsavel: 'sistema',
+        responsavelTipo: 'SISTEMA',
       })
 
       return recibo
@@ -51,11 +57,14 @@ export class SimplesNacionalPortal {
       }
 
       await this.audit.registrar({
-        tenantId, cnpj,
-        entidadeTipo: 'APURACAO_FISCAL', entidadeId: empresaId,
+        tenantId,
+        cnpj,
+        entidadeTipo: 'APURACAO_FISCAL',
+        entidadeId: empresaId,
         evento: 'OBRIGACAO_FALHOU',
         estadoNovo: { competencia, erro: String(err) },
-        responsavel: 'sistema', responsavelTipo: 'SISTEMA',
+        responsavel: 'sistema',
+        responsavelTipo: 'SISTEMA',
       })
 
       throw err

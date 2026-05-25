@@ -4,7 +4,11 @@ import { Decimal, competencias12Meses, parsePeriodo } from '@saas-contabil/share
 export class FatorRService {
   private db = getPrismaClient()
 
-  async calcular(tenantId: string, empresaId: string, competencia: string): Promise<{ fatorR: Decimal; anexo: 'III' | 'V' }> {
+  async calcular(
+    tenantId: string,
+    empresaId: string,
+    competencia: string
+  ): Promise<{ fatorR: Decimal; anexo: 'III' | 'V' }> {
     const competencias = competencias12Meses(competencia)
     const primeiro = competencias[0]
     const { inicio } = parsePeriodo(primeiro ?? competencia)
@@ -45,7 +49,11 @@ export class FatorRService {
     // Soma partidas do tipo DEBITO em contas de despesas de pessoal (iniciadas com '6.1.')
     let folha12m = new Decimal(0)
     for (const lancamento of lancamentosFolha) {
-      const partidas = lancamento.partidas as Array<{ conta: string; valor: string | number; tipo: string }>
+      const partidas = lancamento.partidas as Array<{
+        conta: string
+        valor: string | number
+        tipo: string
+      }>
       if (!Array.isArray(partidas)) continue
       for (const partida of partidas) {
         if (

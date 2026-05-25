@@ -17,7 +17,9 @@ export function StatsCard({ title, value, icon, color }: Props) {
     <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm font-medium text-slate-500">{title}</span>
-        <span className={`w-10 h-10 flex items-center justify-center rounded-lg text-lg ${colorMap[color]}`}>
+        <span
+          className={`w-10 h-10 flex items-center justify-center rounded-lg text-lg ${colorMap[color]}`}
+        >
           {icon === 'building' ? '🏢' : icon === 'file' ? '📄' : icon === 'bell' ? '🔔' : '📅'}
         </span>
       </div>

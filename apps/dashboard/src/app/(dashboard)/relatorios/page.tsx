@@ -169,11 +169,15 @@ export default function RelatoriosPage() {
                       {fmt.format(Number(d?.valorDAS ?? d?.valorDas ?? 0))}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                        ap.status === 'TRANSMITIDO' ? 'bg-green-100 text-green-700' :
-                        ap.status === 'CALCULADO' ? 'bg-blue-100 text-blue-700' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                          ap.status === 'TRANSMITIDO'
+                            ? 'bg-green-100 text-green-700'
+                            : ap.status === 'CALCULADO'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
                         {ap.status}
                       </span>
                     </td>
@@ -214,7 +218,9 @@ export default function RelatoriosPage() {
                   <td className="px-4 py-3 font-medium text-slate-900">
                     {h.competencia}
                     {!h.lido && (
-                      <span className="ml-2 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full">novo</span>
+                      <span className="ml-2 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full">
+                        novo
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right text-slate-600">{h.empresasCount}</td>

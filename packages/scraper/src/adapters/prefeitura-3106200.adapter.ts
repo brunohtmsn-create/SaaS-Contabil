@@ -33,14 +33,17 @@ const SEL = {
   MSG_ERRO_LOGIN: '.error-message, .alert-danger, #mensagemErro, span[class*="error"]',
 
   // Formulário de consulta
-  DATA_INICIO: '#dtInicial, input[id*="DtInicial"], input[name*="dtInicial"], input[id*="DataInicio"]',
+  DATA_INICIO:
+    '#dtInicial, input[id*="DtInicial"], input[name*="dtInicial"], input[id*="DataInicio"]',
   DATA_FIM: '#dtFinal, input[id*="DtFinal"], input[name*="dtFinal"], input[id*="DataFim"]',
   CNPJ_INPUT: '#cnpj, input[id*="Cnpj"], input[name*="cnpj"]',
   COMPETENCIA_INPUT: '#competencia, input[id*="Competencia"], select[id*="Competencia"]',
-  BTN_PESQUISAR: '#btnPesquisar, button[id*="Pesquisar"], input[value="Pesquisar"], button[id*="Buscar"]',
+  BTN_PESQUISAR:
+    '#btnPesquisar, button[id*="Pesquisar"], input[value="Pesquisar"], button[id*="Buscar"]',
 
   // Tabela de resultados
-  GRID_ROWS: 'table.tabelaNfse tbody tr, table[id*="grid"] tbody tr, table[id*="Grid"] tbody tr, .gridContainer tbody tr',
+  GRID_ROWS:
+    'table.tabelaNfse tbody tr, table[id*="grid"] tbody tr, table[id*="Grid"] tbody tr, .gridContainer tbody tr',
   BTN_XML: 'a[title*="XML"], a[href*="xml"], img[alt*="XML"]',
   BTN_PDF: 'a[title*="PDF"], a[href*="pdf"], a[title*="Imprimir"], img[alt*="PDF"]',
   LINK_DETALHE: 'a[id*="lnkNota"], a[id*="lnkDetalhe"], a[href*="detalhe"]',
@@ -54,10 +57,7 @@ const SEL = {
   CAPTCHA_INPUT: '#txtCaptcha, input[id*="captcha"], input[id*="Captcha"]',
 } as const
 
-export class Prefeitura3106200Adapter
-  extends BasePLaywrightAdapter
-  implements PrefeituraAdapter
-{
+export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements PrefeituraAdapter {
   tipo = 'NFSE_EMITIDA'
   fonte = 'PREFEITURA_BH'
   municipio = 'Belo Horizonte'
@@ -130,9 +130,7 @@ export class Prefeitura3106200Adapter
 
         // Coletar cookies da sessão
         const cookies = await page.context().cookies()
-        const cookieStr = cookies
-          .map((c) => `${c.name}=${c.value}`)
-          .join('; ')
+        const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
         return {
           cookies: cookieStr,
@@ -171,10 +169,10 @@ export class Prefeitura3106200Adapter
         await this.garantirSessao(page, cnpj, 'emitidas')
 
         // Navega à tela de consulta de NFS-e emitidas
-        await page.goto(
-          `${BASE_URL}/bhissweb/nfse/consultarNfse`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/bhissweb/nfse/consultarNfse`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroConsulta(page, cnpj, periodo, 'bh-emitidas')
 
@@ -193,10 +191,10 @@ export class Prefeitura3106200Adapter
         await this.garantirSessao(page, cnpj, 'tomadas')
 
         // Navega à tela de consulta de NFS-e recebidas (tomador)
-        await page.goto(
-          `${BASE_URL}/bhissweb/nfse/consultarNfseTomada`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/bhissweb/nfse/consultarNfseTomada`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroConsulta(page, cnpj, periodo, 'bh-tomadas')
 

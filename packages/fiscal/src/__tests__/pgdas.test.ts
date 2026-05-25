@@ -108,7 +108,7 @@ describe('PGDASService — segregarReceitas()', () => {
     ]
     const receitas = (service as any).segregarReceitas(docs, '00.000.000/0001-00', '2025-01')
 
-    expect(receitas.anexoI.toFixed(2)).toBe('1500.00')   // NFCE + NFE 5.x
+    expect(receitas.anexoI.toFixed(2)).toBe('1500.00') // NFCE + NFE 5.x
     expect(receitas.anexoIII.toFixed(2)).toBe('2000.00') // NFSE_EMITIDA
     expect(receitas.total.toFixed(2)).toBe('3500.00')
   })
@@ -134,20 +134,20 @@ describe('PGDASService — buscarFaixa() Anexo I', () => {
   })
 
   const casos = [
-    { rb: '0',         faixa: 0, aliquota: '4',    deducao: '0' },
-    { rb: '90000',     faixa: 0, aliquota: '4',    deducao: '0' },
-    { rb: '180000',    faixa: 0, aliquota: '4',    deducao: '0' },
-    { rb: '180000.01', faixa: 1, aliquota: '7.3',  deducao: '5940' },
-    { rb: '270000',    faixa: 1, aliquota: '7.3',  deducao: '5940' },
-    { rb: '360000',    faixa: 1, aliquota: '7.3',  deducao: '5940' },
-    { rb: '360000.01', faixa: 2, aliquota: '9.5',  deducao: '13860' },
-    { rb: '720000',    faixa: 2, aliquota: '9.5',  deducao: '13860' },
+    { rb: '0', faixa: 0, aliquota: '4', deducao: '0' },
+    { rb: '90000', faixa: 0, aliquota: '4', deducao: '0' },
+    { rb: '180000', faixa: 0, aliquota: '4', deducao: '0' },
+    { rb: '180000.01', faixa: 1, aliquota: '7.3', deducao: '5940' },
+    { rb: '270000', faixa: 1, aliquota: '7.3', deducao: '5940' },
+    { rb: '360000', faixa: 1, aliquota: '7.3', deducao: '5940' },
+    { rb: '360000.01', faixa: 2, aliquota: '9.5', deducao: '13860' },
+    { rb: '720000', faixa: 2, aliquota: '9.5', deducao: '13860' },
     { rb: '720000.01', faixa: 3, aliquota: '10.7', deducao: '22500' },
-    { rb: '1800000',   faixa: 3, aliquota: '10.7', deducao: '22500' },
-    { rb: '1800000.01',faixa: 4, aliquota: '14.3', deducao: '87300' },
-    { rb: '3600000',   faixa: 4, aliquota: '14.3', deducao: '87300' },
-    { rb: '3600000.01',faixa: 5, aliquota: '19',   deducao: '378000' },
-    { rb: '4800000',   faixa: 5, aliquota: '19',   deducao: '378000' },
+    { rb: '1800000', faixa: 3, aliquota: '10.7', deducao: '22500' },
+    { rb: '1800000.01', faixa: 4, aliquota: '14.3', deducao: '87300' },
+    { rb: '3600000', faixa: 4, aliquota: '14.3', deducao: '87300' },
+    { rb: '3600000.01', faixa: 5, aliquota: '19', deducao: '378000' },
+    { rb: '4800000', faixa: 5, aliquota: '19', deducao: '378000' },
   ]
 
   it.each(casos)('RB R$ %s → alíquota %s%% / deduções R$ %s', ({ rb, aliquota, deducao }) => {
@@ -175,26 +175,29 @@ describe('PGDASService — buscarFaixa() Anexo III', () => {
   })
 
   const casos = [
-    { rb: '0',          aliquota: '6',    deducao: '0' },
-    { rb: '180000',     aliquota: '6',    deducao: '0' },
-    { rb: '180000.01',  aliquota: '11.2', deducao: '9360' },
-    { rb: '360000',     aliquota: '11.2', deducao: '9360' },
-    { rb: '360000.01',  aliquota: '13.5', deducao: '17640' },
-    { rb: '720000',     aliquota: '13.5', deducao: '17640' },
-    { rb: '720000.01',  aliquota: '16',   deducao: '35640' },
-    { rb: '1800000',    aliquota: '16',   deducao: '35640' },
-    { rb: '1800000.01', aliquota: '21',   deducao: '125640' },
-    { rb: '3600000',    aliquota: '21',   deducao: '125640' },
-    { rb: '3600000.01', aliquota: '33',   deducao: '648000' },
-    { rb: '4800000',    aliquota: '33',   deducao: '648000' },
+    { rb: '0', aliquota: '6', deducao: '0' },
+    { rb: '180000', aliquota: '6', deducao: '0' },
+    { rb: '180000.01', aliquota: '11.2', deducao: '9360' },
+    { rb: '360000', aliquota: '11.2', deducao: '9360' },
+    { rb: '360000.01', aliquota: '13.5', deducao: '17640' },
+    { rb: '720000', aliquota: '13.5', deducao: '17640' },
+    { rb: '720000.01', aliquota: '16', deducao: '35640' },
+    { rb: '1800000', aliquota: '16', deducao: '35640' },
+    { rb: '1800000.01', aliquota: '21', deducao: '125640' },
+    { rb: '3600000', aliquota: '21', deducao: '125640' },
+    { rb: '3600000.01', aliquota: '33', deducao: '648000' },
+    { rb: '4800000', aliquota: '33', deducao: '648000' },
   ]
 
-  it.each(casos)('RB R$ $rb → alíquota $aliquota%% / deduções R$ $deducao', ({ rb, aliquota, deducao }) => {
-    const faixa = (service as any).buscarFaixa(new Decimal(rb), 'ANEXO_III')
-    expect(faixa).toBeDefined()
-    expect(faixa.aliquota.toString()).toBe(aliquota)
-    expect(faixa.deducao.toString()).toBe(deducao)
-  })
+  it.each(casos)(
+    'RB R$ $rb → alíquota $aliquota%% / deduções R$ $deducao',
+    ({ rb, aliquota, deducao }) => {
+      const faixa = (service as any).buscarFaixa(new Decimal(rb), 'ANEXO_III')
+      expect(faixa).toBeDefined()
+      expect(faixa.aliquota.toString()).toBe(aliquota)
+      expect(faixa.deducao.toString()).toBe(deducao)
+    }
+  )
 })
 
 // ---------------------------------------------------------------------------
@@ -209,26 +212,29 @@ describe('PGDASService — buscarFaixa() Anexo V', () => {
   })
 
   const casos = [
-    { rb: '0',          aliquota: '15.5', deducao: '0' },
-    { rb: '180000',     aliquota: '15.5', deducao: '0' },
-    { rb: '180000.01',  aliquota: '18',   deducao: '4500' },
-    { rb: '360000',     aliquota: '18',   deducao: '4500' },
-    { rb: '360000.01',  aliquota: '19.5', deducao: '9900' },
-    { rb: '720000',     aliquota: '19.5', deducao: '9900' },
-    { rb: '720000.01',  aliquota: '20.5', deducao: '17100' },
-    { rb: '1800000',    aliquota: '20.5', deducao: '17100' },
-    { rb: '1800000.01', aliquota: '23',   deducao: '62100' },
-    { rb: '3600000',    aliquota: '23',   deducao: '62100' },
+    { rb: '0', aliquota: '15.5', deducao: '0' },
+    { rb: '180000', aliquota: '15.5', deducao: '0' },
+    { rb: '180000.01', aliquota: '18', deducao: '4500' },
+    { rb: '360000', aliquota: '18', deducao: '4500' },
+    { rb: '360000.01', aliquota: '19.5', deducao: '9900' },
+    { rb: '720000', aliquota: '19.5', deducao: '9900' },
+    { rb: '720000.01', aliquota: '20.5', deducao: '17100' },
+    { rb: '1800000', aliquota: '20.5', deducao: '17100' },
+    { rb: '1800000.01', aliquota: '23', deducao: '62100' },
+    { rb: '3600000', aliquota: '23', deducao: '62100' },
     { rb: '3600000.01', aliquota: '30.5', deducao: '540000' },
-    { rb: '4800000',    aliquota: '30.5', deducao: '540000' },
+    { rb: '4800000', aliquota: '30.5', deducao: '540000' },
   ]
 
-  it.each(casos)('RB R$ $rb → alíquota $aliquota%% / deduções R$ $deducao', ({ rb, aliquota, deducao }) => {
-    const faixa = (service as any).buscarFaixa(new Decimal(rb), 'ANEXO_V')
-    expect(faixa).toBeDefined()
-    expect(faixa.aliquota.toString()).toBe(aliquota)
-    expect(faixa.deducao.toString()).toBe(deducao)
-  })
+  it.each(casos)(
+    'RB R$ $rb → alíquota $aliquota%% / deduções R$ $deducao',
+    ({ rb, aliquota, deducao }) => {
+      const faixa = (service as any).buscarFaixa(new Decimal(rb), 'ANEXO_V')
+      expect(faixa).toBeDefined()
+      expect(faixa.aliquota.toString()).toBe(aliquota)
+      expect(faixa.deducao.toString()).toBe(deducao)
+    }
+  )
 })
 
 // ---------------------------------------------------------------------------
@@ -265,7 +271,13 @@ describe('PGDASService — calcularAliquotaEfetiva()', () => {
     // = (19710 - 5940) / 270000 * 100
     // = 13770 / 270000 * 100 ≈ 5.1
     const efetiva = calcularAliquotaEfetiva(rb, aliquota, deducao)
-    const esperado = aliquota.div(100).times(rb).minus(deducao).div(rb).times(100).toDecimalPlaces(4)
+    const esperado = aliquota
+      .div(100)
+      .times(rb)
+      .minus(deducao)
+      .div(rb)
+      .times(100)
+      .toDecimalPlaces(4)
     expect(efetiva.toFixed(4)).toBe(esperado.toFixed(4))
     // Verifica que é menor que a nominal (deduções reduzem a efetiva)
     expect(efetiva.lt(aliquota)).toBe(true)

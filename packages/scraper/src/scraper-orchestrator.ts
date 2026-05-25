@@ -18,7 +18,11 @@ export class ScraperOrchestrator {
     ['3106200', new Prefeitura3106200Adapter()],
   ])
 
-  async capturarTodos(cnpj: string, competencia: string, credencial: any): Promise<{
+  async capturarTodos(
+    cnpj: string,
+    competencia: string,
+    credencial: any
+  ): Promise<{
     nfe: DocumentoRaw[]
     nfce: DocumentoRaw[]
     nfseEmitidas: DocumentoRaw[]
@@ -60,7 +64,11 @@ export class ScraperOrchestrator {
     return this.nfceSefaz.fetch(cnpj, periodo)
   }
 
-  async capturarNFSe(cnpj: string, competencia: string, credencial: any): Promise<{
+  async capturarNFSe(
+    cnpj: string,
+    competencia: string,
+    credencial: any
+  ): Promise<{
     emitidas: DocumentoRaw[]
     tomadas: DocumentoRaw[]
   }> {

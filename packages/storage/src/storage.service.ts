@@ -59,9 +59,7 @@ export class StorageService {
   }
 
   async download(s3Key: string): Promise<DownloadResult> {
-    const result = await this.s3.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: s3Key })
-    )
+    const result = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: s3Key }))
 
     const chunks: Uint8Array[] = []
     for await (const chunk of result.Body as AsyncIterable<Uint8Array>) {

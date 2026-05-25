@@ -72,7 +72,7 @@ describe('DCTFWebService — verificarPreRequisitos()', () => {
     mockDb.apuracaoFiscal.findUnique.mockResolvedValue(null)
 
     await expect(
-      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA),
+      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA)
     ).rejects.toThrow('EFD-Reinf e eSocial devem ser fechados antes da DCTFWeb')
   })
 
@@ -84,7 +84,7 @@ describe('DCTFWebService — verificarPreRequisitos()', () => {
     })
 
     await expect(
-      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA),
+      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA)
     ).rejects.toThrow('EFD-Reinf e eSocial devem ser fechados antes da DCTFWeb')
   })
 
@@ -96,7 +96,7 @@ describe('DCTFWebService — verificarPreRequisitos()', () => {
     })
 
     await expect(
-      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA),
+      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA)
     ).rejects.toThrow('EFD-Reinf e eSocial devem ser fechados antes da DCTFWeb')
   })
 
@@ -108,7 +108,7 @@ describe('DCTFWebService — verificarPreRequisitos()', () => {
     })
 
     await expect(
-      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA),
+      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA)
     ).resolves.toBeUndefined()
   })
 
@@ -120,7 +120,7 @@ describe('DCTFWebService — verificarPreRequisitos()', () => {
     })
 
     await expect(
-      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA),
+      (service as any).verificarPreRequisitos(TENANT_ID, EMPRESA_ID, COMPETENCIA)
     ).resolves.toBeUndefined()
   })
 })
@@ -158,11 +158,7 @@ describe('DCTFWebService — consolidarDebitos()', () => {
       id: 'ap-1',
       status: 'CALCULADO',
       dados: {
-        r2010: [
-          { vrRetencao: '500.00' },
-          { vrRetencao: '300.50' },
-          { vrRetencao: '200.00' },
-        ],
+        r2010: [{ vrRetencao: '500.00' }, { vrRetencao: '300.50' }, { vrRetencao: '200.00' }],
       },
     })
 
@@ -177,10 +173,7 @@ describe('DCTFWebService — consolidarDebitos()', () => {
       id: 'ap-1',
       status: 'CALCULADO',
       dados: {
-        r4020: [
-          { vrIR: '150.00' },
-          { vrIR: '75.25' },
-        ],
+        r4020: [{ vrIR: '150.00' }, { vrIR: '75.25' }],
       },
     })
 
@@ -328,10 +321,14 @@ describe('DCTFWebService — gerar()', () => {
 
   it('Lança erro se empresa não encontrada', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValue(null)
-    mockDb.apuracaoFiscal.findUnique.mockResolvedValue({ id: 'ap-1', status: 'CALCULADO', dados: {} })
+    mockDb.apuracaoFiscal.findUnique.mockResolvedValue({
+      id: 'ap-1',
+      status: 'CALCULADO',
+      dados: {},
+    })
 
     await expect(service.gerar(TENANT_ID, EMPRESA_ID, COMPETENCIA)).rejects.toThrow(
-      'Empresa não encontrada',
+      'Empresa não encontrada'
     )
   })
 
@@ -343,7 +340,7 @@ describe('DCTFWebService — gerar()', () => {
     mockDb.apuracaoFiscal.findUnique.mockResolvedValue(null) // EFD-Reinf ausente
 
     await expect(service.gerar(TENANT_ID, EMPRESA_ID, COMPETENCIA)).rejects.toThrow(
-      'EFD-Reinf e eSocial devem ser fechados antes da DCTFWeb',
+      'EFD-Reinf e eSocial devem ser fechados antes da DCTFWeb'
     )
   })
 
@@ -402,7 +399,7 @@ describe('DCTFWebService — gerar()', () => {
           tipo: 'DCTFWEB',
           status: 'CALCULADO',
         }),
-      }),
+      })
     )
   })
 
@@ -415,8 +412,7 @@ describe('DCTFWebService — gerar()', () => {
     // O serviço usa: new Date(ano, mes, 20) onde mes é parseInt('01') = 1
     // portanto vencimento = new Date(2025, 1, 20) → 20 de fevereiro de 2025
     const chamada =
-      mockDb.obrigacao.upsert.mock.calls[0]?.[0] ??
-      mockDb.obrigacao.create.mock.calls[0]?.[0]?.data
+      mockDb.obrigacao.upsert.mock.calls[0]?.[0] ?? mockDb.obrigacao.create.mock.calls[0]?.[0]?.data
 
     // Verifica a criação de obrigação com tipo DCTFWEB
     const upsertArgs = mockDb.apuracaoFiscal.upsert.mock.calls[0][0]
@@ -441,7 +437,7 @@ describe('DCTFWebService — gerar()', () => {
           competencia: COMPETENCIA,
           status: 'PENDENTE',
         }),
-      }),
+      })
     )
   })
 
@@ -473,7 +469,7 @@ describe('DCTFWebService — gerar()', () => {
         cnpj: CNPJ,
         evento: 'DCTFWEB_TRANSMITIDA',
         estadoNovo: expect.objectContaining({ competencia: COMPETENCIA }),
-      }),
+      })
     )
   })
 

@@ -90,7 +90,9 @@ export abstract class BasePLaywrightAdapter implements DocumentAdapter {
         if (token) return token
       } catch (err) {
         // Falha no 2Captcha — tenta AntiCaptcha
-        console.warn(`[CAPTCHA] 2Captcha falhou: ${(err as Error).message}. Tentando AntiCaptcha...`)
+        console.warn(
+          `[CAPTCHA] 2Captcha falhou: ${(err as Error).message}. Tentando AntiCaptcha...`
+        )
       }
     }
 
@@ -175,9 +177,7 @@ export abstract class BasePLaywrightAdapter implements DocumentAdapter {
         const el =
           document.querySelector('[data-hcaptcha-sitekey]') ??
           document.querySelector('.h-captcha[data-sitekey]')
-        return (
-          el?.getAttribute('data-hcaptcha-sitekey') ?? el?.getAttribute('data-sitekey') ?? ''
-        )
+        return el?.getAttribute('data-hcaptcha-sitekey') ?? el?.getAttribute('data-sitekey') ?? ''
       })
       if (!sitekey) throw new Error('[CAPTCHA] sitekey do hCaptcha não encontrado na página')
       return sitekey
@@ -246,10 +246,13 @@ export abstract class BasePLaywrightAdapter implements DocumentAdapter {
     pageUrl: string
   ): Promise<string> {
     // Cria tarefa
-    const taskType =
-      type === 'HCAPTCHA' ? 'HCaptchaTaskProxyless' : 'NoCaptchaTaskProxyless'
+    const taskType = type === 'HCAPTCHA' ? 'HCaptchaTaskProxyless' : 'NoCaptchaTaskProxyless'
 
-    const createResp = await axios.post<{ errorId: number; taskId?: number; errorDescription?: string }>(
+    const createResp = await axios.post<{
+      errorId: number
+      taskId?: number
+      errorDescription?: string
+    }>(
       'https://api.anti-captcha.com/createTask',
       {
         clientKey: apiKey,

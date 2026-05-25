@@ -9,4 +9,10 @@ export { AlertasVencimentosService } from './alertas-vencimentos.service.js'
 export { DCTFWebService } from './dctfweb.service.js'
 export { ESocialService } from './esocial.service.js'
 export { FGTSDigitalService } from './fgts-digital.service.js'
-export type { ResultadoPGDAS, ReceitaSegregada, ResultadoDifal, ResultadoFGTS, ResultadoGRRF } from './types.js'
+export type {
+  ResultadoPGDAS,
+  ReceitaSegregada,
+  ResultadoDifal,
+  ResultadoFGTS,
+  ResultadoGRRF,
+} from './types.js'

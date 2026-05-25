@@ -107,7 +107,11 @@ describe('AlertasVencimentosService — verificarProximosVencimentos()', () => {
     mockDb.obrigacao.findMany.mockResolvedValueOnce([makeObrigacao('ob-1', 5)])
     mockDb.alerta.findFirst.mockResolvedValueOnce(null)
     mockDb.alerta.create.mockResolvedValueOnce({
-      id: 'al-1', tipo: 'VENCIMENTO_OBRIGACAO', mensagem: 'DAS vence em 5 dias', dados: {}, lido: false,
+      id: 'al-1',
+      tipo: 'VENCIMENTO_OBRIGACAO',
+      mensagem: 'DAS vence em 5 dias',
+      dados: {},
+      lido: false,
     })
 
     const service = new AlertasVencimentosService()
@@ -185,9 +189,7 @@ describe('AlertasVencimentosService — verificarProximosVencimentos()', () => {
       makeObrigacao('ob-1', 3),
       makeObrigacao('ob-2', 6),
     ])
-    mockDb.alerta.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
+    mockDb.alerta.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
 
     const service = new AlertasVencimentosService()
     const result = await service.verificarProximosVencimentos('t-1', 7)
@@ -210,7 +212,9 @@ describe('AlertasVencimentosService — marcarComoEnviado()', () => {
 
   it('alerta encontrado → atualiza lido=true', async () => {
     mockDb.alerta.findFirst.mockResolvedValueOnce({
-      id: 'al-1', tipo: 'VENCIMENTO_OBRIGACAO', dados: { cnpj: '11111111000111' },
+      id: 'al-1',
+      tipo: 'VENCIMENTO_OBRIGACAO',
+      dados: { cnpj: '11111111000111' },
     })
 
     const service = new AlertasVencimentosService()
@@ -224,7 +228,9 @@ describe('AlertasVencimentosService — marcarComoEnviado()', () => {
 
   it('após marcar enviado → registra evento ALERTA_MARCADO_ENVIADO no audit', async () => {
     mockDb.alerta.findFirst.mockResolvedValueOnce({
-      id: 'al-1', tipo: 'VENCIMENTO_OBRIGACAO', dados: { cnpj: '11111111000111' },
+      id: 'al-1',
+      tipo: 'VENCIMENTO_OBRIGACAO',
+      dados: { cnpj: '11111111000111' },
     })
 
     const service = new AlertasVencimentosService()
@@ -237,7 +243,9 @@ describe('AlertasVencimentosService — marcarComoEnviado()', () => {
   it('validação de tenantId no findFirst', async () => {
     mockDb.alerta.findFirst.mockResolvedValueOnce(null)
     const service = new AlertasVencimentosService()
-    try { await service.marcarComoEnviado('al-1', 't-abc') } catch {}
+    try {
+      await service.marcarComoEnviado('al-1', 't-abc')
+    } catch {}
     const findFirstArgs = mockDb.alerta.findFirst.mock.calls[0][0]
     expect(findFirstArgs.where.tenantId).toBe('t-abc')
   })

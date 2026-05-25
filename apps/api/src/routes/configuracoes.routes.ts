@@ -13,7 +13,15 @@ export async function configuracoesRoutes(app: FastifyInstance) {
     const [tenant, usuario] = await Promise.all([
       db.tenant.findUnique({
         where: { id: tenantId },
-        select: { id: true, nome: true, cnpj: true, subdominio: true, plano: true, ativo: true, criadoEm: true },
+        select: {
+          id: true,
+          nome: true,
+          cnpj: true,
+          subdominio: true,
+          plano: true,
+          ativo: true,
+          criadoEm: true,
+        },
       }),
       db.usuario.findUnique({
         where: { id: userId },
@@ -48,10 +56,12 @@ export async function configuracoesRoutes(app: FastifyInstance) {
   // PUT /configuracoes/senha — troca senha do usuário logado
   app.put('/senha', async (request, reply) => {
     const { sub: userId } = request.user as any
-    const { senhaAtual, novaSenha } = z.object({
-      senhaAtual: z.string().min(1),
-      novaSenha: z.string().min(8, 'Nova senha deve ter pelo menos 8 caracteres'),
-    }).parse(request.body)
+    const { senhaAtual, novaSenha } = z
+      .object({
+        senhaAtual: z.string().min(1),
+        novaSenha: z.string().min(8, 'Nova senha deve ter pelo menos 8 caracteres'),
+      })
+      .parse(request.body)
 
     const usuario = await db.usuario.findUnique({ where: { id: userId } })
     if (!usuario) return reply.code(404).send({ error: 'Usuário não encontrado' })
@@ -68,7 +78,8 @@ export async function configuracoesRoutes(app: FastifyInstance) {
   // GET /configuracoes/usuarios — lista usuários do tenant (admin only)
   app.get('/usuarios', async (request, reply) => {
     const { tenantId, perfil } = request.user as any
-    if (perfil !== 'ADMIN') return reply.code(403).send({ error: 'Acesso restrito a administradores' })
+    if (perfil !== 'ADMIN')
+      return reply.code(403).send({ error: 'Acesso restrito a administradores' })
 
     return db.usuario.findMany({
       where: { tenantId },

@@ -45,10 +45,7 @@ const SEL = {
   BTN_PROXIMA: 'a[title="Próxima página"]',
 } as const
 
-export class Prefeitura3550308Adapter
-  extends BasePLaywrightAdapter
-  implements PrefeituraAdapter
-{
+export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements PrefeituraAdapter {
   tipo = 'NFSE_EMITIDA'
   fonte = 'PREFEITURA_SP'
   municipio = 'São Paulo'
@@ -101,9 +98,7 @@ export class Prefeitura3550308Adapter
 
         // Coletar cookies da sessão
         const cookies = await page.context().cookies()
-        const cookieStr = cookies
-          .map((c) => `${c.name}=${c.value}`)
-          .join('; ')
+        const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
         return {
           cookies: cookieStr,
@@ -141,10 +136,10 @@ export class Prefeitura3550308Adapter
       this.withPage(async (page) => {
         await this.aplicarSessao(page)
 
-        await page.goto(
-          `${BASE_URL}/contribuinte/nota/consultanota.aspx`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/contribuinte/nota/consultanota.aspx`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroData(page, periodo)
 
@@ -184,10 +179,10 @@ export class Prefeitura3550308Adapter
       this.withPage(async (page) => {
         await this.aplicarSessao(page)
 
-        await page.goto(
-          `${BASE_URL}/contribuinte/nota/consultanotatomador.aspx`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/contribuinte/nota/consultanotatomador.aspx`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroData(page, periodo)
 
@@ -397,9 +392,7 @@ export class Prefeitura3550308Adapter
       return
     }
 
-    throw new Error(
-      'Prefeitura SP: CAPTCHA detectado — CaptchaSolverService ainda não integrado'
-    )
+    throw new Error('Prefeitura SP: CAPTCHA detectado — CaptchaSolverService ainda não integrado')
   }
 
   /**

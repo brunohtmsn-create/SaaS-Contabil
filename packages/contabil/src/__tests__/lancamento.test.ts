@@ -109,7 +109,9 @@ describe('LancamentoService — docToLancamento()', () => {
   })
 
   it('NF-e SAIDA → partida CREDITO em 3.1.1.01 (Receita de vendas) com valorProdutos', () => {
-    const lanc = call(makeDoc({ direcao: 'SAIDA', valorProdutos: '1800.00', valorTotal: '2000.00' }))
+    const lanc = call(
+      makeDoc({ direcao: 'SAIDA', valorProdutos: '1800.00', valorTotal: '2000.00' })
+    )
     const rec = lanc?.partidas.find((p: any) => p.conta === '3.1.1.01')
     expect(rec?.tipo).toBe('CREDITO')
     expect(new Decimal(rec.valor).toFixed(2)).toBe('1800.00')
@@ -134,65 +136,100 @@ describe('LancamentoService — docToLancamento()', () => {
   })
 
   it('NFSe TOMADA → partida DEBITO em 4.1.2.01 (Despesa de serviços)', () => {
-    const lanc = call(makeDoc({
-      tipo: 'NFSE_TOMADA', direcao: 'ENTRADA',
-      valorServicos: '3000.00', valorTotal: '3000.00', valorIssRetido: '0.00',
-    }))
+    const lanc = call(
+      makeDoc({
+        tipo: 'NFSE_TOMADA',
+        direcao: 'ENTRADA',
+        valorServicos: '3000.00',
+        valorTotal: '3000.00',
+        valorIssRetido: '0.00',
+      })
+    )
     const deb = lanc?.partidas.find((p: any) => p.conta === '4.1.2.01')
     expect(deb?.tipo).toBe('DEBITO')
   })
 
   it('NFSe TOMADA → partida CREDITO em 2.1.1.02 (Fornecedores de serviço)', () => {
-    const lanc = call(makeDoc({
-      tipo: 'NFSE_TOMADA', direcao: 'ENTRADA',
-      valorServicos: '3000.00', valorTotal: '3000.00', valorIssRetido: '0.00',
-    }))
+    const lanc = call(
+      makeDoc({
+        tipo: 'NFSE_TOMADA',
+        direcao: 'ENTRADA',
+        valorServicos: '3000.00',
+        valorTotal: '3000.00',
+        valorIssRetido: '0.00',
+      })
+    )
     const cred = lanc?.partidas.find((p: any) => p.conta === '2.1.1.02')
     expect(cred?.tipo).toBe('CREDITO')
   })
 
   it('NFSe TOMADA com ISS retido > 0 → inclui partida CREDITO em 2.1.4.03', () => {
-    const lanc = call(makeDoc({
-      tipo: 'NFSE_TOMADA', direcao: 'ENTRADA',
-      valorServicos: '5000.00', valorTotal: '5000.00', valorIssRetido: '250.00',
-    }))
+    const lanc = call(
+      makeDoc({
+        tipo: 'NFSE_TOMADA',
+        direcao: 'ENTRADA',
+        valorServicos: '5000.00',
+        valorTotal: '5000.00',
+        valorIssRetido: '250.00',
+      })
+    )
     const iss = lanc?.partidas.find((p: any) => p.conta === '2.1.4.03')
     expect(iss?.tipo).toBe('CREDITO')
     expect(new Decimal(iss.valor).toFixed(2)).toBe('250.00')
   })
 
   it('NFSe TOMADA sem ISS retido → sem partida 2.1.4.03', () => {
-    const lanc = call(makeDoc({
-      tipo: 'NFSE_TOMADA', direcao: 'ENTRADA',
-      valorServicos: '2000.00', valorTotal: '2000.00', valorIssRetido: '0.00',
-    }))
+    const lanc = call(
+      makeDoc({
+        tipo: 'NFSE_TOMADA',
+        direcao: 'ENTRADA',
+        valorServicos: '2000.00',
+        valorTotal: '2000.00',
+        valorIssRetido: '0.00',
+      })
+    )
     const iss = lanc?.partidas.find((p: any) => p.conta === '2.1.4.03')
     expect(iss).toBeUndefined()
   })
 
   it('NFSe EMITIDA → partida DEBITO em 1.1.2.02 (Clientes)', () => {
-    const lanc = call(makeDoc({
-      tipo: 'NFSE_EMITIDA', direcao: 'PRESTACAO',
-      valorServicos: '4000.00', valorTotal: '4000.00', valorIss: '200.00',
-    }))
+    const lanc = call(
+      makeDoc({
+        tipo: 'NFSE_EMITIDA',
+        direcao: 'PRESTACAO',
+        valorServicos: '4000.00',
+        valorTotal: '4000.00',
+        valorIss: '200.00',
+      })
+    )
     const deb = lanc?.partidas.find((p: any) => p.conta === '1.1.2.02')
     expect(deb?.tipo).toBe('DEBITO')
   })
 
   it('NFSe EMITIDA → partida CREDITO em 3.1.2.01 (Receita de serviços)', () => {
-    const lanc = call(makeDoc({
-      tipo: 'NFSE_EMITIDA', direcao: 'PRESTACAO',
-      valorServicos: '4000.00', valorTotal: '4000.00', valorIss: '0.00',
-    }))
+    const lanc = call(
+      makeDoc({
+        tipo: 'NFSE_EMITIDA',
+        direcao: 'PRESTACAO',
+        valorServicos: '4000.00',
+        valorTotal: '4000.00',
+        valorIss: '0.00',
+      })
+    )
     const rec = lanc?.partidas.find((p: any) => p.conta === '3.1.2.01')
     expect(rec?.tipo).toBe('CREDITO')
   })
 
   it('NFSe EMITIDA com ISS > 0 → inclui partida CREDITO em 2.1.4.04', () => {
-    const lanc = call(makeDoc({
-      tipo: 'NFSE_EMITIDA', direcao: 'PRESTACAO',
-      valorServicos: '4000.00', valorTotal: '4000.00', valorIss: '200.00',
-    }))
+    const lanc = call(
+      makeDoc({
+        tipo: 'NFSE_EMITIDA',
+        direcao: 'PRESTACAO',
+        valorServicos: '4000.00',
+        valorTotal: '4000.00',
+        valorIss: '200.00',
+      })
+    )
     const iss = lanc?.partidas.find((p: any) => p.conta === '2.1.4.04')
     expect(iss?.tipo).toBe('CREDITO')
     expect(new Decimal(iss.valor).toFixed(2)).toBe('200.00')
@@ -204,7 +241,14 @@ describe('LancamentoService — docToLancamento()', () => {
   })
 
   it('todas as partidas de NF-e ENTRADA têm valor ≥ 0', () => {
-    const lanc = call(makeDoc({ direcao: 'ENTRADA', valorProdutos: '900.00', valorIcms: '100.00', valorTotal: '1000.00' }))
+    const lanc = call(
+      makeDoc({
+        direcao: 'ENTRADA',
+        valorProdutos: '900.00',
+        valorIcms: '100.00',
+        valorTotal: '1000.00',
+      })
+    )
     for (const p of lanc?.partidas ?? []) {
       expect(new Decimal(p.valor).gte(0)).toBe(true)
     }
@@ -219,11 +263,16 @@ describe('LancamentoService — gerarLancamentos()', () => {
   it('empresa não encontrada → lança erro', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
     const service = new LancamentoService()
-    await expect(service.gerarLancamentos('t-1', 'emp-1', '2025-01')).rejects.toThrow('Empresa não encontrada')
+    await expect(service.gerarLancamentos('t-1', 'emp-1', '2025-01')).rejects.toThrow(
+      'Empresa não encontrada'
+    )
   })
 
   it('sem documentos CONCILIADOS → retorna array vazio', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.documentoFiscal.findMany.mockResolvedValueOnce([])
     const service = new LancamentoService()
     const result = await service.gerarLancamentos('t-1', 'emp-1', '2025-01')
@@ -231,7 +280,10 @@ describe('LancamentoService — gerarLancamentos()', () => {
   })
 
   it('filtra apenas documentos com status CONCILIADO', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.documentoFiscal.findMany.mockResolvedValueOnce([])
     const service = new LancamentoService()
     await service.gerarLancamentos('t-1', 'emp-1', '2025-01')
@@ -242,7 +294,10 @@ describe('LancamentoService — gerarLancamentos()', () => {
   })
 
   it('1 NF-e SAIDA → gera 1 lançamento e retorna array com 1 item', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.documentoFiscal.findMany.mockResolvedValueOnce([makeDoc()])
     const service = new LancamentoService()
     const result = await service.gerarLancamentos('t-1', 'emp-1', '2025-01')
@@ -251,7 +306,10 @@ describe('LancamentoService — gerarLancamentos()', () => {
   })
 
   it('documento de tipo desconhecido → não cria lançamento', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.documentoFiscal.findMany.mockResolvedValueOnce([makeDoc({ tipo: 'CTEOS' })])
     const service = new LancamentoService()
     const result = await service.gerarLancamentos('t-1', 'emp-1', '2025-01')
@@ -268,11 +326,16 @@ describe('LancamentoService — lancarImpostos()', () => {
   it('empresa não encontrada → lança erro', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
     const service = new LancamentoService()
-    await expect(service.lancarImpostos('t-1', 'emp-1', '2025-01')).rejects.toThrow('Empresa não encontrada')
+    await expect(service.lancarImpostos('t-1', 'emp-1', '2025-01')).rejects.toThrow(
+      'Empresa não encontrada'
+    )
   })
 
   it('sem apuração PGDAS → nenhum lançamento de DAS', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
     const service = new LancamentoService()
     await service.lancarImpostos('t-1', 'emp-1', '2025-01')
@@ -280,7 +343,10 @@ describe('LancamentoService — lancarImpostos()', () => {
   })
 
   it('valorDAS = 0 → nenhum lançamento de DAS', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ dados: { valorDAS: '0' } })
     const service = new LancamentoService()
     await service.lancarImpostos('t-1', 'emp-1', '2025-01')
@@ -288,7 +354,10 @@ describe('LancamentoService — lancarImpostos()', () => {
   })
 
   it('valorDAS = R$1.500 → cria lançamento com débito em 6.1.1.01 e crédito em 2.1.4.05', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ dados: { valorDAS: '1500.00' } })
     const service = new LancamentoService()
     await service.lancarImpostos('t-1', 'emp-1', '2025-01')
@@ -304,7 +373,10 @@ describe('LancamentoService — lancarImpostos()', () => {
   })
 
   it('historico do DAS contém "Simples Nacional" e competência', async () => {
-    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ id: 'emp-1', cnpj: '11.111.111/0001-11' })
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
     mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ dados: { valorDAS: '800.00' } })
     const service = new LancamentoService()
     await service.lancarImpostos('t-1', 'emp-1', '2025-01')

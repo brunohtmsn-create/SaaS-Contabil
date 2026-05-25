@@ -128,7 +128,7 @@ export class EmailService {
    */
   async enviarVencimento(
     destinatario: DestinatarioNotificacao,
-    obrigacao: { tipo: string; vencimento: Date; empresa: string },
+    obrigacao: { tipo: string; vencimento: Date; empresa: string }
   ): Promise<void> {
     if (!destinatario.email) return
 
@@ -156,7 +156,7 @@ export class EmailService {
   async enviarFechamentoConcluido(
     destinatario: DestinatarioNotificacao,
     empresa: string,
-    competencia: string,
+    competencia: string
   ): Promise<void> {
     if (!destinatario.email) return
 
@@ -174,7 +174,11 @@ export class EmailService {
       ${botaoAcao('Ver Relatório', process.env['NEXT_PUBLIC_API_URL'] ?? '#', SUCCESS_COLOR)}
     `
 
-    await this.enviar(destinatario.email, titulo, layout('Fechamento Concluído', SUCCESS_COLOR, corpo))
+    await this.enviar(
+      destinatario.email,
+      titulo,
+      layout('Fechamento Concluído', SUCCESS_COLOR, corpo)
+    )
   }
 
   /**
@@ -182,7 +186,7 @@ export class EmailService {
    */
   async enviarAlerta(
     destinatario: DestinatarioNotificacao,
-    alerta: { tipo: string; mensagem: string },
+    alerta: { tipo: string; mensagem: string }
   ): Promise<void> {
     if (!destinatario.email) return
 
@@ -209,7 +213,7 @@ export class EmailService {
     destinatario: DestinatarioNotificacao,
     empresa: string,
     descricao: string,
-    score: number,
+    score: number
   ): Promise<void> {
     if (!destinatario.email) return
 
@@ -241,7 +245,7 @@ export class EmailService {
   async enviarAlertaExclusaoSN(
     destinatario: DestinatarioNotificacao,
     empresa: string,
-    motivo: string,
+    motivo: string
   ): Promise<void> {
     if (!destinatario.email) return
 

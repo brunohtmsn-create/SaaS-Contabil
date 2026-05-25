@@ -1,7 +1,24 @@
-import { format, startOfMonth, endOfMonth, parseISO, addMonths, subMonths, addDays, differenceInCalendarDays } from 'date-fns'
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  parseISO,
+  addMonths,
+  subMonths,
+  addDays,
+  differenceInCalendarDays,
+} from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 
-export { startOfMonth, endOfMonth, parseISO, addMonths, subMonths, addDays, differenceInCalendarDays }
+export {
+  startOfMonth,
+  endOfMonth,
+  parseISO,
+  addMonths,
+  subMonths,
+  addDays,
+  differenceInCalendarDays,
+}
 
 const TZ = 'America/Sao_Paulo'
 
@@ -21,7 +38,11 @@ export function formatCompetencia(date: Date): string {
   return format(toZonedTime(date, TZ), 'yyyy-MM')
 }
 
-export function parsePeriodo(competencia: string): { inicio: Date; fim: Date; competencia: string } {
+export function parsePeriodo(competencia: string): {
+  inicio: Date
+  fim: Date
+  competencia: string
+} {
   const base = parseISO(`${competencia}-01`)
   return {
     inicio: startOfMonth(base),

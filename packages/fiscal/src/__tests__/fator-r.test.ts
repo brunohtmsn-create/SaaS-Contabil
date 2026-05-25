@@ -51,10 +51,11 @@ beforeEach(() => {
 // Replica a fórmula implementada em fator-r.service.ts
 // ---------------------------------------------------------------------------
 
-function calcularFatorRPuro(folha12m: Decimal, receitaBruta12m: Decimal): { fatorR: Decimal; anexo: 'III' | 'V' } {
-  const fatorR = receitaBruta12m.gt(0)
-    ? folha12m.div(receitaBruta12m).times(100)
-    : new Decimal(0)
+function calcularFatorRPuro(
+  folha12m: Decimal,
+  receitaBruta12m: Decimal
+): { fatorR: Decimal; anexo: 'III' | 'V' } {
+  const fatorR = receitaBruta12m.gt(0) ? folha12m.div(receitaBruta12m).times(100) : new Decimal(0)
   const anexo: 'III' | 'V' = fatorR.gte(28) ? 'III' : 'V'
   return { fatorR, anexo }
 }
@@ -242,15 +243,15 @@ describe('FatorRService — calcular() com mock do DB', () => {
 describe('FatorR — casos de negócio', () => {
   it('Empresa de serviços com folha alta migra para Anexo III (tributação menor)', () => {
     // Simula escritório com folha de pessoal representativa
-    const folha = new Decimal(300000)   // R$300k/ano de folha
-    const rb = new Decimal(1000000)     // R$1M de receita
+    const folha = new Decimal(300000) // R$300k/ano de folha
+    const rb = new Decimal(1000000) // R$1M de receita
     const { fatorR, anexo } = calcularFatorRPuro(folha, rb)
     expect(fatorR.gte(28)).toBe(true)
     expect(anexo).toBe('III')
   })
 
   it('Empresa de serviços com folha baixa fica no Anexo V (tributação maior)', () => {
-    const folha = new Decimal(200000)   // R$200k/ano = 20%
+    const folha = new Decimal(200000) // R$200k/ano = 20%
     const rb = new Decimal(1000000)
     const { fatorR, anexo } = calcularFatorRPuro(folha, rb)
     expect(fatorR.lt(28)).toBe(true)
@@ -273,8 +274,9 @@ describe('FatorR — casos de negócio', () => {
     expect(callArgs.where.dataCompetencia.lte).toBeInstanceOf(Date)
     // Janela: 12 meses → diferença de ~365 dias
     const diasDiferenca = Math.floor(
-      (callArgs.where.dataCompetencia.lte.getTime() - callArgs.where.dataCompetencia.gte.getTime())
-      / (1000 * 60 * 60 * 24)
+      (callArgs.where.dataCompetencia.lte.getTime() -
+        callArgs.where.dataCompetencia.gte.getTime()) /
+        (1000 * 60 * 60 * 24)
     )
     expect(diasDiferenca).toBeGreaterThan(300)
     expect(diasDiferenca).toBeLessThan(400)
