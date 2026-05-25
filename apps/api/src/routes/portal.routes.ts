@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
 import { Queue } from 'bullmq'
-import IORedis from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 
 export async function portalRoutes(app: FastifyInstance) {
   const db = getPrismaClient()

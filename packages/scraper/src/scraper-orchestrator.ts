@@ -12,7 +12,7 @@ export class ScraperOrchestrator {
   private nfceSefaz = new NFCeSefazAdapter()
   private nfsePortalNacional = new NFSePortalNacionalAdapter()
 
-  private prefeituras: Map<string, PrefeituraAdapter> = new Map([
+  private prefeituras: Map<string, PrefeituraAdapter> = new Map<string, PrefeituraAdapter>([
     ['3550308', new Prefeitura3550308Adapter()],
     ['3304557', new Prefeitura3304557Adapter()],
     ['3106200', new Prefeitura3106200Adapter()],

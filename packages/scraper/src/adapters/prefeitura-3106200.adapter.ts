@@ -64,7 +64,6 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
   ibge = '3106200'
 
   private session: Session | null = null
-  private storage = new StorageService()
 
   // ─────────────────────────────────────────────────────────────────────────
   // Autenticação
@@ -109,7 +108,7 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
         const loginError = await page.isVisible(SEL.MSG_ERRO_LOGIN)
         if (loginError) {
           const msg = await page.textContent(SEL.MSG_ERRO_LOGIN)
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             credData.login,
             'bh-prefeitura-login',
@@ -120,7 +119,7 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
         // Verificar redirecionamento correto (portal autentica e redireciona ao menu)
         const currentUrl = page.url()
         if (currentUrl.includes('login') || currentUrl.includes('Login')) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             credData.login,
             'bh-prefeitura-login-redirect',
@@ -233,7 +232,7 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
 
           return Buffer.concat(chunks).toString('utf8')
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `bh-xml-${doc.numero}`,
@@ -274,7 +273,7 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
 
           return Buffer.concat(chunks)
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `bh-pdf-${doc.numero}`,
@@ -313,7 +312,7 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
    */
   private async garantirSessao(page: Page, cnpj: string, contexto: string): Promise<void> {
     if (!this.session) {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `bh-sem-sessao-${contexto}`,
@@ -321,7 +320,7 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
       )
     }
     if (this.session!.expiresAt < nowBR()) {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `bh-sessao-expirada-${contexto}`,
@@ -343,7 +342,7 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
     try {
       await page.waitForSelector(SEL.DATA_INICIO, { timeout: 15_000 })
     } catch {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `bh-filtro-${contexto}`,
@@ -481,19 +480,4 @@ export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements P
    * Tira screenshot, faz upload ao S3 e lança erro.
    * Regra: screenshot obrigatório antes de qualquer throw.
    */
-  private async captureAndThrow(
-    page: Page,
-    cnpj: string,
-    jobId: string,
-    mensagem: string
-  ): Promise<never> {
-    try {
-      const screenshot = await page.screenshot({ fullPage: true })
-      const s3Key = S3KeyBuilder.erroScreenshot(cnpj, jobId)
-      await this.storage.upload(s3Key, screenshot, 'image/png')
-    } catch {
-      // não mascarar o erro original
-    }
-    throw new Error(mensagem)
-  }
 }

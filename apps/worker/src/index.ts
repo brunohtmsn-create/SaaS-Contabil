@@ -1,5 +1,5 @@
 import { Worker, Queue, QueueEvents } from 'bullmq'
-import IORedis from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { fechamentoCompleto } from './jobs/fechamento.job.js'
 import { scraperJob } from './jobs/scraper.job.js'
 import { fiscalJob } from './jobs/fiscal.job.js'

@@ -55,13 +55,13 @@ export class LancamentoService {
         responsavelTipo: 'SISTEMA',
       })
 
-      lancamentos.push({ ...lancamento, id: saved.id })
+      lancamentos.push({ ...lancamento, data: doc.dataEmissao, id: saved.id })
     }
 
     return lancamentos
   }
 
-  private docToLancamento(doc: DocumentoFiscal): Lancamento | null {
+  private docToLancamento(doc: DocumentoFiscal): Omit<Lancamento, 'data'> | null {
     const valorTotal = new Decimal(doc.valorTotal.toString())
     const valorProdutos = new Decimal(doc.valorProdutos.toString())
     const valorServicos = new Decimal(doc.valorServicos.toString())

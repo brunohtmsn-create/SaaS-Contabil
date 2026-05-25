@@ -31,8 +31,8 @@ export async function portalJob(job: Job<PortalJobData>): Promise<void> {
       operacao: job.data.operacao,
       credencialId,
       prioridade: job.data.prioridade,
-      competencia: job.data.competencia,
-      dados: job.data.dados,
+      ...(job.data.competencia !== undefined && { competencia: job.data.competencia }),
+      ...(job.data.dados !== undefined && { dados: job.data.dados }),
     },
     credencial.data
   )

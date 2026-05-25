@@ -337,6 +337,7 @@ enum TipoApuracao {
   CSLL_LR
   PIS
   COFINS
+  ECD
 }
 
 enum StatusApuracao {
@@ -564,6 +565,8 @@ enum EntidadeAuditavel {
   OBRIGACAO
   PORTAL_JOB
   ARQUIVO_S3
+  ALERTA
+  EMPRESA_CLIENTE
 }
 
 enum TipoEventoAudit {
@@ -610,6 +613,8 @@ enum TipoEventoAudit {
   DCTFWEB_TRANSMITIDA
   ESOCIAL_TRANSMITIDO
   ALERTA_MARCADO_ENVIADO
+  RISCO_EXCLUSAO_SN_DETECTADO
+  CALENDARIO_ANUAL_GERADO
 }
 
 enum TipoResponsavel {

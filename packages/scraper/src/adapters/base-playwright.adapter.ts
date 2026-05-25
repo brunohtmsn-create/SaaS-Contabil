@@ -20,7 +20,7 @@ export abstract class BasePLaywrightAdapter implements DocumentAdapter {
   protected browser: Browser | null = null
   protected context: BrowserContext | null = null
 
-  private storage = new StorageService()
+  protected storage = new StorageService()
 
   protected async getBrowser(): Promise<Browser> {
     if (!this.browser) {
@@ -300,6 +300,25 @@ export abstract class BasePLaywrightAdapter implements DocumentAdapter {
     }
 
     throw new Error('[CAPTCHA] AntiCaptcha: timeout de 120s atingido sem resposta')
+  }
+
+  /**
+   * Captura screenshot, faz upload no S3 e lança o erro. Sempre retorna never.
+   */
+  protected async captureAndThrow(
+    page: Page,
+    cnpj: string,
+    contexto: string,
+    mensagem: string
+  ): Promise<never> {
+    try {
+      const screenshot = await page.screenshot({ fullPage: true })
+      const s3Key = S3KeyBuilder.erroScreenshot(cnpj, `${this.fonte}-${contexto}`)
+      await this.storage.upload(s3Key, screenshot, 'image/png')
+    } catch {
+      // não ocultar o erro original
+    }
+    throw new Error(mensagem)
   }
 
   /**

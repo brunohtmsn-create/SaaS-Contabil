@@ -47,7 +47,7 @@ export class AuditChainVerifier {
       integro: !primeiraFalha,
       totalEventos: eventos.length,
       eventosVerificados: primeiraFalha ? Number(primeiraFalha.sequencia) - 1 : eventos.length,
-      primeiraFalha,
+      ...(primeiraFalha !== undefined && { primeiraFalha }),
     }
   }
 }

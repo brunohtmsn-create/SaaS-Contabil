@@ -62,7 +62,7 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
       evento,
       estadoNovo,
       ...AUDIT_SISTEMA,
-      jobId: job.id,
+      ...(job.id !== undefined && { jobId: job.id }),
     })
 
   await auditJob('FECHAMENTO_INICIADO', { competencia, jobId: job.id })

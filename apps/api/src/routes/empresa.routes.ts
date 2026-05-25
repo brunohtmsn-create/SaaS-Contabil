@@ -40,8 +40,14 @@ export async function empresaRoutes(app: FastifyInstance) {
     const existing = await db.empresaCliente.findFirst({ where: { tenantId, cnpj: data.cnpj } })
     if (existing) return reply.code(409).send({ error: 'CNPJ já cadastrado' })
 
+    const { nomeFantasia, ...requiredFields } = data
     return db.empresaCliente.create({
-      data: { ...data, tenantId, dataAbertura: new Date(data.dataAbertura) },
+      data: {
+        ...requiredFields,
+        tenantId,
+        dataAbertura: new Date(data.dataAbertura),
+        ...(nomeFantasia !== undefined && { nomeFantasia }),
+      },
     })
   })
 
@@ -53,8 +59,12 @@ export async function empresaRoutes(app: FastifyInstance) {
     const empresa = await db.empresaCliente.findFirst({ where: { id, tenantId } })
     if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
 
-    // tenantId no where garante isolamento multi-tenant
-    return db.empresaCliente.update({ where: { id, tenantId }, data })
+    // tenantId no where garante isolamento multi-tenant — filtra undefined para compatibilidade exactOptionalPropertyTypes
+    const updateData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
+    return db.empresaCliente.update({
+      where: { id, tenantId },
+      data: updateData as Parameters<typeof db.empresaCliente.update>[0]['data'],
+    })
   })
 
   app.delete('/:id', async (request, reply) => {

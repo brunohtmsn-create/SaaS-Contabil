@@ -52,7 +52,6 @@ export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements P
   ibge = '3550308'
 
   private session: Session | null = null
-  private storage = new StorageService()
 
   // ─────────────────────────────────────────────────────────────────────────
   // Autenticação
@@ -74,7 +73,7 @@ export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements P
         // Resolver CAPTCHA se presente
         const hasCaptcha = await page.isVisible(SEL.CAPTCHA_IMG)
         if (hasCaptcha) {
-          await this.solveCaptcha(page)
+          await this.resolverCaptchaLocal(page)
         }
 
         // Preencher credenciais
@@ -88,7 +87,7 @@ export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements P
         const loginError = await page.isVisible(SEL.MSG_ERRO_LOGIN)
         if (loginError) {
           const msg = await page.textContent(SEL.MSG_ERRO_LOGIN)
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             credData.login,
             'sp-prefeitura-login',
@@ -240,7 +239,7 @@ export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements P
 
           return Buffer.concat(chunks).toString('utf8')
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `sp-xml-${doc.numero}`,
@@ -278,7 +277,7 @@ export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements P
 
           return Buffer.concat(chunks)
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `sp-pdf-${doc.numero}`,
@@ -379,7 +378,7 @@ export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements P
    * Placeholder — a lógica real de 2Captcha/AntiCaptcha será implementada
    * no módulo dedicado de CAPTCHA.
    */
-  private async solveCaptcha(page: Page): Promise<void> {
+  private async resolverCaptchaLocal(page: Page): Promise<void> {
     // TODO: integrar com CaptchaSolverService (2Captcha → AntiCaptcha)
     // O serviço receberá a imagem em base64 e retornará o texto
     const captchaImg = page.locator(SEL.CAPTCHA_IMG)
@@ -395,23 +394,4 @@ export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements P
     throw new Error('Prefeitura SP: CAPTCHA detectado — CaptchaSolverService ainda não integrado')
   }
 
-  /**
-   * Tira screenshot, faz upload ao S3 e lança erro com a mensagem fornecida.
-   * Garante conformidade com a regra: screenshot obrigatório antes de throw.
-   */
-  private async captureAndThrow(
-    page: Page,
-    cnpj: string,
-    jobId: string,
-    mensagem: string
-  ): Promise<never> {
-    try {
-      const screenshot = await page.screenshot({ fullPage: true })
-      const s3Key = S3KeyBuilder.erroScreenshot(cnpj, jobId)
-      await this.storage.upload(s3Key, screenshot, 'image/png')
-    } catch {
-      // não mascarar o erro original
-    }
-    throw new Error(mensagem)
-  }
 }

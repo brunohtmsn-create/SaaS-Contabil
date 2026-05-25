@@ -177,7 +177,7 @@ export class DCTFWebService {
     })
 
     // Registra obrigação para controle de vencimento (dia 20)
-    const [ano, mes] = competencia.split('-').map(Number)
+    const [ano, mes] = competencia.split('-').map(Number) as [number, number]
     const vencimento = new Date(ano, mes, 20) // dia 20 do mês seguinte
     await this.db.obrigacao
       .upsert({

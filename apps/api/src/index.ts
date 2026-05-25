@@ -3,7 +3,7 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
 import websocket from '@fastify/websocket'
-import IORedis from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { getPrismaClient } from '@saas-contabil/database'
 import { authRoutes } from './routes/auth.routes.js'
 import { empresaRoutes } from './routes/empresa.routes.js'
@@ -75,7 +75,7 @@ app.setErrorHandler((error, _request, reply) => {
   if (statusCode >= 500) {
     app.log.error(error)
   }
-  reply.code(statusCode).send({ error: error.message ?? 'Erro interno do servidor' })
+  return reply.code(statusCode).send({ error: error.message ?? 'Erro interno do servidor' })
 })
 
 await app.register(authRoutes, { prefix: '/auth' })
@@ -104,7 +104,7 @@ app.get('/health', async (_request, reply) => {
     db.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
     redis
       .ping()
-      .then((r) => r === 'PONG')
+      .then((r: string) => r === 'PONG')
       .catch(() => false),
   ])
   redis.disconnect()

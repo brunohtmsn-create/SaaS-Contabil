@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
 import { StorageService } from '@saas-contabil/storage'
 import { Queue } from 'bullmq'
-import IORedis from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 
 export async function relatorioRoutes(app: FastifyInstance) {
   const db = getPrismaClient()

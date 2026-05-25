@@ -5,7 +5,7 @@ import { parsePeriodo, limparCNPJ, formatCompetencia } from '@saas-contabil/shar
 import { NormalizerService } from '@saas-contabil/normalizer'
 import { StorageService, S3KeyBuilder } from '@saas-contabil/storage'
 import { Queue } from 'bullmq'
-import IORedis from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { XMLParser } from 'fast-xml-parser'
 import { Decimal } from 'decimal.js'
 

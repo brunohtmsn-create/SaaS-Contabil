@@ -56,7 +56,7 @@ export default function AuditoriaPage() {
   const paginaAtual = filtrados.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE)
 
   const tiposEvento = useMemo(
-    () => [...new Set(eventos.map((e) => e.evento as string))].sort(),
+    () => Array.from(new Set(eventos.map((e) => e.evento as string))).sort(),
     [eventos]
   )
 

@@ -86,7 +86,7 @@ export async function credencialRoutes(app: FastifyInstance) {
         cnpj,
         tipo: tipo as any,
         rawData: fileBuffer,
-        validade: validade ? new Date(validade) : undefined,
+        ...(validade && { validade: new Date(validade) }),
         escopos,
         criadoPor,
       })
@@ -109,7 +109,7 @@ export async function credencialRoutes(app: FastifyInstance) {
       cnpj,
       tipo: tipo as any,
       rawData: Buffer.from(senha, 'utf-8'),
-      validade: validade ? new Date(validade) : undefined,
+      ...(validade && { validade: new Date(validade) }),
       escopos,
       criadoPor,
     })

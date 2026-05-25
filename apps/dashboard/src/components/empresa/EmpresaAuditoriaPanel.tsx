@@ -69,9 +69,9 @@ export function EmpresaAuditoriaPanel({ empresaId }: Props) {
                   {new Date(ev.timestamp).toLocaleString('pt-BR')}
                 </time>
               </div>
-              {ev.estadoNovo &&
+              {ev.estadoNovo != null &&
                 typeof ev.estadoNovo === 'object' &&
-                Object.keys(ev.estadoNovo as object).length > 0 && (
+                Object.keys(ev.estadoNovo as Record<string, unknown>).length > 0 && (
                   <details className="mt-2 ml-11">
                     <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600">
                       Ver detalhes

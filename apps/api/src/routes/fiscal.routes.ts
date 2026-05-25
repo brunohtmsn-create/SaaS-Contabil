@@ -189,7 +189,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const { empresaId, competencia } = params.parse(request.params)
 
     const service = new ESocialService()
-    return service.transmitirFolha(tenantId, empresaId, competencia)
+    return service.processar(tenantId, empresaId, competencia)
   })
 
   app.post('/dctfweb/:empresaId/:competencia', async (request) => {
