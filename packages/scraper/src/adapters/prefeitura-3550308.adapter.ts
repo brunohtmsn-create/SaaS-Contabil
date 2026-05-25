@@ -393,5 +393,4 @@ export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements P
 
     throw new Error('Prefeitura SP: CAPTCHA detectado — CaptchaSolverService ainda não integrado')
   }
-
 }

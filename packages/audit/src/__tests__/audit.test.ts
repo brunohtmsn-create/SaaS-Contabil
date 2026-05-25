@@ -36,13 +36,13 @@ const mockDb = {
   },
 }
 
-vi.mock('@saas-contabil/database', () => ({
-  getPrismaClient: vi.fn(() => mockDb),
-  // Re-exporta os enums como constantes simples para satisfazer os tipos
-  EntidadeAuditavel: {},
-  TipoEventoAudit: {},
-  TipoResponsavel: {},
-}))
+vi.mock('@saas-contabil/database', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@saas-contabil/database')>()
+  return {
+    ...actual,
+    getPrismaClient: vi.fn(() => mockDb),
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Import dos serviços APÓS os mocks

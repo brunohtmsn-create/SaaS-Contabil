@@ -304,6 +304,10 @@ jobs:
         run: pnpm --filter @saas-contabil/database db:generate
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas_contabil
+      - name: Build workspace packages
+        run: pnpm --filter './packages/*' build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas_contabil
       - name: Type check — all packages
         run: pnpm --filter '*' exec tsc --noEmit
 
