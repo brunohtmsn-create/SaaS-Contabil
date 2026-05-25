@@ -1,3 +1,5 @@
 export { EcacPortal } from './ecac.portal.js'
 export { SimplesNacionalPortal } from './simples-nacional.portal.js'
+export { SefazSpPortal } from './sefaz-sp.portal.js'
+export type { ResultadoDeSTDA, ResultadoGNRE } from './sefaz-sp.portal.js'
 export { PortalOrchestrator } from './portal-orchestrator.js'

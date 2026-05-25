@@ -32,12 +32,22 @@ const mockSimples = {
   transmitirPGDAS: vi.fn(),
 }
 
+const mockSefazSp = {
+  transmitirDeSTDA: vi.fn(),
+  emitirGNRE: vi.fn(),
+  emitirGNRELote: vi.fn(),
+}
+
 vi.mock('../ecac.portal.js', () => ({
   EcacPortal: vi.fn(() => mockEcac),
 }))
 
 vi.mock('../simples-nacional.portal.js', () => ({
   SimplesNacionalPortal: vi.fn(() => mockSimples),
+}))
+
+vi.mock('../sefaz-sp.portal.js', () => ({
+  SefazSpPortal: vi.fn(() => mockSefazSp),
 }))
 
 const mockDb = {
@@ -49,6 +59,18 @@ const mockDb = {
 
 vi.mock('@saas-contabil/database', () => ({
   getPrismaClient: vi.fn(() => mockDb),
+}))
+
+vi.mock('@saas-contabil/shared', () => ({
+  Decimal: class MockDecimal {
+    private v: string
+    constructor(v: string | number) {
+      this.v = String(v)
+    }
+    toFixed(n: number) {
+      return parseFloat(this.v).toFixed(n)
+    }
+  },
 }))
 
 import { PortalOrchestrator } from '../portal-orchestrator.js'
@@ -64,6 +86,19 @@ beforeEach(() => {
   mockEcac.consultarSituacaoFiscal.mockResolvedValue({ situacao: 'REGULAR', pendencias: [] })
   mockEcac.baixarCertidao.mockResolvedValue('portais/certidao-2025-01.pdf')
   mockSimples.transmitirPGDAS.mockResolvedValue('PGDAS-RECIBO-001')
+  mockSefazSp.transmitirDeSTDA.mockResolvedValue({
+    protocolo: 'PROTO-001',
+    recibo: 'DESTDA-SP-001',
+    dataTransmissao: new Date(),
+  })
+  mockSefazSp.emitirGNRE.mockResolvedValue({
+    numeroGuia: 'GNRE-001',
+    uf: 'SP',
+    codigoBarras: '12345.67890',
+    vencimento: new Date(),
+    pdfKey: 'gnre/sp.pdf',
+  })
+  mockSefazSp.emitirGNRELote.mockResolvedValue([])
 })
 
 // ---------------------------------------------------------------------------
@@ -229,5 +264,131 @@ describe('PortalOrchestrator — persistência portalJob', () => {
     await orch.executar(makeJob('ECAC', 'CONSULTA_SITUACAO'), CRED_BUF)
     const updateWhere = mockDb.portalJob.update.mock.calls[0][0].where
     expect(updateWhere.id).toBe('job-xyz')
+  })
+})
+
+// ===========================================================================
+// PortalOrchestrator — SEFAZ SP (DeSTDA + GNRE)
+// ===========================================================================
+
+describe('PortalOrchestrator — SEFAZ SP', () => {
+  it('SEFAZ_SP:TRANSMITIR_DESTDA → chama transmitirDeSTDA com certBuffer e certSenha', async () => {
+    const orch = new PortalOrchestrator()
+    await orch.executar(
+      makeJob('SEFAZ_SP', 'TRANSMITIR_DESTDA', {
+        competencia: '2025-01',
+        dados: { certSenha: 'senha123' },
+      }),
+      CRED_BUF
+    )
+    expect(mockSefazSp.transmitirDeSTDA).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      '2025-01',
+      CRED_BUF,
+      'senha123'
+    )
+  })
+
+  it('SEFAZ_SP:TRANSMITIR_DESTDA sem senha → passa string vazia', async () => {
+    const orch = new PortalOrchestrator()
+    await orch.executar(
+      makeJob('SEFAZ_SP', 'TRANSMITIR_DESTDA', { competencia: '2025-01' }),
+      CRED_BUF
+    )
+    expect(mockSefazSp.transmitirDeSTDA).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      '2025-01',
+      CRED_BUF,
+      ''
+    )
+  })
+
+  it('SEFAZ_SP:EMITIR_GNRE → chama emitirGNRE com uf, valor e codReceita', async () => {
+    const orch = new PortalOrchestrator()
+    await orch.executar(
+      makeJob('SEFAZ_SP', 'EMITIR_GNRE', {
+        competencia: '2025-01',
+        dados: { uf: 'MG', valor: '1500.00', codReceita: '10008-0' },
+      }),
+      CRED_BUF
+    )
+    expect(mockSefazSp.emitirGNRE).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      '2025-01',
+      'MG',
+      expect.objectContaining({ toFixed: expect.any(Function) }),
+      '10008-0'
+    )
+  })
+
+  it('SEFAZ_SP:EMITIR_GNRE sem dados → usa defaults (SP, 0, 10008-0)', async () => {
+    const orch = new PortalOrchestrator()
+    await orch.executar(makeJob('SEFAZ_SP', 'EMITIR_GNRE', { competencia: '2025-01' }), CRED_BUF)
+    expect(mockSefazSp.emitirGNRE).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      '2025-01',
+      'SP',
+      expect.objectContaining({ toFixed: expect.any(Function) }),
+      '10008-0'
+    )
+  })
+
+  it('SEFAZ_SP:EMITIR_GNRE_LOTE → chama emitirGNRELote com array mapeado', async () => {
+    const orch = new PortalOrchestrator()
+    await orch.executar(
+      makeJob('SEFAZ_SP', 'EMITIR_GNRE_LOTE', {
+        competencia: '2025-01',
+        dados: {
+          gnres: [
+            { uf: 'SP', valor: '100.00', codReceita: '10008-0' },
+            { uf: 'MG', valor: '200.00', codReceita: '10008-0' },
+          ],
+        },
+      }),
+      CRED_BUF
+    )
+    expect(mockSefazSp.emitirGNRELote).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      '2025-01',
+      expect.arrayContaining([
+        expect.objectContaining({ uf: 'SP' }),
+        expect.objectContaining({ uf: 'MG' }),
+      ])
+    )
+  })
+
+  it('SEFAZ_SP:EMITIR_GNRE_LOTE sem dados → passa array vazio', async () => {
+    const orch = new PortalOrchestrator()
+    await orch.executar(
+      makeJob('SEFAZ_SP', 'EMITIR_GNRE_LOTE', { competencia: '2025-01' }),
+      CRED_BUF
+    )
+    expect(mockSefazSp.emitirGNRELote).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      '2025-01',
+      []
+    )
+  })
+
+  it('SEFAZ_SP falha → atualiza portalJob para ERRO', async () => {
+    mockSefazSp.transmitirDeSTDA.mockRejectedValueOnce(new Error('SPED offline'))
+    const orch = new PortalOrchestrator()
+    await expect(
+      orch.executar(makeJob('SEFAZ_SP', 'TRANSMITIR_DESTDA', { competencia: '2025-01' }), CRED_BUF)
+    ).rejects.toThrow('SPED offline')
+    const updateData = mockDb.portalJob.update.mock.calls[0][0].data
+    expect(updateData.status).toBe('ERRO')
   })
 })
