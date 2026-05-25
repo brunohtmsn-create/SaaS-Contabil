@@ -28,21 +28,29 @@ function sha256(data: string): string {
 // Mock de @saas-contabil/database (deve vir ANTES dos imports dos serviços)
 // ---------------------------------------------------------------------------
 
-const mockDb = {
-  auditEvent: {
-    findFirst: vi.fn(),
-    findMany: vi.fn(),
-    create: vi.fn(),
+const { mockDb } = vi.hoisted(() => ({
+  mockDb: {
+    auditEvent: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
   },
-}
+}))
 
-vi.mock('@saas-contabil/database', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@saas-contabil/database')>()
-  return {
-    ...actual,
-    getPrismaClient: vi.fn(() => mockDb),
-  }
-})
+vi.mock('@saas-contabil/database', () => ({
+  getPrismaClient: vi.fn(() => mockDb),
+  EntidadeAuditavel: {},
+  TipoEventoAudit: {},
+  TipoResponsavel: {},
+  // Prisma.DbNull é um sentinel de runtime — qualquer valor único serve no mock
+  // pois mockDb.auditEvent.create é vi.fn() e nunca acessa o banco real.
+  Prisma: {
+    DbNull: Symbol('DbNull'),
+    JsonNull: Symbol('JsonNull'),
+    AnyNull: Symbol('AnyNull'),
+  },
+}))
 
 // ---------------------------------------------------------------------------
 // Import dos serviços APÓS os mocks
