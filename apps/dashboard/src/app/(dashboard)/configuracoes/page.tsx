@@ -424,6 +424,12 @@ export default function ConfiguracoesPage() {
         </section>
       )}
 
+      {/* Alíquotas ISS por Município */}
+      <section className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Alíquotas de ISS por Município</h2>
+        <ISSConfigPanel />
+      </section>
+
       {/* Sair */}
       <div className="flex justify-end pb-6">
         <button
@@ -436,6 +442,133 @@ export default function ConfiguracoesPage() {
           Sair da conta
         </button>
       </div>
+    </div>
+  )
+}
+
+type ISSConfig = {
+  id: string
+  municipioIBGE: string
+  municipioNome: string
+  aliquota: string
+  criadoEm: string
+}
+
+function ISSConfigPanel() {
+  const qc = useQueryClient()
+  const [form, setForm] = useState({ municipioIBGE: '', municipioNome: '', aliquota: '' })
+  const [err, setErr] = useState('')
+
+  const { data: configs = [] } = useQuery<ISSConfig[]>({
+    queryKey: ['iss-config'],
+    queryFn: () => api.get('/configuracoes/iss').then((r) => r.data),
+  })
+
+  const salvar = useMutation({
+    mutationFn: (body: { municipioIBGE: string; municipioNome: string; aliquota: number }) =>
+      api.post('/configuracoes/iss', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['iss-config'] })
+      setForm({ municipioIBGE: '', municipioNome: '', aliquota: '' })
+      setErr('')
+    },
+    onError: () => setErr('Verifique os campos: IBGE deve ter 7 dígitos, alíquota entre 0 e 10%.'),
+  })
+
+  const remover = useMutation({
+    mutationFn: (id: string) => api.delete(`/configuracoes/iss/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['iss-config'] }),
+  })
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const aliquota = parseFloat(form.aliquota.replace(',', '.')) / 100
+    if (isNaN(aliquota)) {
+      setErr('Alíquota inválida.')
+      return
+    }
+    salvar.mutate({ municipioIBGE: form.municipioIBGE, municipioNome: form.municipioNome, aliquota })
+  }
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Código IBGE (7 dígitos)</label>
+          <input
+            type="text"
+            maxLength={7}
+            value={form.municipioIBGE}
+            onChange={(e) => setForm((f) => ({ ...f, municipioIBGE: e.target.value }))}
+            placeholder="3550308"
+            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-36"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Nome do Município</label>
+          <input
+            type="text"
+            value={form.municipioNome}
+            onChange={(e) => setForm((f) => ({ ...f, municipioNome: e.target.value }))}
+            placeholder="São Paulo"
+            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-48"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Alíquota (%)</label>
+          <input
+            type="text"
+            value={form.aliquota}
+            onChange={(e) => setForm((f) => ({ ...f, aliquota: e.target.value }))}
+            placeholder="5.00"
+            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-24"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={salvar.isPending}
+          className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {salvar.isPending ? 'Salvando...' : 'Salvar'}
+        </button>
+      </form>
+      {err && <p className="text-xs text-red-600">{err}</p>}
+
+      {configs.length === 0 ? (
+        <p className="text-sm text-slate-400 py-2">Nenhuma alíquota configurada. Usando padrão de 2%.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
+              <th className="pb-2 pr-4">IBGE</th>
+              <th className="pb-2 pr-4">Município</th>
+              <th className="pb-2 pr-4">Alíquota</th>
+              <th className="pb-2"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {configs.map((c) => (
+              <tr key={c.id}>
+                <td className="py-2 pr-4 font-mono text-xs">{c.municipioIBGE}</td>
+                <td className="py-2 pr-4">{c.municipioNome}</td>
+                <td className="py-2 pr-4 font-mono">{(parseFloat(c.aliquota) * 100).toFixed(2)}%</td>
+                <td className="py-2">
+                  <button
+                    onClick={() => remover.mutate(c.id)}
+                    disabled={remover.isPending}
+                    className="text-xs text-red-500 hover:text-red-700"
+                  >
+                    Remover
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }
