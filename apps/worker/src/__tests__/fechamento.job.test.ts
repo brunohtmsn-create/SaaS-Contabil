@@ -3,7 +3,8 @@
  *
  * Cobre:
  *  - Todas as 12 fases são chamadas em ordem
- *  - eSocial e DCTFWeb: erros são tolerados (não interrompem o job)
+ *  - eSocial: "sem empregados" é tolerado; outros erros registram auditoria e continuam
+ *  - DCTFWeb: falha de pré-requisito (EFD-Reinf não fechado) rethrows; outras falhas são toleradas
  *  - Sem credencial → pula scraper e normalizer
  *  - Com credencial → executa scraper + normalizer
  *  - Documentos PENDENTE_REVISAO → loga aviso mas não para
@@ -256,15 +257,35 @@ describe('fechamentoCompleto — tolerância a falhas opcionais', () => {
     expect(mockFgts.apurar).toHaveBeenCalledOnce()
   })
 
-  it('DCTFWeb com erro → continua o fechamento', async () => {
-    mockDctfweb.gerar.mockRejectedValueOnce(new Error('EFD-Reinf não fechado'))
+  it('DCTFWeb sem obrigações → continua o fechamento', async () => {
+    mockDctfweb.gerar.mockRejectedValueOnce(new Error('empresa sem contribuições DCTFWeb'))
     await expect(fechamentoCompleto(makeJob())).resolves.toBeUndefined()
     expect(mockFgts.apurar).toHaveBeenCalledOnce()
   })
 
-  it('eSocial e DCTFWeb ambos com erro → FGTS e lançamentos ainda executam', async () => {
+  it('DCTFWeb com pré-requisito não atendido (EFD-Reinf) → rethrow', async () => {
+    mockDctfweb.gerar.mockRejectedValueOnce(new Error('EFD-Reinf e eSocial devem ser fechados'))
+    await expect(fechamentoCompleto(makeJob())).rejects.toThrow('EFD-Reinf')
+    expect(mockAudit.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ evento: 'OBRIGACAO_FALHOU' })
+    )
+  })
+
+  it('eSocial com erro inesperado → registra auditoria e continua', async () => {
+    mockEsocial.processar.mockRejectedValueOnce(new Error('timeout DB'))
+    await expect(fechamentoCompleto(makeJob())).resolves.toBeUndefined()
+    expect(mockAudit.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evento: 'OBRIGACAO_FALHOU',
+        estadoNovo: expect.objectContaining({ fase: 'ESOCIAL' }),
+      })
+    )
+    expect(mockFgts.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('eSocial e DCTFWeb (sem obrigação) com erro → FGTS e lançamentos ainda executam', async () => {
     mockEsocial.processar.mockRejectedValueOnce(new Error('sem empregados'))
-    mockDctfweb.gerar.mockRejectedValueOnce(new Error('pré-requisito falhou'))
+    mockDctfweb.gerar.mockRejectedValueOnce(new Error('sem obrigações'))
     await expect(fechamentoCompleto(makeJob())).resolves.toBeUndefined()
     expect(mockLancamento.gerarLancamentos).toHaveBeenCalledOnce()
     expect(mockFgts.apurar).toHaveBeenCalledOnce()
@@ -311,11 +332,11 @@ describe('fechamentoCompleto — scraper e normalizer', () => {
     expect(mockNormalizer.normalizar).toHaveBeenCalledOnce()
   })
 
-  it('falha no scraper → loga e continua com documentos existentes', async () => {
+  it('falha no scraper → propaga erro (CLAUDE.md regra 6 e 11)', async () => {
     mockCredential.retrieve.mockResolvedValueOnce({ data: {} })
     mockScraper.capturarTodos.mockRejectedValueOnce(new Error('timeout SEFAZ'))
-    await expect(fechamentoCompleto(makeJob('cred-1'))).resolves.toBeUndefined()
-    expect(mockPGDAS.apurar).toHaveBeenCalledOnce()
+    await expect(fechamentoCompleto(makeJob('cred-1'))).rejects.toThrow('timeout SEFAZ')
+    expect(mockPGDAS.apurar).not.toHaveBeenCalled()
   })
 })
 

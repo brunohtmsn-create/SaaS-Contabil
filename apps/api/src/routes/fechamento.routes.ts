@@ -21,7 +21,7 @@ export async function fechamentoRoutes(app: FastifyInstance) {
       .parse(request.params)
 
     const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
-    if (!empresa) return { error: 'Empresa não encontrada' }
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
 
     // Busca credencial ativa mais recente (prefere CERTIFICADO_A1, aceita e-CAC)
     const credencial = await db.credencial.findFirst({

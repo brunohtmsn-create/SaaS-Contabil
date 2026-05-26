@@ -85,13 +85,14 @@ export class PortalOrchestrator {
 
         case 'SEFAZ_SP:EMITIR_GNRE': {
           const d = job.dados as { uf?: string; valor?: string; codReceita?: string } | undefined
+          if (!d?.valor) throw new Error('GNRE requer campo valor nos dados do job')
           resultado = await this.sefazSp.emitirGNRE(
             job.tenantId,
             job.empresaId,
             job.cnpj,
             job.competencia ?? '',
             d?.uf ?? 'SP',
-            new Decimal(d?.valor ?? '0'),
+            new Decimal(d.valor),
             d?.codReceita ?? '10008-0'
           )
           break

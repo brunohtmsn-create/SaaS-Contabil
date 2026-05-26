@@ -13,7 +13,7 @@ import { chromium, Browser, Page } from 'playwright'
 import { AuditService } from '@saas-contabil/audit'
 import { StorageService, S3KeyBuilder } from '@saas-contabil/storage'
 import { getPrismaClient } from '@saas-contabil/database'
-import { Decimal, nowBR } from '@saas-contabil/shared'
+import { Decimal, nowBR, parsePeriodo, addMeses, formatCompetencia } from '@saas-contabil/shared'
 
 const SPED_SP_URL = 'https://www.sped.fazenda.sp.gov.br/spedsp/jsp/login.jsf'
 const GNRE_SP_URL = 'https://www.gnre.pe.gov.br/gnre/portal/consultarGuia.do'
@@ -219,13 +219,15 @@ export class SefazSpPortal {
         (await numeroGuiaEl.textContent())?.trim() ?? `GNRE-${uf}-${cnpj}-${Date.now()}`
 
       // Download do PDF
-      const pdfKey = S3KeyBuilder.erroScreenshot(cnpj, `gnre-${uf}-${competencia}`)
+      const pdfKey = S3KeyBuilder.guiaGNRE(cnpj, competencia, uf)
       const pdfContent = await page.pdf({ format: 'A4' })
       await this.storage.upload(pdfKey, Buffer.from(pdfContent), 'application/pdf')
 
-      // Vencimento: último dia útil do mês seguinte (simplificado: dia 20 do mês seguinte)
-      const [ano, mes] = competencia.split('-').map(Number) as [number, number]
-      const vencimento = new Date(ano, mes, 20)
+      // Vencimento: dia 20 do mês seguinte à competência
+      const { inicio: inicioCompetencia } = parsePeriodo(competencia)
+      const proximoMes = formatCompetencia(addMeses(inicioCompetencia, 1))
+      const { inicio: inicioProximo } = parsePeriodo(proximoMes)
+      const vencimento = new Date(inicioProximo.getFullYear(), inicioProximo.getMonth(), 20)
 
       const resultado: ResultadoGNRE = {
         numeroGuia,

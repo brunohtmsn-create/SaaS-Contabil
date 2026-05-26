@@ -8,7 +8,7 @@ import {
   addDays,
   differenceInCalendarDays,
 } from 'date-fns'
-import { toZonedTime, fromZonedTime } from 'date-fns-tz'
+import { toZonedTime } from 'date-fns-tz'
 
 export {
   startOfMonth,
@@ -23,7 +23,7 @@ export {
 const TZ = 'America/Sao_Paulo'
 
 export function nowBR(): Date {
-  return fromZonedTime(new Date(), TZ)
+  return new Date()
 }
 
 export function toDateBR(date: Date): Date {

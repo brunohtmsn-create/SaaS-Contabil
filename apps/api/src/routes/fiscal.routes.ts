@@ -162,9 +162,11 @@ export async function fiscalRoutes(app: FastifyInstance) {
     })
   })
 
-  app.post('/obrigacoes/calendario/:empresaId/:ano', async (request) => {
+  app.post('/obrigacoes/calendario/:empresaId/:ano', async (request, reply) => {
     const { tenantId } = request.user as any
-    const { empresaId, ano } = request.params as { empresaId: string; ano: string }
+    const { empresaId, ano } = z
+      .object({ empresaId: z.string().uuid(), ano: z.string().regex(/^\d{4}$/) })
+      .parse(request.params)
 
     const service = new MonitoramentoSNService()
     return service.gerarCalendarioAnual(tenantId, empresaId, Number(ano))

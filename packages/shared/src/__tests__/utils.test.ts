@@ -170,11 +170,9 @@ describe('nowBR()', () => {
     const before = Date.now()
     const d = nowBR()
     const after = Date.now()
-    // nowBR() = fromZonedTime(new Date(), 'America/Sao_Paulo')
-    // o timestamp em ms será deslocado do UTC pelo offset de Sao Paulo (-3h ou -2h)
-    // mas deve permanecer dentro de um intervalo razoável em relação ao now
-    expect(d.getTime()).toBeGreaterThan(before - 5 * 60 * 60 * 1000)
-    expect(d.getTime()).toBeLessThan(after + 5 * 60 * 60 * 1000)
+    // nowBR() = new Date() — instante UTC correto para armazenamento em Prisma DateTime
+    expect(d.getTime()).toBeGreaterThanOrEqual(before)
+    expect(d.getTime()).toBeLessThanOrEqual(after)
   })
 })
 

@@ -78,30 +78,24 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
     await job.log('FASE 1: Capturando documentos fiscais...')
     let capturadosTotal = 0
     if (job.data.credencialId) {
-      try {
-        const credencial = await credentialService.retrieve(job.data.credencialId, tenantId)
-        const docs = await scraper.capturarTodos(cnpj, competencia, credencial)
-        const todosRaw = [...docs.nfe, ...docs.nfce, ...docs.nfseEmitidas, ...docs.nfseTomadas]
-        capturadosTotal = todosRaw.length
-        await job.log(
-          `FASE 1: ${capturadosTotal} documento(s) capturados (NF-e:${docs.nfe.length} NFC-e:${docs.nfce.length} NFSe:${docs.nfseEmitidas.length + docs.nfseTomadas.length})`
-        )
+      const credencial = await credentialService.retrieve(job.data.credencialId, tenantId)
+      const docs = await scraper.capturarTodos(cnpj, competencia, credencial)
+      const todosRaw = [...docs.nfe, ...docs.nfce, ...docs.nfseEmitidas, ...docs.nfseTomadas]
+      capturadosTotal = todosRaw.length
+      await job.log(
+        `FASE 1: ${capturadosTotal} documento(s) capturados (NF-e:${docs.nfe.length} NFC-e:${docs.nfce.length} NFSe:${docs.nfseEmitidas.length + docs.nfseTomadas.length})`
+      )
 
-        // FASE 2: Normalização e deduplicação
-        await job.log('FASE 2: Normalizando e deduplicando documentos...')
-        let novos = 0
-        for (const raw of todosRaw) {
-          const salvo = await normalizer.normalizar(raw, tenantId, empresaId)
-          if (salvo) novos++
-        }
-        await job.log(
-          `FASE 2: ${novos} documento(s) novos persistidos (${capturadosTotal - novos} duplicatas ignoradas)`
-        )
-      } catch (scraperErr) {
-        await job.log(
-          `FASE 1: Falha no scraper — ${String(scraperErr)} — continuando com documentos existentes`
-        )
+      // FASE 2: Normalização e deduplicação
+      await job.log('FASE 2: Normalizando e deduplicando documentos...')
+      let novos = 0
+      for (const raw of todosRaw) {
+        const salvo = await normalizer.normalizar(raw, tenantId, empresaId)
+        if (salvo) novos++
       }
+      await job.log(
+        `FASE 2: ${novos} documento(s) novos persistidos (${capturadosTotal - novos} duplicatas ignoradas)`
+      )
     } else {
       await job.log('FASE 1: Sem credencial configurada — usando documentos já importados')
     }
@@ -151,8 +145,13 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
     try {
       await esocial.processar(tenantId, empresaId, competencia)
     } catch (esocialErr) {
-      // eSocial é opcional — empresa sem empregados não gera eventos
-      await job.log(`FASE 8: eSocial ignorado — ${String(esocialErr)}`)
+      const msg = String(esocialErr)
+      if (msg.includes('sem empregados') || msg.includes('SEM_EMPREGADOS')) {
+        await job.log(`FASE 8: eSocial ignorado — empresa sem empregados`)
+      } else {
+        await auditJob('OBRIGACAO_FALHOU', { fase: 'ESOCIAL', competencia, erro: msg })
+        await job.log(`FASE 8: eSocial falhou (registrado em auditoria) — ${msg}`)
+      }
     }
     await job.updateProgress(82)
 
@@ -160,8 +159,17 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
     try {
       await dctfweb.gerar(tenantId, empresaId, competencia)
     } catch (dctfErr) {
-      // DCTFWeb depende de EFD-Reinf e eSocial — loga mas não interrompe
-      await job.log(`FASE 9: DCTFWeb ignorada — ${String(dctfErr)}`)
+      const msg = String(dctfErr)
+      // Pré-requisito não atendido (EFD-Reinf não fechado) → falha real, deve retentar
+      if (
+        msg.includes('EFD-Reinf') ||
+        msg.includes('pré-requisito') ||
+        msg.includes('prerequisito')
+      ) {
+        throw new Error(`FASE 9: DCTFWeb bloqueada por pré-requisito — ${msg}`)
+      }
+      // Sem obrigações DCTFWeb (empresa sem funcionários e sem contribuições) → OK
+      await job.log(`FASE 9: DCTFWeb sem obrigações — ${msg}`)
     }
     await job.updateProgress(86)
 
