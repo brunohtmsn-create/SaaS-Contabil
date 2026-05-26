@@ -10,6 +10,7 @@ const navItems = [
   { href: '/documentos', label: 'Documentos', icon: '📄' },
   { href: '/fiscal', label: 'Fiscal', icon: '💰' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
+  { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },
   { href: '/contabil', label: 'Contábil', icon: '📒' },
   { href: '/portais', label: 'Portais Gov.', icon: '🏛️' },
