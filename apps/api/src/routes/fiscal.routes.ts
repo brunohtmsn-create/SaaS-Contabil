@@ -11,6 +11,8 @@ import {
   ESocialService,
   MonitoramentoSNService,
   FatorRService,
+  FGTSDigitalService,
+  EFDReinfService,
 } from '@saas-contabil/fiscal'
 
 const params = z.object({
@@ -228,6 +230,22 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const service = new DCTFWebService()
     return service.gerar(tenantId, empresaId, competencia)
+  })
+
+  app.post('/fgts/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new FGTSDigitalService()
+    return service.apurar(tenantId, empresaId, competencia)
+  })
+
+  app.post('/efdreinf/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new EFDReinfService()
+    return service.processar(tenantId, empresaId, competencia)
   })
 
   app.post('/monitoramento/calendario/:empresaId', async (request) => {

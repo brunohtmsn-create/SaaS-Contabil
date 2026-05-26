@@ -28,6 +28,8 @@ const mockDCTFWeb = { gerar: vi.fn() }
 const mockESocial = { processar: vi.fn() }
 const mockMonitoramento = { gerarCalendarioAnual: vi.fn() }
 const mockFatorR = { calcular: vi.fn() }
+const mockFGTS = { apurar: vi.fn() }
+const mockEFDReinf = { processar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -38,6 +40,8 @@ vi.mock('@saas-contabil/fiscal', () => ({
   ESocialService: vi.fn(() => mockESocial),
   MonitoramentoSNService: vi.fn(() => mockMonitoramento),
   FatorRService: vi.fn(() => mockFatorR),
+  FGTSDigitalService: vi.fn(() => mockFGTS),
+  EFDReinfService: vi.fn(() => mockEFDReinf),
 }))
 
 const { mockDb } = vi.hoisted(() => ({
@@ -442,5 +446,59 @@ describe('PATCH /fiscal/obrigacoes/:id', () => {
     const updateWhere = mockDb.obrigacao.update.mock.calls[0][0].where
     expect(updateWhere.tenantId).toBe(TENANT_ID)
     expect(updateWhere.id).toBe('obr-iso')
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/fgts/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/fgts/:empresaId/:competencia', () => {
+  it('chama FGTSDigitalService.apurar e retorna resultado', async () => {
+    const resultado = { tipo: 'FGTS', status: 'CALCULADO', totalFGTS: '800.00' }
+    mockFGTS.apurar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/fgts/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockFGTS.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().totalFGTS).toBe('800.00')
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/fgts/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/fgts/${EMPRESA_ID}/202505`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/efdreinf/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/efdreinf/:empresaId/:competencia', () => {
+  it('chama EFDReinfService.processar e retorna resultado', async () => {
+    const resultado = { eventos: ['R-2010', 'R-2020'], status: 'PROCESSADO' }
+    mockEFDReinf.processar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/efdreinf/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockEFDReinf.processar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().status).toBe('PROCESSADO')
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/efdreinf/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/efdreinf/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
   })
 })
