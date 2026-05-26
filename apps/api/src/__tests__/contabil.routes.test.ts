@@ -7,6 +7,8 @@
  *  POST /contabil/depreciacao/:empresaId/:comp       — calcula depreciação
  *  POST /contabil/ecd/:empresaId/:ano                — gera ECD
  *  POST /contabil/open-finance/sincronizar/:id       — sincroniza Open Finance
+ *  POST /contabil/bancario/:empresaId/:comp          — conciliação bancária
+ *  GET  /contabil/transacoes/status/:empresaId       — status de conciliação bancária
  *  GET  /contabil/transacoes/:empresaId              — lista transações bancárias
  *  GET  /contabil/bens/:empresaId                    — lista bens ativos
  *  POST /contabil/bens/:empresaId                    — cadastra bem ativo
@@ -25,18 +27,20 @@ const mockLancamento = { gerarLancamentos: vi.fn() }
 const mockDepreciacao = { calcular: vi.fn() }
 const mockECD = { gerar: vi.fn() }
 const mockOpenFinance = { sincronizarContas: vi.fn() }
+const mockConciliacaoBancaria = { conciliar: vi.fn() }
 
 vi.mock('@saas-contabil/contabil', () => ({
   LancamentoService: vi.fn(() => mockLancamento),
   DepreciacaoService: vi.fn(() => mockDepreciacao),
   ECDService: vi.fn(() => mockECD),
   OpenFinanceService: vi.fn(() => mockOpenFinance),
+  ConciliacaoBancariaService: vi.fn(() => mockConciliacaoBancaria),
 }))
 
 const { mockDb } = vi.hoisted(() => ({
   mockDb: {
     lancamentoContabil: { findMany: vi.fn() },
-    transacaoBancaria: { findMany: vi.fn() },
+    transacaoBancaria: { findMany: vi.fn(), count: vi.fn() },
     bemAtivo: { findMany: vi.fn(), create: vi.fn() },
   },
 }))
@@ -213,13 +217,13 @@ describe('POST /contabil/ecd/:empresaId/:ano', () => {
 // ===========================================================================
 
 describe('POST /contabil/open-finance/sincronizar/:empresaId', () => {
-  it('sincroniza e retorna contagem de transações → 200', async () => {
-    mockOpenFinance.sincronizarContas.mockResolvedValueOnce(42)
+  it('sincroniza e retorna success → 200', async () => {
+    mockOpenFinance.sincronizarContas.mockResolvedValueOnce(undefined)
 
     const res = await req('POST', `/contabil/open-finance/sincronizar/${EMPRESA_ID}`)
 
     expect(res.statusCode).toBe(200)
-    expect(res.json().transacoesImportadas).toBe(42)
+    expect(res.json()).toEqual({ success: true })
     expect(mockOpenFinance.sincronizarContas).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID)
   })
 })
@@ -348,5 +352,88 @@ describe('POST /contabil/bens/:empresaId', () => {
     })
 
     expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /contabil/bancario/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /contabil/bancario/:empresaId/:competencia', () => {
+  it('chama ConciliacaoBancariaService.conciliar e retorna success → 200', async () => {
+    mockConciliacaoBancaria.conciliar.mockResolvedValueOnce(undefined)
+
+    const res = await req('POST', `/contabil/bancario/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ success: true })
+    expect(mockConciliacaoBancaria.conciliar).toHaveBeenCalledWith(
+      TENANT_ID,
+      EMPRESA_ID,
+      COMPETENCIA
+    )
+  })
+
+  it('usa tenantId do JWT, não do body', async () => {
+    mockConciliacaoBancaria.conciliar.mockResolvedValueOnce(undefined)
+
+    await req('POST', `/contabil/bancario/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    const [tenantArg] = mockConciliacaoBancaria.conciliar.mock.calls[0]
+    expect(tenantArg).toBe(TENANT_ID)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/contabil/bancario/${EMPRESA_ID}/25-5`)
+
+    expect(res.statusCode).toBe(400)
+    expect(mockConciliacaoBancaria.conciliar).not.toHaveBeenCalled()
+  })
+
+  it('empresaId sem UUID → 400', async () => {
+    const res = await req('POST', `/contabil/bancario/nao-uuid/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(400)
+    expect(mockConciliacaoBancaria.conciliar).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// GET /contabil/transacoes/status/:empresaId
+// ===========================================================================
+
+describe('GET /contabil/transacoes/status/:empresaId', () => {
+  it('retorna contagens total, conciliadas, naoConciliadas → 200', async () => {
+    mockDb.transacaoBancaria.count
+      .mockResolvedValueOnce(10) // total
+      .mockResolvedValueOnce(7) // conciliadas
+      .mockResolvedValueOnce(3) // naoConciliadas
+
+    const res = await req(
+      'GET',
+      `/contabil/transacoes/status/${EMPRESA_ID}?competencia=${COMPETENCIA}`
+    )
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ total: 10, conciliadas: 7, naoConciliadas: 3 })
+  })
+
+  it('usa tenantId do JWT nas queries de count', async () => {
+    mockDb.transacaoBancaria.count.mockResolvedValue(0)
+
+    await req('GET', `/contabil/transacoes/status/${EMPRESA_ID}`)
+
+    for (const call of mockDb.transacaoBancaria.count.mock.calls) {
+      expect(call[0].where.tenantId).toBe(TENANT_ID)
+      expect(call[0].where.empresaId).toBe(EMPRESA_ID)
+    }
+  })
+
+  it('sem competencia → busca sem filtro de data', async () => {
+    mockDb.transacaoBancaria.count.mockResolvedValue(5)
+
+    const res = await req('GET', `/contabil/transacoes/status/${EMPRESA_ID}`)
+
+    expect(res.statusCode).toBe(200)
   })
 })

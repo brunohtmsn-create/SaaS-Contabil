@@ -6,6 +6,7 @@ import {
   DepreciacaoService,
   ECDService,
   OpenFinanceService,
+  ConciliacaoBancariaService,
 } from '@saas-contabil/contabil'
 
 const params = z.object({
@@ -53,8 +54,36 @@ export async function contabilRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
     const { empresaId } = request.params as { empresaId: string }
     const service = new OpenFinanceService()
-    const count = await service.sincronizarContas(tenantId, empresaId)
-    return { transacoesImportadas: count }
+    await service.sincronizarContas(tenantId, empresaId)
+    return { success: true }
+  })
+
+  app.post('/bancario/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const service = new ConciliacaoBancariaService()
+    await service.conciliar(tenantId, empresaId, competencia)
+    return { success: true }
+  })
+
+  app.get('/transacoes/status/:empresaId', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId } = request.params as { empresaId: string }
+    const { competencia } = request.query as { competencia?: string }
+
+    const where: any = { tenantId, empresaId }
+    if (competencia) {
+      const { inicio, fim } = (await import('@saas-contabil/shared')).parsePeriodo(competencia)
+      where.data = { gte: inicio, lte: fim }
+    }
+
+    const [total, conciliadas, naoConciliadas] = await Promise.all([
+      db.transacaoBancaria.count({ where }),
+      db.transacaoBancaria.count({ where: { ...where, status: 'CONCILIADA' } }),
+      db.transacaoBancaria.count({ where: { ...where, status: 'NAO_CONCILIADA' } }),
+    ])
+
+    return { total, conciliadas, naoConciliadas }
   })
 
   app.get('/transacoes/:empresaId', async (request) => {
