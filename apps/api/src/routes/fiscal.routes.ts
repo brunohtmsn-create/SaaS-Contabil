@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
-import { nowBR } from '@saas-contabil/shared'
+import { nowBR, parsePeriodo } from '@saas-contabil/shared'
 import {
   PGDASService,
   DifalService,
@@ -97,8 +97,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const { empresaId, competencia } = params.parse(request.params)
 
     // PGDAS → transmitir SOMENTE após conciliação completa do período (CLAUDE.md regra 11)
-    const { parsePeriodo: pp } = await import('@saas-contabil/shared')
-    const { inicio, fim } = pp(competencia)
+    const { inicio, fim } = parsePeriodo(competencia)
     const pendentes = await db.documentoFiscal.count({
       where: {
         tenantId,
@@ -133,7 +132,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const where: any = { tenantId, empresaId }
     if (mes) {
-      const { inicio, fim } = (await import('@saas-contabil/shared')).parsePeriodo(mes)
+      const { inicio, fim } = parsePeriodo(mes)
       where.vencimento = { gte: inicio, lte: fim }
     }
 
@@ -152,7 +151,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
     if (status) where.status = status
     const periodo = competencia ?? mes
     if (periodo) {
-      const { inicio, fim } = (await import('@saas-contabil/shared')).parsePeriodo(periodo)
+      const { inicio, fim } = parsePeriodo(periodo)
       where.vencimento = { gte: inicio, lte: fim }
     }
 
