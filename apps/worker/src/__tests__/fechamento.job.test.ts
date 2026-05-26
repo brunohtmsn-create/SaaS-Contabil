@@ -196,7 +196,11 @@ describe('fechamentoCompleto — fluxo principal', () => {
     expect(mockNotificacao.notificarTenant).toHaveBeenCalledWith(
       't-1',
       'FECHAMENTO_CONCLUIDO',
-      expect.objectContaining({ empresaId: 'emp-1', cnpj: '11111111000111', competencia: '2025-01' })
+      expect.objectContaining({
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025-01',
+      })
     )
   })
 
