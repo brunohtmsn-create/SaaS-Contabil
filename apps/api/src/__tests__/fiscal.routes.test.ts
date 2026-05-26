@@ -1,0 +1,398 @@
+/**
+ * Testes de integração — fiscal.routes.ts
+ *
+ * Foco nos caminhos críticos:
+ *  POST /fiscal/pgdas/transmitir/:id/:comp — bloqueia se há docs não conciliados (CLAUDE.md §11)
+ *  GET  /fiscal/apuracoes — filtra por tenantId
+ *  GET  /fiscal/obrigacoes — filtra por tenantId + competência + status
+ *  POST /fiscal/pgdas/:id/:comp — chama PGDASService.apurar
+ *  GET  /fiscal/pgdas/:id/:comp — busca apuração, 404 se ausente
+ *  GET  /fiscal/fator-r/:id/:comp — retorna fatorR e anexo
+ *  POST /fiscal/obrigacoes/calendario/:id/:ano — valida ano com regex
+ */
+
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
+import Fastify, { FastifyInstance } from 'fastify'
+import jwt from '@fastify/jwt'
+import { ZodError } from 'zod'
+
+// ---------------------------------------------------------------------------
+// Mocks de serviços fiscais e Prisma
+// ---------------------------------------------------------------------------
+
+const mockPGDAS = { apurar: vi.fn() }
+const mockDifal = { calcular: vi.fn() }
+const mockGNRE = { gerar: vi.fn() }
+const mockDeSTDA = { gerar: vi.fn() }
+const mockDCTFWeb = { gerar: vi.fn() }
+const mockESocial = { processar: vi.fn() }
+const mockMonitoramento = { gerarCalendarioAnual: vi.fn() }
+const mockFatorR = { calcular: vi.fn() }
+
+vi.mock('@saas-contabil/fiscal', () => ({
+  PGDASService: vi.fn(() => mockPGDAS),
+  DifalService: vi.fn(() => mockDifal),
+  GNREService: vi.fn(() => mockGNRE),
+  DeSTDAService: vi.fn(() => mockDeSTDA),
+  DCTFWebService: vi.fn(() => mockDCTFWeb),
+  ESocialService: vi.fn(() => mockESocial),
+  MonitoramentoSNService: vi.fn(() => mockMonitoramento),
+  FatorRService: vi.fn(() => mockFatorR),
+}))
+
+const { mockDb } = vi.hoisted(() => ({
+  mockDb: {
+    apuracaoFiscal: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
+    documentoFiscal: {
+      count: vi.fn(),
+    },
+    obrigacao: {
+      findMany: vi.fn(),
+    },
+  },
+}))
+
+vi.mock('@saas-contabil/database', () => ({
+  getPrismaClient: vi.fn(() => mockDb),
+}))
+
+vi.mock('@saas-contabil/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@saas-contabil/shared')>()
+  return {
+    ...actual,
+    nowBR: vi.fn(() => new Date('2025-06-01T12:00:00Z')),
+  }
+})
+
+import { fiscalRoutes } from '../routes/fiscal.routes.js'
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+const TENANT_ID = 'tenant-fiscal'
+const USER_ID = 'user-fiscal'
+const EMPRESA_ID = '550e8400-e29b-41d4-a716-446655440000'
+const COMPETENCIA = '2025-05'
+
+let app: FastifyInstance
+
+beforeAll(async () => {
+  app = Fastify({ logger: false })
+  await app.register(jwt, { secret: 'test-secret-key-32-chars-minimum!!' })
+
+  app.addHook('onRequest', async (request) => {
+    if (request.headers['x-test-skip-auth'] === '1') {
+      ;(request as any).user = { sub: USER_ID, tenantId: TENANT_ID, perfil: 'CONTADOR' }
+    }
+  })
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.errors })
+    }
+    const statusCode = error.statusCode ?? 500
+    return reply.code(statusCode).send({ error: error.message ?? 'Erro interno' })
+  })
+
+  await app.register(fiscalRoutes, { prefix: '/fiscal' })
+  await app.ready()
+})
+
+afterAll(async () => {
+  await app.close()
+})
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+function req(method: string, url: string, payload?: unknown) {
+  return app.inject({
+    method: method as any,
+    url,
+    headers: { 'x-test-skip-auth': '1' },
+    payload: payload as any,
+  })
+}
+
+// ===========================================================================
+// POST /fiscal/pgdas/transmitir — regra crítica CLAUDE.md §11
+// ===========================================================================
+
+describe('POST /fiscal/pgdas/transmitir/:empresaId/:competencia', () => {
+  const url = `/fiscal/pgdas/transmitir/${EMPRESA_ID}/${COMPETENCIA}`
+
+  it('com todos documentos conciliados → 200 e status TRANSMITIDO', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0) // sem pendentes
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'apuracao-1', status: 'CALCULADO' })
+    mockDb.apuracaoFiscal.update.mockResolvedValueOnce({})
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().success).toBe(true)
+    expect(res.json().status).toBe('TRANSMITIDO')
+  })
+
+  it('com documentos PENDENTE_REVISAO → 422 (bloqueia transmissão)', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(3) // 3 pendentes
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error).toMatch(/não conciliados/i)
+    // Não deve atualizar o status
+    expect(mockDb.apuracaoFiscal.update).not.toHaveBeenCalled()
+  })
+
+  it('com 1 documento pendente → 422 com count correto na mensagem', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(1)
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error).toMatch(/1/)
+  })
+
+  it('PGDAS não apurado → 404', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0) // sem pendentes
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/não apurado/i)
+  })
+
+  it('update seta status TRANSMITIDO na apuração', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0)
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'apuracao-1' })
+    mockDb.apuracaoFiscal.update.mockResolvedValueOnce({})
+
+    await req('POST', url)
+
+    const updateData = mockDb.apuracaoFiscal.update.mock.calls[0][0].data
+    expect(updateData.status).toBe('TRANSMITIDO')
+  })
+
+  it('count filtra por tenantId e empresaId (isolamento)', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0)
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'ap-1' })
+    mockDb.apuracaoFiscal.update.mockResolvedValueOnce({})
+
+    await req('POST', url)
+
+    const countWhere = mockDb.documentoFiscal.count.mock.calls[0][0].where
+    expect(countWhere.tenantId).toBe(TENANT_ID)
+    expect(countWhere.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('competencia inválida (não YYYY-MM) → 400', async () => {
+    const res = await req('POST', `/fiscal/pgdas/transmitir/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('empresaId inválido (não UUID) → 400', async () => {
+    const res = await req('POST', `/fiscal/pgdas/transmitir/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/pgdas/:id/:comp — apuração
+// ===========================================================================
+
+describe('POST /fiscal/pgdas/:empresaId/:competencia', () => {
+  it('chama PGDASService.apurar e retorna resultado', async () => {
+    const resultado = { tipo: 'PGDAS', status: 'CALCULADO', valorDAS: '1500.00' }
+    mockPGDAS.apurar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/pgdas/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockPGDAS.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().valorDAS).toBe('1500.00')
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/pgdas/:id/:comp — busca apuração
+// ===========================================================================
+
+describe('GET /fiscal/pgdas/:empresaId/:competencia', () => {
+  it('apuração encontrada → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-1',
+      tipo: 'PGDAS',
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/pgdas/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('PGDAS')
+  })
+
+  it('apuração não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/pgdas/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/não encontrado/i)
+  })
+
+  it('busca com tenantId do JWT', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'ap-1' })
+
+    await req('GET', `/fiscal/pgdas/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe(EMPRESA_ID)
+    expect(where.tipo).toBe('PGDAS')
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/apuracoes
+// ===========================================================================
+
+describe('GET /fiscal/apuracoes', () => {
+  it('retorna apurações do tenant', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([{ id: 'ap-1', tipo: 'PGDAS' }])
+
+    const res = await req('GET', '/fiscal/apuracoes')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(1)
+  })
+
+  it('filtra por tenantId (isolamento)', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/apuracoes')
+
+    const { where } = mockDb.apuracaoFiscal.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
+
+  it('com ?competencia=YYYY-MM adiciona filtro', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/apuracoes?competencia=2025-05')
+
+    const { where } = mockDb.apuracaoFiscal.findMany.mock.calls[0][0]
+    expect(where.competencia).toBe('2025-05')
+  })
+
+  it('com ?tipo=PGDAS adiciona filtro de tipo', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/apuracoes?tipo=PGDAS')
+
+    const { where } = mockDb.apuracaoFiscal.findMany.mock.calls[0][0]
+    expect(where.tipo).toBe('PGDAS')
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/obrigacoes
+// ===========================================================================
+
+describe('GET /fiscal/obrigacoes', () => {
+  it('retorna obrigações do tenant', async () => {
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([{ id: 'obr-1', tipo: 'DAS' }])
+
+    const res = await req('GET', '/fiscal/obrigacoes')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(1)
+  })
+
+  it('filtra por tenantId', async () => {
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/obrigacoes')
+
+    const { where } = mockDb.obrigacao.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
+
+  it('com ?status=PENDENTE adiciona filtro de status', async () => {
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/obrigacoes?status=PENDENTE')
+
+    const { where } = mockDb.obrigacao.findMany.mock.calls[0][0]
+    expect(where.status).toBe('PENDENTE')
+  })
+
+  it('com ?competencia=YYYY-MM adiciona filtro de vencimento por período', async () => {
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/obrigacoes?competencia=2025-05')
+
+    const { where } = mockDb.obrigacao.findMany.mock.calls[0][0]
+    expect(where.vencimento).toBeDefined()
+    expect(where.vencimento.gte).toBeDefined()
+    expect(where.vencimento.lte).toBeDefined()
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/fator-r/:id/:comp
+// ===========================================================================
+
+describe('GET /fiscal/fator-r/:empresaId/:competencia', () => {
+  it('retorna fatorR e anexo calculado', async () => {
+    const { Decimal } = await import('@saas-contabil/shared')
+    mockFatorR.calcular.mockResolvedValueOnce({
+      fatorR: new Decimal('0.28'),
+      anexo: 'III',
+    })
+
+    const res = await req('GET', `/fiscal/fator-r/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.empresaId).toBe(EMPRESA_ID)
+    expect(body.competencia).toBe(COMPETENCIA)
+    expect(body.fatorR).toBe('0.28')
+    expect(body.anexo).toBe('III')
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/obrigacoes/calendario/:empresaId/:ano
+// ===========================================================================
+
+describe('POST /fiscal/obrigacoes/calendario/:empresaId/:ano', () => {
+  it('ano válido → chama MonitoramentoSNService.gerarCalendarioAnual', async () => {
+    mockMonitoramento.gerarCalendarioAnual.mockResolvedValueOnce({ criados: 12 })
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(
+      TENANT_ID,
+      EMPRESA_ID,
+      2025
+    )
+  })
+
+  it('ano inválido (texto) → 400', async () => {
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/ABCD`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('empresaId não-UUID → 400', async () => {
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/nao-uuid/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
