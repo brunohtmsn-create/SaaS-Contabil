@@ -6,6 +6,7 @@ import { fiscalJob } from './jobs/fiscal.job.js'
 import { portalJob } from './jobs/portal.job.js'
 import { monitoramentoDiario } from './jobs/monitoramento.job.js'
 import { gerarRelatorioMensal } from './jobs/relatorio.job.js'
+import { bancarioJob } from './jobs/bancario.job.js'
 
 const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
@@ -17,6 +18,7 @@ const QUEUE_FISCAL = 'fiscal'
 const QUEUE_PORTAL = 'portal'
 const QUEUE_MONITORAMENTO = 'monitoramento'
 const QUEUE_RELATORIO = 'relatorio'
+const QUEUE_BANCARIO = 'bancario'
 
 export const queues = {
   fechamento: new Queue(QUEUE_FECHAMENTO, { connection: redis }),
@@ -25,6 +27,7 @@ export const queues = {
   portal: new Queue(QUEUE_PORTAL, { connection: redis }),
   monitoramento: new Queue(QUEUE_MONITORAMENTO, { connection: redis }),
   relatorio: new Queue(QUEUE_RELATORIO, { connection: redis }),
+  bancario: new Queue(QUEUE_BANCARIO, { connection: redis }),
 }
 
 // Cron: monitoramento:diario toda manhã às 7h BRT (= 10h UTC)
@@ -37,6 +40,16 @@ await queues.monitoramento.add(
   }
 )
 
+// Cron: bancario:nightly toda madrugada às 3h BRT (= 6h UTC)
+await queues.bancario.add(
+  'bancario:nightly',
+  { modo: 'BATCH_GLOBAL' },
+  {
+    repeat: { pattern: '0 6 * * *' },
+    jobId: 'bancario:nightly',
+  }
+)
+
 const workers = [
   new Worker(QUEUE_FECHAMENTO, fechamentoCompleto, { connection: redis, concurrency: 3 }),
   new Worker(QUEUE_SCRAPER, scraperJob, { connection: redis, concurrency: 5 }),
@@ -44,6 +57,7 @@ const workers = [
   new Worker(QUEUE_PORTAL, portalJob, { connection: redis, concurrency: 2 }),
   new Worker(QUEUE_MONITORAMENTO, monitoramentoDiario, { connection: redis, concurrency: 1 }),
   new Worker(QUEUE_RELATORIO, gerarRelatorioMensal, { connection: redis, concurrency: 2 }),
+  new Worker(QUEUE_BANCARIO, bancarioJob, { connection: redis, concurrency: 2 }),
 ]
 
 for (const worker of workers) {
@@ -60,6 +74,7 @@ console.log('[Worker] Started — listening to queues:', Object.keys(queues).joi
 console.log(
   '[Worker] Cron job "monitoramento:diario" agendado para 10:00 UTC (07:00 BRT) diariamente'
 )
+console.log('[Worker] Cron job "bancario:nightly" agendado para 06:00 UTC (03:00 BRT) diariamente')
 
 process.on('SIGTERM', async () => {
   console.log('[Worker] SIGTERM received, shutting down...')
