@@ -89,7 +89,7 @@ export async function relatorioRoutes(app: FastifyInstance) {
     const alerta = await db.alerta.findFirst({ where: { id, tenantId } })
     if (!alerta) return reply.code(404).send({ error: 'Registro não encontrado' })
 
-    await db.alerta.update({ where: { id }, data: { lido: true } })
+    await db.alerta.update({ where: { id, tenantId }, data: { lido: true } })
     return { ok: true }
   })
 }
