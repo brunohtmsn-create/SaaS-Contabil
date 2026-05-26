@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
+import { validarCNPJ } from '@saas-contabil/shared'
 
 const createEmpresaSchema = z.object({
-  cnpj: z.string().length(14),
+  cnpj: z.string().length(14).refine(validarCNPJ, { message: 'CNPJ inválido' }),
   razaoSocial: z.string().min(1),
   nomeFantasia: z.string().optional(),
   regime: z.enum(['SIMPLES_NACIONAL', 'MEI', 'LUCRO_PRESUMIDO', 'LUCRO_REAL']),

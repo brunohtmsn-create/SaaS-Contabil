@@ -225,6 +225,12 @@ describe('POST /empresas', () => {
     expect(res.statusCode).toBe(400)
   })
 
+  it('CNPJ com dígitos verificadores inválidos → 400', async () => {
+    // 11222333000100 tem dígitos verificadores errados (correto seria 81)
+    const res = await req('POST', '/empresas', { ...payload, cnpj: '11222333000100' })
+    expect(res.statusCode).toBe(400)
+  })
+
   it('regime inválido → 400', async () => {
     const res = await req('POST', '/empresas', { ...payload, regime: 'MEI_GOLD' })
     expect(res.statusCode).toBe(400)
