@@ -52,6 +52,8 @@ const { mockDb } = vi.hoisted(() => ({
     },
     obrigacao: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
     },
   },
 }))
@@ -390,5 +392,55 @@ describe('POST /fiscal/obrigacoes/calendario/:empresaId/:ano', () => {
   it('empresaId não-UUID → 400', async () => {
     const res = await req('POST', `/fiscal/obrigacoes/calendario/nao-uuid/2025`)
     expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// PATCH /fiscal/obrigacoes/:id
+// ===========================================================================
+
+describe('PATCH /fiscal/obrigacoes/:id', () => {
+  it('atualiza status para PAGA → 200', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({ id: 'obr-1', tenantId: TENANT_ID })
+    mockDb.obrigacao.update.mockResolvedValueOnce({ id: 'obr-1', status: 'PAGA' })
+
+    const res = await req('PATCH', '/fiscal/obrigacoes/obr-1', { status: 'PAGA' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('PAGA')
+  })
+
+  it('atualiza para DISPENSADA → 200', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({ id: 'obr-2' })
+    mockDb.obrigacao.update.mockResolvedValueOnce({ id: 'obr-2', status: 'DISPENSADA' })
+
+    const res = await req('PATCH', '/fiscal/obrigacoes/obr-2', { status: 'DISPENSADA' })
+
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('obrigação não encontrada → 404', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('PATCH', '/fiscal/obrigacoes/nao-existe', { status: 'PAGA' })
+
+    expect(res.statusCode).toBe(404)
+    expect(mockDb.obrigacao.update).not.toHaveBeenCalled()
+  })
+
+  it('status inválido → 400', async () => {
+    const res = await req('PATCH', '/fiscal/obrigacoes/obr-1', { status: 'STATUS_INVENTADO' })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('update usa tenantId do JWT no where (isolamento)', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({ id: 'obr-iso' })
+    mockDb.obrigacao.update.mockResolvedValueOnce({ id: 'obr-iso', status: 'PAGA' })
+
+    await req('PATCH', '/fiscal/obrigacoes/obr-iso', { status: 'PAGA' })
+
+    const updateWhere = mockDb.obrigacao.update.mock.calls[0][0].where
+    expect(updateWhere.tenantId).toBe(TENANT_ID)
+    expect(updateWhere.id).toBe('obr-iso')
   })
 })

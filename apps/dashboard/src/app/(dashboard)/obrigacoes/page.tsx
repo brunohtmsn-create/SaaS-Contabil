@@ -160,6 +160,15 @@ export default function ObrigacoesPage() {
     },
   })
 
+  // Mutation para atualizar status da obrigação
+  const atualizarStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: StatusObrigacao }) =>
+      api.patch(`/fiscal/obrigacoes/${id}`, { status }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
+    },
+  })
+
   // Ordena por vencimento mais próximo primeiro
   const obrigacoesOrdenadas = [...obrigacoes].sort(
     (a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime()
@@ -326,6 +335,25 @@ export default function ObrigacoesPage() {
                         <span className="text-xs text-green-600 font-medium">
                           Recibo: {obr.recibo.slice(0, 12)}…
                         </span>
+                      ) : obr.status === 'PENDENTE' || obr.status === 'ATRASADA' ? (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => atualizarStatus.mutate({ id: obr.id, status: 'PAGA' })}
+                            disabled={atualizarStatus.isPending}
+                            className="text-xs px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          >
+                            Paga
+                          </button>
+                          <button
+                            onClick={() =>
+                              atualizarStatus.mutate({ id: obr.id, status: 'DISPENSADA' })
+                            }
+                            disabled={atualizarStatus.isPending}
+                            className="text-xs px-2 py-1 border border-slate-300 text-slate-600 rounded-md hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                          >
+                            Dispensar
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-xs text-slate-400">—</span>
                       )}

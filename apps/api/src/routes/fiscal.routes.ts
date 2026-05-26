@@ -162,6 +162,34 @@ export async function fiscalRoutes(app: FastifyInstance) {
     })
   })
 
+  app.patch('/obrigacoes/:id', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { id } = request.params as { id: string }
+    const body = z
+      .object({
+        status: z.enum(['TRANSMITIDA', 'PAGA', 'DISPENSADA', 'PENDENTE', 'ERRO']),
+        recibo: z.string().optional(),
+        cumprideEm: z.string().optional(),
+        valor: z.string().optional(),
+      })
+      .parse(request.body)
+
+    const obrigacao = await db.obrigacao.findFirst({ where: { id, tenantId } })
+    if (!obrigacao) return reply.code(404).send({ error: 'Obrigação não encontrada' })
+
+    const updated = await db.obrigacao.update({
+      where: { id, tenantId },
+      data: {
+        status: body.status as any,
+        ...(body.recibo !== undefined && { recibo: body.recibo }),
+        ...(body.cumprideEm !== undefined && { cumprideEm: new Date(body.cumprideEm) }),
+        ...(body.valor !== undefined && { valor: body.valor }),
+      },
+    })
+
+    return updated
+  })
+
   app.post('/obrigacoes/calendario/:empresaId/:ano', async (request, reply) => {
     const { tenantId } = request.user as any
     const { empresaId, ano } = z
