@@ -28,6 +28,7 @@ const {
   mockEsocial,
   mockDctfweb,
   mockFgts,
+  mockDMS,
   mockLancamento,
   mockDepreciacao,
   mockBancaria,
@@ -48,6 +49,7 @@ const {
   mockDifal: { calcular: vi.fn().mockResolvedValue(undefined) },
   mockGNRE: { gerar: vi.fn().mockResolvedValue(undefined) },
   mockDeSTDA: { gerar: vi.fn().mockResolvedValue(undefined) },
+  mockDMS: { apurar: vi.fn().mockResolvedValue(undefined) },
   mockReinf: { processar: vi.fn().mockResolvedValue(undefined) },
   mockEsocial: { processar: vi.fn().mockResolvedValue(undefined) },
   mockDctfweb: { gerar: vi.fn().mockResolvedValue(undefined) },
@@ -89,6 +91,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   ESocialService: vi.fn(() => mockEsocial),
   DCTFWebService: vi.fn(() => mockDctfweb),
   FGTSDigitalService: vi.fn(() => mockFgts),
+  DMSService: vi.fn(() => mockDMS),
 }))
 
 vi.mock('@saas-contabil/contabil', () => ({

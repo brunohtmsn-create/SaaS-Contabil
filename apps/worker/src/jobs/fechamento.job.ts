@@ -9,6 +9,7 @@ import {
   ESocialService,
   DCTFWebService,
   FGTSDigitalService,
+  DMSService,
 } from '@saas-contabil/fiscal'
 import {
   LancamentoService,
@@ -36,6 +37,7 @@ const lancamento = new LancamentoService()
 const depreciacao = new DepreciacaoService()
 const bancaria = new ConciliacaoBancariaService()
 const fgts = new FGTSDigitalService()
+const dms = new DMSService()
 const openFinance = new OpenFinanceService()
 const audit = new AuditService()
 const notificacao = new NotificationService()
@@ -135,6 +137,16 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
 
     await job.log('FASE 6: Gerando DeSTDA...')
     await destda.gerar(tenantId, empresaId, competencia)
+    await job.updateProgress(68)
+
+    await job.log('FASE 6b: Apurando DMS (ISS Municipal)...')
+    try {
+      await dms.apurar(tenantId, empresaId, competencia)
+    } catch (dmsErr) {
+      const msg = String(dmsErr)
+      // Empresa sem NFSe no período → ignora silenciosamente
+      await job.log(`FASE 6b: DMS sem NFSe no período — ${msg}`)
+    }
     await job.updateProgress(70)
 
     await job.log('FASE 7: Processando EFD-Reinf...')
