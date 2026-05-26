@@ -211,6 +211,9 @@ export default function FiscalPage() {
                 DeSTDA
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                DMS
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
                 Ações
               </th>
             </tr>
@@ -220,6 +223,7 @@ export default function FiscalPage() {
               const pgdas = apuracaoPorEmpresa(emp.id, 'PGDAS')
               const difal = apuracaoPorEmpresa(emp.id, 'DIFAL')
               const destda = apuracaoPorEmpresa(emp.id, 'DESTDA')
+              const dms = apuracaoPorEmpresa(emp.id, 'DMS')
               const dados = pgdas?.dados as any
               const fatorR = dados?.fatorR != null ? `${Number(dados.fatorR).toFixed(1)}%` : '—'
               const anexo = dados?.faixaAnexo ? `Anexo ${dados.faixaAnexo}` : null
@@ -261,6 +265,9 @@ export default function FiscalPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-center">
+                    {dms ? statusBadge(dms.status) : <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                       {!pgdas && (
                         <button
@@ -295,7 +302,7 @@ export default function FiscalPage() {
             })}
             {snEmpresas.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
                   Nenhuma empresa do Simples Nacional cadastrada.
                 </td>
               </tr>
