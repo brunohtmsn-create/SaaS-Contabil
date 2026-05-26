@@ -141,7 +141,7 @@ export default function ObrigacoesPage() {
     queryFn: () => {
       const params = new URLSearchParams({ competencia })
       if (statusFiltro !== 'TODAS') params.set('status', statusFiltro)
-      return api.get(`/obrigacoes?${params.toString()}`).then((r) => r.data)
+      return api.get(`/fiscal/obrigacoes?${params.toString()}`).then((r) => r.data)
     },
   })
 
@@ -154,7 +154,7 @@ export default function ObrigacoesPage() {
   // Mutation para gerar calendário anual
   const gerarCalendario = useMutation({
     mutationFn: ({ empresaId, ano }: { empresaId: string; ano: number }) =>
-      api.post(`/obrigacoes/calendario/${empresaId}/${ano}`).then((r) => r.data),
+      api.post(`/fiscal/obrigacoes/calendario/${empresaId}/${ano}`).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
     },
