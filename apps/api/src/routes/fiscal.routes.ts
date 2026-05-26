@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
+import { nowBR } from '@saas-contabil/shared'
 import {
   PGDASService,
   DifalService,
@@ -206,10 +207,6 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const { ano } = request.query as { ano?: string }
 
     const service = new MonitoramentoSNService()
-    return service.gerarCalendarioAnual(
-      tenantId,
-      empresaId,
-      Number(ano ?? new Date().getFullYear())
-    )
+    return service.gerarCalendarioAnual(tenantId, empresaId, Number(ano ?? nowBR().getFullYear()))
   })
 }
