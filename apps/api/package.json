@@ -7,6 +7,8 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:migrate": "prisma migrate dev --schema=../../packages/database/prisma/schema.prisma",
     "db:migrate:prod": "prisma migrate deploy --schema=../../packages/database/prisma/schema.prisma",
     "db:seed": "tsx ../../packages/database/src/seed.ts",
@@ -41,8 +43,10 @@
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^1.6.1",
     "prisma": "^5.16.0",
     "tsx": "^4.16.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.1"
   }
 }

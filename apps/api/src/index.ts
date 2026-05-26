@@ -4,6 +4,7 @@ import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
 import websocket from '@fastify/websocket'
 import { Redis as IORedis } from 'ioredis'
+import { ZodError } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
 import { authRoutes } from './routes/auth.routes.js'
 import { empresaRoutes } from './routes/empresa.routes.js'
@@ -68,6 +69,9 @@ app.addHook('onRequest', async (request, reply) => {
 })
 
 app.setErrorHandler((error, _request, reply) => {
+  if (error instanceof ZodError) {
+    return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.errors })
+  }
   if (error.validation) {
     return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.validation })
   }

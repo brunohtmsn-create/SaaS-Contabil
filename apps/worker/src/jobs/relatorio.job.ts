@@ -192,6 +192,7 @@ export async function gerarRelatorioMensal(job: Job<RelatorioJobData>): Promise<
         tipo: 'PGDAS_PENDENTE', // tipo genérico de notificação disponível no enum
         mensagem: `Relatório consolidado de ${competencia} disponível para download.`,
         dados: {
+          tipo: 'RELATORIO_CONSOLIDADO',
           competencia,
           s3Key,
           downloadUrl: signedUrl,
