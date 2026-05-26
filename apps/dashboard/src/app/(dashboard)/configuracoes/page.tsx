@@ -426,7 +426,9 @@ export default function ConfiguracoesPage() {
 
       {/* Alíquotas ISS por Município */}
       <section className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">Alíquotas de ISS por Município</h2>
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">
+          Alíquotas de ISS por Município
+        </h2>
         <ISSConfigPanel />
       </section>
 
@@ -487,14 +489,20 @@ function ISSConfigPanel() {
       setErr('Alíquota inválida.')
       return
     }
-    salvar.mutate({ municipioIBGE: form.municipioIBGE, municipioNome: form.municipioNome, aliquota })
+    salvar.mutate({
+      municipioIBGE: form.municipioIBGE,
+      municipioNome: form.municipioNome,
+      aliquota,
+    })
   }
 
   return (
     <div className="space-y-4">
       <form onSubmit={handleSubmit} className="flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Código IBGE (7 dígitos)</label>
+          <label className="block text-xs font-medium text-slate-600 mb-1">
+            Código IBGE (7 dígitos)
+          </label>
           <input
             type="text"
             maxLength={7}
@@ -538,7 +546,9 @@ function ISSConfigPanel() {
       {err && <p className="text-xs text-red-600">{err}</p>}
 
       {configs.length === 0 ? (
-        <p className="text-sm text-slate-400 py-2">Nenhuma alíquota configurada. Usando padrão de 2%.</p>
+        <p className="text-sm text-slate-400 py-2">
+          Nenhuma alíquota configurada. Usando padrão de 2%.
+        </p>
       ) : (
         <table className="w-full text-sm">
           <thead>
@@ -554,7 +564,9 @@ function ISSConfigPanel() {
               <tr key={c.id}>
                 <td className="py-2 pr-4 font-mono text-xs">{c.municipioIBGE}</td>
                 <td className="py-2 pr-4">{c.municipioNome}</td>
-                <td className="py-2 pr-4 font-mono">{(parseFloat(c.aliquota) * 100).toFixed(2)}%</td>
+                <td className="py-2 pr-4 font-mono">
+                  {(parseFloat(c.aliquota) * 100).toFixed(2)}%
+                </td>
                 <td className="py-2">
                   <button
                     onClick={() => remover.mutate(c.id)}
