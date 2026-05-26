@@ -147,4 +147,93 @@ export async function configuracoesRoutes(app: FastifyInstance) {
 
     return updated
   })
+
+  // GET /configuracoes/iss — lista alíquotas de ISS configuradas para o tenant
+  app.get('/iss', async (request) => {
+    const { tenantId } = request.user as any
+
+    const configs = await db.alerta.findMany({
+      where: { tenantId, tipo: 'CONFIGURACAO_ISS' },
+      orderBy: { criadoEm: 'desc' },
+    })
+
+    return configs.map((c) => {
+      const dados = c.dados as Record<string, unknown>
+      return {
+        id: c.id,
+        municipioIBGE: dados['municipioIBGE'],
+        municipioNome: dados['municipioNome'],
+        aliquota: dados['aliquota'],
+        criadoEm: c.criadoEm,
+      }
+    })
+  })
+
+  // POST /configuracoes/iss — cria ou atualiza alíquota de ISS para um município
+  app.post('/iss', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const body = z
+      .object({
+        municipioIBGE: z
+          .string()
+          .length(7)
+          .regex(/^\d{7}$/),
+        municipioNome: z.string().min(2),
+        aliquota: z.number().min(0).max(0.1),
+      })
+      .parse(request.body)
+
+    const existente = await db.alerta.findFirst({
+      where: {
+        tenantId,
+        tipo: 'CONFIGURACAO_ISS',
+        dados: { path: ['municipioIBGE'], equals: body.municipioIBGE },
+      },
+    })
+
+    if (existente) {
+      const updated = await db.alerta.update({
+        where: { id: existente.id, tenantId },
+        data: {
+          dados: {
+            municipioIBGE: body.municipioIBGE,
+            municipioNome: body.municipioNome,
+            aliquota: String(body.aliquota),
+          },
+        },
+      })
+      return updated
+    }
+
+    const config = await db.alerta.create({
+      data: {
+        tenantId,
+        empresaId: null as any,
+        tipo: 'CONFIGURACAO_ISS',
+        mensagem: `Alíquota ISS — ${body.municipioNome} (${body.municipioIBGE}): ${(body.aliquota * 100).toFixed(2)}%`,
+        dados: {
+          municipioIBGE: body.municipioIBGE,
+          municipioNome: body.municipioNome,
+          aliquota: String(body.aliquota),
+        },
+        lido: true,
+      },
+    })
+
+    return reply.code(201).send(config)
+  })
+
+  // DELETE /configuracoes/iss/:id — remove configuração de alíquota ISS
+  app.delete('/iss/:id', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { id } = request.params as { id: string }
+
+    const config = await db.alerta.findFirst({
+      where: { id, tenantId, tipo: 'CONFIGURACAO_ISS' },
+    })
+    if (!config) return reply.code(404).send({ error: 'Configuração não encontrada' })
+
+    await db.alerta.delete({ where: { id } })
+    return { success: true }
+  })
 }

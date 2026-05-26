@@ -40,6 +40,13 @@ const { mockDb } = vi.hoisted(() => ({
       count: vi.fn(),
     },
     empresaCliente: { count: vi.fn() },
+    alerta: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
   },
 }))
 
@@ -467,5 +474,142 @@ describe('PATCH /configuracoes/usuarios/:id', () => {
     expect(res.statusCode).toBe(200)
     const { data } = mockDb.usuario.update.mock.calls[0][0]
     expect(data.ativo).toBe(false)
+  })
+})
+
+// ===========================================================================
+// GET /configuracoes/iss — listar alíquotas ISS
+// ===========================================================================
+
+describe('GET /configuracoes/iss', () => {
+  it('retorna configurações de ISS do tenant → 200', async () => {
+    const configs = [
+      {
+        id: 'alerta-1',
+        dados: { municipioIBGE: '3550308', municipioNome: 'São Paulo', aliquota: '0.05' },
+        criadoEm: new Date(),
+      },
+    ]
+    mockDb.alerta.findMany.mockResolvedValueOnce(configs)
+
+    const res = await req(adminApp, 'GET', '/configuracoes/iss')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(1)
+    expect(res.json()[0].municipioIBGE).toBe('3550308')
+    expect(res.json()[0].aliquota).toBe('0.05')
+  })
+
+  it('filtra por tenantId e tipo CONFIGURACAO_ISS', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req(adminApp, 'GET', '/configuracoes/iss')
+
+    const where = mockDb.alerta.findMany.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('CONFIGURACAO_ISS')
+  })
+
+  it('retorna array vazio quando não há configurações', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    const res = await req(adminApp, 'GET', '/configuracoes/iss')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(0)
+  })
+})
+
+// ===========================================================================
+// POST /configuracoes/iss — criar/atualizar alíquota ISS
+// ===========================================================================
+
+describe('POST /configuracoes/iss', () => {
+  const body = { municipioIBGE: '3550308', municipioNome: 'São Paulo', aliquota: 0.05 }
+
+  it('cria nova configuração → 201', async () => {
+    mockDb.alerta.findFirst.mockResolvedValueOnce(null)
+    mockDb.alerta.create.mockResolvedValueOnce({ id: 'alerta-novo', tipo: 'CONFIGURACAO_ISS' })
+
+    const res = await req(adminApp, 'POST', '/configuracoes/iss', body)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockDb.alerta.create).toHaveBeenCalledOnce()
+    const createData = mockDb.alerta.create.mock.calls[0][0].data
+    expect(createData.tenantId).toBe(TENANT_ID)
+    expect(createData.tipo).toBe('CONFIGURACAO_ISS')
+    expect((createData.dados as any).municipioIBGE).toBe('3550308')
+    expect((createData.dados as any).aliquota).toBe('0.05')
+  })
+
+  it('atualiza configuração existente → 200', async () => {
+    mockDb.alerta.findFirst.mockResolvedValueOnce({ id: 'alerta-existente' })
+    mockDb.alerta.update.mockResolvedValueOnce({ id: 'alerta-existente', tipo: 'CONFIGURACAO_ISS' })
+
+    const res = await req(adminApp, 'POST', '/configuracoes/iss', body)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockDb.alerta.create).not.toHaveBeenCalled()
+    expect(mockDb.alerta.update).toHaveBeenCalledOnce()
+  })
+
+  it('municipioIBGE inválido (não 7 dígitos) → 400', async () => {
+    const res = await req(adminApp, 'POST', '/configuracoes/iss', {
+      ...body,
+      municipioIBGE: '12345',
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('aliquota > 10% → 400', async () => {
+    const res = await req(adminApp, 'POST', '/configuracoes/iss', {
+      ...body,
+      aliquota: 0.15,
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('aliquota negativa → 400', async () => {
+    const res = await req(adminApp, 'POST', '/configuracoes/iss', {
+      ...body,
+      aliquota: -0.01,
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// DELETE /configuracoes/iss/:id — remover alíquota ISS
+// ===========================================================================
+
+describe('DELETE /configuracoes/iss/:id', () => {
+  it('remove configuração existente → 200 com success: true', async () => {
+    mockDb.alerta.findFirst.mockResolvedValueOnce({ id: 'alerta-1', tipo: 'CONFIGURACAO_ISS' })
+    mockDb.alerta.delete.mockResolvedValueOnce({})
+
+    const res = await req(adminApp, 'DELETE', '/configuracoes/iss/alerta-1')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().success).toBe(true)
+    expect(mockDb.alerta.delete).toHaveBeenCalledWith({ where: { id: 'alerta-1' } })
+  })
+
+  it('configuração não encontrada → 404', async () => {
+    mockDb.alerta.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req(adminApp, 'DELETE', '/configuracoes/iss/nao-existe')
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('findFirst filtra por tenantId e tipo CONFIGURACAO_ISS (isolamento)', async () => {
+    mockDb.alerta.findFirst.mockResolvedValueOnce(null)
+
+    await req(adminApp, 'DELETE', '/configuracoes/iss/alerta-2')
+
+    const where = mockDb.alerta.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('CONFIGURACAO_ISS')
+    expect(where.id).toBe('alerta-2')
   })
 })
