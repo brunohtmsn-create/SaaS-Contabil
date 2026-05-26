@@ -42,6 +42,7 @@ const { mockDb } = vi.hoisted(() => ({
     lancamentoContabil: { findMany: vi.fn() },
     transacaoBancaria: { findMany: vi.fn(), count: vi.fn() },
     bemAtivo: { findMany: vi.fn(), create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    empresaCliente: { findFirst: vi.fn() },
   },
 }))
 
@@ -546,5 +547,121 @@ describe('PATCH /contabil/bens/:empresaId/:bemId', () => {
 
     const updateWhere = mockDb.bemAtivo.update.mock.calls[0][0].where
     expect(updateWhere.id).toBe(BEM_ID)
+  })
+})
+
+// ===========================================================================
+// GET /contabil/bens/:empresaId/:bemId/depreciacao
+// ===========================================================================
+
+describe('GET /contabil/bens/:empresaId/:bemId/depreciacao', () => {
+  const BEM_ID = 'bem-uuid-depr'
+  const url = `/contabil/bens/${EMPRESA_ID}/${BEM_ID}/depreciacao`
+
+  it('retorna bem e lançamentos de depreciação → 200', async () => {
+    const bem = { id: BEM_ID, descricao: 'Servidor HP', status: 'ATIVO' }
+    const lancamentos = [
+      { id: 'l-1', historico: 'Depreciação — Servidor HP', competencia: '2025-01' },
+      { id: 'l-2', historico: 'Depreciação — Servidor HP', competencia: '2025-02' },
+    ]
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce(bem)
+    mockDb.lancamentoContabil.findMany.mockResolvedValueOnce(lancamentos)
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().bem.id).toBe(BEM_ID)
+    expect(res.json().lancamentos).toHaveLength(2)
+    expect(res.json().totalLancamentos).toBe(2)
+  })
+
+  it('bem não encontrado → 404', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', url)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('filtra lançamentos por tenantId e empresaId (isolamento)', async () => {
+    const bem = { id: BEM_ID, descricao: 'Impressora', status: 'ATIVO' }
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce(bem)
+    mockDb.lancamentoContabil.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const lancWhere = mockDb.lancamentoContabil.findMany.mock.calls[0][0].where
+    expect(lancWhere.tenantId).toBe(TENANT_ID)
+    expect(lancWhere.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('findFirst busca bem por tenantId, empresaId e bemId', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce(null)
+
+    await req('GET', url)
+
+    const where = mockDb.bemAtivo.findFirst.mock.calls[0][0].where
+    expect(where.id).toBe(BEM_ID)
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe(EMPRESA_ID)
+  })
+})
+
+// ===========================================================================
+// GET /contabil/depreciacao/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /contabil/depreciacao/:empresaId/:competencia', () => {
+  const url = `/contabil/depreciacao/${EMPRESA_ID}/${COMPETENCIA}`
+
+  it('retorna lançamentos de depreciação do período → 200', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+    const lancamentos = [
+      { id: 'l-1', historico: 'Depreciação — Computador', competencia: COMPETENCIA },
+      { id: 'l-2', historico: 'Depreciação — Mesa', competencia: COMPETENCIA },
+    ]
+    mockDb.lancamentoContabil.findMany.mockResolvedValueOnce(lancamentos)
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().empresaId).toBe(EMPRESA_ID)
+    expect(res.json().competencia).toBe(COMPETENCIA)
+    expect(res.json().totalLancamentos).toBe(2)
+    expect(res.json().lancamentos).toHaveLength(2)
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', url)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('filtra lançamentos por tenantId, empresaId e competencia', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({ id: EMPRESA_ID })
+    mockDb.lancamentoContabil.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const lancWhere = mockDb.lancamentoContabil.findMany.mock.calls[0][0].where
+    expect(lancWhere.tenantId).toBe(TENANT_ID)
+    expect(lancWhere.empresaId).toBe(EMPRESA_ID)
+    expect(lancWhere.competencia).toBe(COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('GET', `/contabil/depreciacao/${EMPRESA_ID}/202505`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('busca empresa filtrando por tenantId (isolamento)', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    await req('GET', url)
+
+    const where = mockDb.empresaCliente.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.id).toBe(EMPRESA_ID)
   })
 })

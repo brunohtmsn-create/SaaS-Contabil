@@ -166,4 +166,50 @@ export async function contabilRoutes(app: FastifyInstance) {
 
     return db.bemAtivo.update({ where: { id: bemId }, data: data as any })
   })
+
+  // Lista lançamentos de depreciação de um bem específico
+  app.get('/bens/:empresaId/:bemId/depreciacao', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, bemId } = request.params as { empresaId: string; bemId: string }
+
+    const bem = await db.bemAtivo.findFirst({ where: { id: bemId, tenantId, empresaId } })
+    if (!bem) return reply.code(404).send({ error: 'Bem ativo não encontrado' })
+
+    const lancamentos = await db.lancamentoContabil.findMany({
+      where: {
+        tenantId,
+        empresaId,
+        historico: { contains: bem.descricao },
+      },
+      orderBy: { data: 'asc' },
+    })
+
+    return { bem, lancamentos, totalLancamentos: lancamentos.length }
+  })
+
+  // Resumo de depreciação por competência
+  app.get('/depreciacao/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    const lancamentos = await db.lancamentoContabil.findMany({
+      where: {
+        tenantId,
+        empresaId,
+        competencia,
+        historico: { startsWith: 'Depreciação' },
+      },
+      orderBy: { data: 'asc' },
+    })
+
+    return {
+      empresaId,
+      competencia,
+      totalLancamentos: lancamentos.length,
+      lancamentos,
+    }
+  })
 }
