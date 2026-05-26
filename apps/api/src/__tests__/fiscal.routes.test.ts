@@ -940,3 +940,162 @@ describe('POST /fiscal/dms/:empresaId/:competencia', () => {
     expect(res.statusCode).toBe(400)
   })
 })
+
+// ===========================================================================
+// GET /fiscal/difal/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/difal/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-difal-1',
+      tipo: 'DIFAL',
+      competencia: COMPETENCIA,
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/difal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DIFAL')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('DIFAL')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/difal/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('GET', `/fiscal/difal/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/gnre/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/gnre/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-gnre-1',
+      tipo: 'GNRE',
+      competencia: COMPETENCIA,
+      status: 'PENDENTE',
+    })
+
+    const res = await req('GET', `/fiscal/gnre/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('GNRE')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('GNRE')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/gnre/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/destda/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/destda/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-destda-1',
+      tipo: 'DESTDA',
+      competencia: COMPETENCIA,
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/destda/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DESTDA')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tipo).toBe('DESTDA')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/destda/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/dms/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/dms/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-dms-1',
+      tipo: 'DMS',
+      competencia: COMPETENCIA,
+      status: 'PENDENTE',
+    })
+
+    const res = await req('GET', `/fiscal/dms/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DMS')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('DMS')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/dms/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('GET', `/fiscal/dms/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/efdreinf/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/efdreinf/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-reinf-1',
+      tipo: 'EFD_REINF',
+      competencia: COMPETENCIA,
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/efdreinf/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('EFD_REINF')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('EFD_REINF')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/efdreinf/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('GET', `/fiscal/efdreinf/${EMPRESA_ID}/202505`)
+    expect(res.statusCode).toBe(400)
+  })
+})

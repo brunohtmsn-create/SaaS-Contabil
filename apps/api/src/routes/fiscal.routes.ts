@@ -72,6 +72,17 @@ export async function fiscalRoutes(app: FastifyInstance) {
     return service.calcular(tenantId, empresaId, competencia)
   })
 
+  app.get('/difal/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'DIFAL' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'DIFAL não encontrado' })
+    return apuracao
+  })
+
   app.post('/gnre/:empresaId/:competencia', async (request) => {
     const { tenantId } = request.user as any
     const { empresaId, competencia } = params.parse(request.params)
@@ -80,12 +91,56 @@ export async function fiscalRoutes(app: FastifyInstance) {
     return service.gerar(tenantId, empresaId, competencia)
   })
 
+  app.get('/gnre/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'GNRE' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'GNRE não encontrado' })
+    return apuracao
+  })
+
   app.post('/destda/:empresaId/:competencia', async (request) => {
     const { tenantId } = request.user as any
     const { empresaId, competencia } = params.parse(request.params)
 
     const service = new DeSTDAService()
     return service.gerar(tenantId, empresaId, competencia)
+  })
+
+  app.get('/destda/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'DESTDA' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'DeSTDA não encontrado' })
+    return apuracao
+  })
+
+  app.get('/dms/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'DMS' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'DMS não encontrado' })
+    return apuracao
+  })
+
+  app.get('/efdreinf/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'EFD_REINF' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'EFD-Reinf não encontrado' })
+    return apuracao
   })
 
   app.get('/apuracoes', async (request) => {
