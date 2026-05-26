@@ -11,7 +11,7 @@ export async function fechamentoRoutes(app: FastifyInstance) {
   })
   const fechamentoQueue = new Queue('fechamento', { connection: redis })
 
-  app.post('/run/:empresaId/:competencia', async (request) => {
+  app.post('/run/:empresaId/:competencia', async (request, reply) => {
     const { tenantId } = request.user as any
     const { empresaId, competencia } = z
       .object({
