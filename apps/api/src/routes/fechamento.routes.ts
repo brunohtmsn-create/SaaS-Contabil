@@ -23,6 +23,13 @@ export async function fechamentoRoutes(app: FastifyInstance) {
     const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
     if (!empresa) return { error: 'Empresa não encontrada' }
 
+    // Busca credencial ativa mais recente (prefere CERTIFICADO_A1, aceita e-CAC)
+    const credencial = await db.credencial.findFirst({
+      where: { tenantId, empresaId, status: 'ATIVO' },
+      orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
+      select: { id: true },
+    })
+
     const job = await fechamentoQueue.add(
       'fechamento-completo',
       {
@@ -30,6 +37,7 @@ export async function fechamentoRoutes(app: FastifyInstance) {
         empresaId,
         cnpj: empresa.cnpj,
         competencia,
+        ...(credencial && { credencialId: credencial.id }),
       },
       {
         attempts: 3,
@@ -37,7 +45,13 @@ export async function fechamentoRoutes(app: FastifyInstance) {
       }
     )
 
-    return { jobId: job.id, status: 'INICIADO', empresa: empresa.cnpj, competencia }
+    return {
+      jobId: job.id,
+      status: 'INICIADO',
+      empresa: empresa.cnpj,
+      competencia,
+      comCredencial: !!credencial,
+    }
   })
 
   app.get('/status/:empresaId/:competencia', async (request) => {
@@ -57,30 +71,50 @@ export async function fechamentoRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
     const { competencia } = request.params as { competencia: string }
 
+    // Busca empresas ativas com sua credencial ativa mais recente em uma query só
     const empresas = await db.empresaCliente.findMany({
       where: { tenantId, ativa: true },
-      select: { id: true, cnpj: true },
+      select: {
+        id: true,
+        cnpj: true,
+        credenciais: {
+          where: { status: 'ATIVO' },
+          orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
+          take: 1,
+          select: { id: true },
+        },
+      },
     })
 
     const jobs = await Promise.all(
-      empresas.map((empresa) =>
-        fechamentoQueue.add(
+      empresas.map((empresa, idx) => {
+        const credencial = empresa.credenciais[0]
+        return fechamentoQueue.add(
           'fechamento-completo',
           {
             tenantId,
             empresaId: empresa.id,
             cnpj: empresa.cnpj,
             competencia,
+            ...(credencial && { credencialId: credencial.id }),
           },
           {
             attempts: 3,
             backoff: { type: 'exponential', delay: 2000 },
-            delay: Math.random() * 5000,
+            // Escalonamento: stagger de 500ms por empresa para não sobrecarregar
+            delay: idx * 500,
           }
         )
-      )
+      })
     )
 
-    return { total: jobs.length, jobIds: jobs.map((j) => j.id), competencia }
+    const semCredencial = empresas.filter((e) => !e.credenciais[0]).length
+
+    return {
+      total: jobs.length,
+      semCredencial,
+      jobIds: jobs.map((j) => j.id),
+      competencia,
+    }
   })
 }
