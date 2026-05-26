@@ -491,6 +491,33 @@ describe('POST /fiscal/fgts/:empresaId/:competencia', () => {
 })
 
 // ===========================================================================
+// POST /fiscal/fgts/grrf/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/fgts/grrf/:empresaId/:competencia', () => {
+  it('chama FGTSDigitalService.gerarGRRF e retorna resultado', async () => {
+    const resultado = { saldoFGTS: '3000.00', multaRescisoria: '1200.00', totalGuia: '4200.00' }
+    mockFGTS.gerarGRRF = vi.fn().mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/fgts/grrf/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockFGTS.gerarGRRF).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().totalGuia).toBe('4200.00')
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/fgts/grrf/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/fgts/grrf/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
 // POST /fiscal/efdreinf/:empresaId/:competencia
 // ===========================================================================
 

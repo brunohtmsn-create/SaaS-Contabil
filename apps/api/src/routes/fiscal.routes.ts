@@ -258,6 +258,14 @@ export async function fiscalRoutes(app: FastifyInstance) {
     return service.apurar(tenantId, empresaId, competencia)
   })
 
+  app.post('/fgts/grrf/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new FGTSDigitalService()
+    return service.gerarGRRF(tenantId, empresaId, competencia)
+  })
+
   app.post('/efdreinf/:empresaId/:competencia', async (request) => {
     const { tenantId } = request.user as any
     const { empresaId, competencia } = params.parse(request.params)
