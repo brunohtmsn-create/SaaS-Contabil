@@ -44,7 +44,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   EFDReinfService: vi.fn(() => mockEFDReinf),
 }))
 
-const { mockDb } = vi.hoisted(() => ({
+const { mockDb, mockQueue } = vi.hoisted(() => ({
   mockDb: {
     apuracaoFiscal: {
       findFirst: vi.fn(),
@@ -59,11 +59,24 @@ const { mockDb } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       update: vi.fn(),
     },
+    empresaCliente: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
   },
+  mockQueue: { add: vi.fn() },
 }))
 
 vi.mock('@saas-contabil/database', () => ({
   getPrismaClient: vi.fn(() => mockDb),
+}))
+
+vi.mock('bullmq', () => ({
+  Queue: vi.fn(() => mockQueue),
+}))
+
+vi.mock('ioredis', () => ({
+  Redis: vi.fn(() => ({})),
 }))
 
 vi.mock('@saas-contabil/shared', async (importOriginal) => {
@@ -115,6 +128,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockQueue.add.mockResolvedValue({ id: 'job-123' })
 })
 
 function req(method: string, url: string, payload?: unknown) {
@@ -499,6 +513,126 @@ describe('POST /fiscal/efdreinf/:empresaId/:competencia', () => {
 
   it('competencia inválida → 400', async () => {
     const res = await req('POST', `/fiscal/efdreinf/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/job/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/job/:empresaId/:competencia', () => {
+  it('empresa encontrada → enfileira job e retorna jobId', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+
+    const res = await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, {
+      operacao: 'PGDAS',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().jobId).toBe('job-123')
+    expect(res.json().operacao).toBe('PGDAS')
+    expect(res.json().status).toBe('ENFILEIRADO')
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, {
+      operacao: 'TODOS',
+    })
+
+    expect(res.statusCode).toBe(404)
+    expect(mockQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('sem operacao no body → usa TODOS por default', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+
+    const res = await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, {})
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().operacao).toBe('TODOS')
+  })
+
+  it('operacao inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, {
+      operacao: 'OPERACAO_INEXISTENTE',
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('job enfileirado inclui tenantId do JWT', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+
+    await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, { operacao: 'DIFAL' })
+
+    const jobData = mockQueue.add.mock.calls[0][1]
+    expect(jobData.tenantId).toBe(TENANT_ID)
+    expect(jobData.empresaId).toBe(EMPRESA_ID)
+    expect(jobData.operacao).toBe('DIFAL')
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/batch/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/batch/:competencia', () => {
+  it('enfileira job para cada empresa ativa', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181' },
+      { id: 'emp-2', cnpj: '99888777000166' },
+    ])
+
+    const res = await req('POST', `/fiscal/batch/${COMPETENCIA}`, { operacao: 'PGDAS' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(2)
+    expect(res.json().jobIds).toHaveLength(2)
+    expect(mockQueue.add).toHaveBeenCalledTimes(2)
+  })
+
+  it('sem empresas ativas → total: 0', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/batch/${COMPETENCIA}`, {})
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(0)
+    expect(mockQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('sem operacao → usa TODOS por default', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([{ id: 'emp-1', cnpj: '11111111000191' }])
+
+    const res = await req('POST', `/fiscal/batch/${COMPETENCIA}`, {})
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().operacao).toBe('TODOS')
+  })
+
+  it('filtra empresas por tenantId do JWT', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('POST', `/fiscal/batch/${COMPETENCIA}`, {})
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', '/fiscal/batch/202505', {})
     expect(res.statusCode).toBe(400)
   })
 })

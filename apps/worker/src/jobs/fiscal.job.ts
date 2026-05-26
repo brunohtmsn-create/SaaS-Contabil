@@ -7,6 +7,7 @@ import {
   EFDReinfService,
   ESocialService,
   DCTFWebService,
+  FGTSDigitalService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -14,7 +15,16 @@ type FiscalJobData = {
   empresaId: string
   cnpj: string
   competencia: string
-  operacao: 'PGDAS' | 'DIFAL' | 'GNRE' | 'DESTDA' | 'EFDREINF' | 'ESOCIAL' | 'DCTFWEB' | 'TODOS'
+  operacao:
+    | 'PGDAS'
+    | 'DIFAL'
+    | 'GNRE'
+    | 'DESTDA'
+    | 'EFDREINF'
+    | 'ESOCIAL'
+    | 'DCTFWEB'
+    | 'FGTS'
+    | 'TODOS'
 }
 
 export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
@@ -56,6 +66,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
       await dctf.gerar(tenantId, empresaId, competencia)
       break
     }
+    case 'FGTS': {
+      const fgts = new FGTSDigitalService()
+      await fgts.apurar(tenantId, empresaId, competencia)
+      break
+    }
     case 'TODOS': {
       const pgdas = new PGDASService()
       const difal = new DifalService()
@@ -64,6 +79,7 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
       const reinf = new EFDReinfService()
       const eSocial = new ESocialService()
       const dctf = new DCTFWebService()
+      const fgts = new FGTSDigitalService()
       await pgdas.apurar(tenantId, empresaId, competencia)
       await difal.calcular(tenantId, empresaId, competencia)
       await gnre.gerar(tenantId, empresaId, competencia)
@@ -73,6 +89,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
         await eSocial.processar(tenantId, empresaId, competencia)
       } catch {
         // empresa sem empregados — ignora
+      }
+      try {
+        await fgts.apurar(tenantId, empresaId, competencia)
+      } catch {
+        // empresa sem folha de pagamento — ignora
       }
       try {
         await dctf.gerar(tenantId, empresaId, competencia)

@@ -14,14 +14,32 @@ import {
   FGTSDigitalService,
   EFDReinfService,
 } from '@saas-contabil/fiscal'
+import { Queue } from 'bullmq'
+import { Redis as IORedis } from 'ioredis'
 
 const params = z.object({
   empresaId: z.string().uuid(),
   competencia: z.string().regex(/^\d{4}-\d{2}$/),
 })
 
+const OPERACOES_FISCAIS = [
+  'PGDAS',
+  'DIFAL',
+  'GNRE',
+  'DESTDA',
+  'EFDREINF',
+  'ESOCIAL',
+  'DCTFWEB',
+  'FGTS',
+  'TODOS',
+] as const
+
 export async function fiscalRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+  })
+  const fiscalQueue = new Queue('fiscal', { connection: redis })
 
   app.post('/pgdas/:empresaId/:competencia', async (request, reply) => {
     const { tenantId } = request.user as any
@@ -246,6 +264,63 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const service = new EFDReinfService()
     return service.processar(tenantId, empresaId, competencia)
+  })
+
+  // Enfileira job fiscal para uma empresa específica
+  app.post('/job/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const { operacao } = z
+      .object({ operacao: z.enum(OPERACOES_FISCAIS).default('TODOS') })
+      .parse(request.body ?? {})
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    const job = await fiscalQueue.add(
+      'fiscal-operacao',
+      { tenantId, empresaId, cnpj: empresa.cnpj, competencia, operacao },
+      { attempts: 3, backoff: { type: 'exponential', delay: 2000 } }
+    )
+
+    return { jobId: job.id, status: 'ENFILEIRADO', operacao, competencia, empresa: empresa.cnpj }
+  })
+
+  // Enfileira jobs fiscais para todas as empresas ativas do tenant
+  app.post('/batch/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { competencia } = z
+      .object({ competencia: z.string().regex(/^\d{4}-\d{2}$/) })
+      .parse(request.params)
+    const { operacao } = z
+      .object({ operacao: z.enum(OPERACOES_FISCAIS).default('TODOS') })
+      .parse(request.body ?? {})
+
+    const empresas = await db.empresaCliente.findMany({
+      where: { tenantId, ativa: true },
+      select: { id: true, cnpj: true },
+    })
+
+    const jobs = await Promise.all(
+      empresas.map((empresa, idx) =>
+        fiscalQueue.add(
+          'fiscal-operacao',
+          { tenantId, empresaId: empresa.id, cnpj: empresa.cnpj, competencia, operacao },
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 2000 },
+            delay: idx * 300,
+          }
+        )
+      )
+    )
+
+    return {
+      total: jobs.length,
+      operacao,
+      competencia,
+      jobIds: jobs.map((j) => j.id),
+    }
   })
 
   app.post('/monitoramento/calendario/:empresaId', async (request) => {
