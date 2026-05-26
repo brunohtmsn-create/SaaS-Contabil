@@ -135,4 +135,35 @@ export async function contabilRoutes(app: FastifyInstance) {
       },
     })
   })
+
+  app.get('/bens/:empresaId/:bemId', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, bemId } = request.params as { empresaId: string; bemId: string }
+
+    const bem = await db.bemAtivo.findFirst({ where: { id: bemId, tenantId, empresaId } })
+    if (!bem) return reply.code(404).send({ error: 'Bem ativo não encontrado' })
+    return bem
+  })
+
+  app.patch('/bens/:empresaId/:bemId', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, bemId } = request.params as { empresaId: string; bemId: string }
+    const body = z
+      .object({
+        status: z.enum(['ATIVO', 'BAIXADO', 'CONCLUIDO']).optional(),
+        descricao: z.string().optional(),
+        valorResidual: z.number().optional(),
+      })
+      .parse(request.body)
+
+    const bem = await db.bemAtivo.findFirst({ where: { id: bemId, tenantId, empresaId } })
+    if (!bem) return reply.code(404).send({ error: 'Bem ativo não encontrado' })
+
+    const data: Record<string, unknown> = {}
+    if (body.status !== undefined) data['status'] = body.status
+    if (body.descricao !== undefined) data['descricao'] = body.descricao
+    if (body.valorResidual !== undefined) data['valorResidual'] = body.valorResidual
+
+    return db.bemAtivo.update({ where: { id: bemId }, data: data as any })
+  })
 }

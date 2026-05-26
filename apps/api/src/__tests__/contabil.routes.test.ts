@@ -41,7 +41,7 @@ const { mockDb } = vi.hoisted(() => ({
   mockDb: {
     lancamentoContabil: { findMany: vi.fn() },
     transacaoBancaria: { findMany: vi.fn(), count: vi.fn() },
-    bemAtivo: { findMany: vi.fn(), create: vi.fn() },
+    bemAtivo: { findMany: vi.fn(), create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   },
 }))
 
@@ -435,5 +435,116 @@ describe('GET /contabil/transacoes/status/:empresaId', () => {
     const res = await req('GET', `/contabil/transacoes/status/${EMPRESA_ID}`)
 
     expect(res.statusCode).toBe(200)
+  })
+})
+
+// ===========================================================================
+// GET /contabil/bens/:empresaId/:bemId
+// ===========================================================================
+
+describe('GET /contabil/bens/:empresaId/:bemId', () => {
+  const BEM_ID = 'bem-uuid-001'
+  const url = `/contabil/bens/${EMPRESA_ID}/${BEM_ID}`
+
+  it('bem encontrado → 200 com dados do bem', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce({
+      id: BEM_ID,
+      descricao: 'Computador Dell',
+      status: 'ATIVO',
+    })
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().id).toBe(BEM_ID)
+    expect(res.json().descricao).toBe('Computador Dell')
+  })
+
+  it('bem não encontrado → 404', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/não encontrado/i)
+  })
+
+  it('findFirst filtra por tenantId, empresaId e bemId (isolamento)', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce({ id: BEM_ID })
+
+    await req('GET', url)
+
+    const where = mockDb.bemAtivo.findFirst.mock.calls[0][0].where
+    expect(where.id).toBe(BEM_ID)
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe(EMPRESA_ID)
+  })
+})
+
+// ===========================================================================
+// PATCH /contabil/bens/:empresaId/:bemId
+// ===========================================================================
+
+describe('PATCH /contabil/bens/:empresaId/:bemId', () => {
+  const BEM_ID = 'bem-uuid-002'
+  const url = `/contabil/bens/${EMPRESA_ID}/${BEM_ID}`
+
+  it('atualiza status para BAIXADO → 200', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce({ id: BEM_ID, status: 'ATIVO' })
+    mockDb.bemAtivo.update.mockResolvedValueOnce({ id: BEM_ID, status: 'BAIXADO' })
+
+    const res = await req('PATCH', url, { status: 'BAIXADO' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('BAIXADO')
+  })
+
+  it('bem não encontrado → 404', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('PATCH', url, { status: 'BAIXADO' })
+
+    expect(res.statusCode).toBe(404)
+    expect(mockDb.bemAtivo.update).not.toHaveBeenCalled()
+  })
+
+  it('status inválido → 400', async () => {
+    const res = await req('PATCH', url, { status: 'STATUS_INVALIDO' })
+
+    expect(res.statusCode).toBe(400)
+    expect(mockDb.bemAtivo.findFirst).not.toHaveBeenCalled()
+  })
+
+  it('atualiza descricao sem alterar status', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce({ id: BEM_ID, status: 'ATIVO' })
+    mockDb.bemAtivo.update.mockResolvedValueOnce({ id: BEM_ID, descricao: 'Nova descrição' })
+
+    const res = await req('PATCH', url, { descricao: 'Nova descrição' })
+
+    expect(res.statusCode).toBe(200)
+    const updateData = mockDb.bemAtivo.update.mock.calls[0][0].data
+    expect(updateData.descricao).toBe('Nova descrição')
+    expect(updateData.status).toBeUndefined()
+  })
+
+  it('findFirst filtra por tenantId e empresaId (isolamento)', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce({ id: BEM_ID })
+    mockDb.bemAtivo.update.mockResolvedValueOnce({ id: BEM_ID })
+
+    await req('PATCH', url, { status: 'CONCLUIDO' })
+
+    const where = mockDb.bemAtivo.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('update usa o id do bem no where', async () => {
+    mockDb.bemAtivo.findFirst.mockResolvedValueOnce({ id: BEM_ID })
+    mockDb.bemAtivo.update.mockResolvedValueOnce({ id: BEM_ID, status: 'ATIVO' })
+
+    await req('PATCH', url, { status: 'ATIVO' })
+
+    const updateWhere = mockDb.bemAtivo.update.mock.calls[0][0].where
+    expect(updateWhere.id).toBe(BEM_ID)
   })
 })
