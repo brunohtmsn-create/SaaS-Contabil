@@ -373,3 +373,64 @@ describe('POST /documentos/capturar/:empresaId/:competencia', () => {
     expect(where.tenantId).toBe(TENANT_ID)
   })
 })
+
+// ===========================================================================
+// GET /documentos/stats/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /documentos/stats/:empresaId/:competencia', () => {
+  const url = `/documentos/stats/${EMPRESA_ID}/${COMPETENCIA}`
+
+  it('retorna total, porTipo e porStatus → 200', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(15)
+    mockDb.documentoFiscal.groupBy
+      .mockResolvedValueOnce([
+        { tipo: 'NFE', _count: 10, _sum: { valorTotal: '50000.00' } },
+        { tipo: 'NFSE_EMITIDA', _count: 5, _sum: { valorTotal: '15000.00' } },
+      ])
+      .mockResolvedValueOnce([
+        { status: 'CONCILIADO', _count: 12 },
+        { status: 'PENDENTE_REVISAO', _count: 3 },
+      ])
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(15)
+    expect(res.json().porTipo).toHaveLength(2)
+    expect(res.json().porStatus).toHaveLength(2)
+  })
+
+  it('filtra por tenantId e empresaId (isolamento)', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0)
+    mockDb.documentoFiscal.groupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const countWhere = mockDb.documentoFiscal.count.mock.calls[0][0].where
+    expect(countWhere.tenantId).toBe(TENANT_ID)
+    expect(countWhere.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('usa datas de início e fim do período (parsePeriodo)', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0)
+    mockDb.documentoFiscal.groupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const countWhere = mockDb.documentoFiscal.count.mock.calls[0][0].where
+    expect(countWhere.dataCompetencia.gte).toEqual(new Date('2025-05-01'))
+    expect(countWhere.dataCompetencia.lte).toEqual(new Date('2025-05-31'))
+  })
+
+  it('total zero quando não há documentos', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0)
+    mockDb.documentoFiscal.groupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(0)
+    expect(res.json().porTipo).toHaveLength(0)
+  })
+})
