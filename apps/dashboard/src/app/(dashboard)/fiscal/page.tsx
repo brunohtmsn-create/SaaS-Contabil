@@ -65,6 +65,19 @@ export default function FiscalPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['apuracoes', competencia] }),
   })
 
+  const [batchResult, setBatchResult] = useState<{
+    total: number
+    semCredencial: number
+  } | null>(null)
+
+  const fechamentoBatch = useMutation({
+    mutationFn: () => api.post(`/fechamento/batch/${competencia}`).then((r) => r.data),
+    onSuccess: (data) => {
+      setBatchResult(data)
+      queryClient.invalidateQueries({ queryKey: ['apuracoes', competencia] })
+    },
+  })
+
   const transmitirPGDAS = useMutation({
     mutationFn: ({ empresaId }: { empresaId: string }) =>
       api.post(`/fiscal/pgdas/transmitir/${empresaId}/${competencia}`).then((r) => r.data),
@@ -108,6 +121,43 @@ export default function FiscalPage() {
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      {/* Fechamento em Lote */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 flex-wrap">
+        <span className="text-lg flex-shrink-0">🔄</span>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-700">Fechamento em Lote</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Processa todas as empresas ativas para a competência selecionada
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setBatchResult(null)
+            fechamentoBatch.mutate()
+          }}
+          disabled={fechamentoBatch.isPending}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {fechamentoBatch.isPending ? (
+            <RefreshCw className="w-4 h-4 animate-spin" />
+          ) : (
+            <Play className="w-4 h-4" />
+          )}
+          {fechamentoBatch.isPending ? 'Enfileirando...' : `Fechar ${competencia} — Lote`}
+        </button>
+        {batchResult && (
+          <div className="text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+            <span className="text-green-600 font-semibold">{batchResult.total} jobs</span> enfileirados
+            {batchResult.semCredencial > 0 && (
+              <span className="text-yellow-600 ml-2">({batchResult.semCredencial} sem credencial)</span>
+            )}
+          </div>
+        )}
+        {fechamentoBatch.isError && (
+          <span className="text-sm text-red-600 font-medium">Erro ao enfileirar. Tente novamente.</span>
+        )}
       </div>
 
       {/* KPI */}
