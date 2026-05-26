@@ -6,6 +6,8 @@ import {
   GNREService,
   DeSTDAService,
   EFDReinfService,
+  ESocialService,
+  DCTFWebService,
   FGTSDigitalService,
 } from '@saas-contabil/fiscal'
 import {
@@ -28,6 +30,8 @@ const difal = new DifalService()
 const gnre = new GNREService()
 const destda = new DeSTDAService()
 const reinf = new EFDReinfService()
+const esocial = new ESocialService()
+const dctfweb = new DCTFWebService()
 const lancamento = new LancamentoService()
 const depreciacao = new DepreciacaoService()
 const bancaria = new ConciliacaoBancariaService()
@@ -141,20 +145,38 @@ export async function fechamentoCompleto(job: Job<FechamentoJobData>): Promise<v
 
     await job.log('FASE 7: Processando EFD-Reinf...')
     await reinf.processar(tenantId, empresaId, competencia)
-    await job.updateProgress(80)
+    await job.updateProgress(75)
 
-    await job.log('FASE 8: Gerando lançamentos contábeis...')
+    await job.log('FASE 8: Processando eSocial (se houver empregados)...')
+    try {
+      await esocial.processar(tenantId, empresaId, competencia)
+    } catch (esocialErr) {
+      // eSocial é opcional — empresa sem empregados não gera eventos
+      await job.log(`FASE 8: eSocial ignorado — ${String(esocialErr)}`)
+    }
+    await job.updateProgress(82)
+
+    await job.log('FASE 9: Gerando DCTFWeb...')
+    try {
+      await dctfweb.gerar(tenantId, empresaId, competencia)
+    } catch (dctfErr) {
+      // DCTFWeb depende de EFD-Reinf e eSocial — loga mas não interrompe
+      await job.log(`FASE 9: DCTFWeb ignorada — ${String(dctfErr)}`)
+    }
+    await job.updateProgress(86)
+
+    await job.log('FASE 10: Gerando lançamentos contábeis...')
     await lancamento.gerarLancamentos(tenantId, empresaId, competencia)
     await lancamento.lancarImpostos(tenantId, empresaId, competencia)
     await depreciacao.calcular(tenantId, empresaId, competencia)
-    await job.updateProgress(90)
+    await job.updateProgress(92)
 
-    await job.log('FASE 9: Sincronizando Open Finance e conciliação bancária...')
+    await job.log('FASE 11: Sincronizando Open Finance e conciliação bancária...')
     await openFinance.sincronizarContas(tenantId, empresaId)
     await bancaria.conciliar(tenantId, empresaId, competencia)
-    await job.updateProgress(95)
+    await job.updateProgress(96)
 
-    await job.log('FASE 10: Apurando FGTS Digital...')
+    await job.log('FASE 12: Apurando FGTS Digital...')
     await fgts.apurar(tenantId, empresaId, competencia)
 
     await auditJob('FECHAMENTO_CONCLUIDO', { competencia, jobId: job.id })

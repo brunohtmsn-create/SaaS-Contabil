@@ -7,6 +7,8 @@
  *  - GNRE  → chama GNREService.gerar()
  *  - DESTDA → chama DeSTDAService.gerar()
  *  - EFDREINF → chama EFDReinfService.processar()
+ *  - ESOCIAL → chama ESocialService.processar()
+ *  - DCTFWEB → chama DCTFWebService.gerar()
  *  - TODOS → chama todos os serviços em sequência
  */
 
@@ -21,6 +23,8 @@ const mockDifal = { calcular: vi.fn() }
 const mockGNRE = { gerar: vi.fn() }
 const mockDeSTDA = { gerar: vi.fn() }
 const mockEFDReinf = { processar: vi.fn() }
+const mockESocial = { processar: vi.fn() }
+const mockDCTFWeb = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -28,6 +32,8 @@ vi.mock('@saas-contabil/fiscal', () => ({
   GNREService: vi.fn(() => mockGNRE),
   DeSTDAService: vi.fn(() => mockDeSTDA),
   EFDReinfService: vi.fn(() => mockEFDReinf),
+  ESocialService: vi.fn(() => mockESocial),
+  DCTFWebService: vi.fn(() => mockDCTFWeb),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -85,7 +91,19 @@ describe('fiscalJob — roteamento de operações', () => {
     expect(mockEFDReinf.processar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
   })
 
-  it('TODOS → chama todos os serviços', async () => {
+  it('ESOCIAL → chama ESocialService.processar', async () => {
+    await fiscalJob(makeJob('ESOCIAL'))
+    expect(mockESocial.processar).toHaveBeenCalledOnce()
+    expect(mockESocial.processar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
+  })
+
+  it('DCTFWEB → chama DCTFWebService.gerar', async () => {
+    await fiscalJob(makeJob('DCTFWEB'))
+    expect(mockDCTFWeb.gerar).toHaveBeenCalledOnce()
+    expect(mockDCTFWeb.gerar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
+  })
+
+  it('TODOS → chama todos os serviços principais', async () => {
     await fiscalJob(makeJob('TODOS'))
     expect(mockPGDAS.apurar).toHaveBeenCalledOnce()
     expect(mockDifal.calcular).toHaveBeenCalledOnce()
@@ -94,7 +112,14 @@ describe('fiscalJob — roteamento de operações', () => {
     expect(mockEFDReinf.processar).toHaveBeenCalledOnce()
   })
 
-  it('TODOS → mantém ordem: PGDAS antes de DIFAL', async () => {
+  it('TODOS → tenta eSocial e DCTFWeb (continua se falhar)', async () => {
+    mockESocial.processar.mockRejectedValueOnce(new Error('sem empregados'))
+    mockDCTFWeb.gerar.mockRejectedValueOnce(new Error('EFD não fechado'))
+    await expect(fiscalJob(makeJob('TODOS'))).resolves.toBeUndefined()
+    expect(mockPGDAS.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('TODOS → mantém ordem: PGDAS antes de DIFAL antes de EFD-Reinf', async () => {
     const order: string[] = []
     mockPGDAS.apurar.mockImplementation(() => {
       order.push('PGDAS')
@@ -118,7 +143,8 @@ describe('fiscalJob — roteamento de operações', () => {
     })
 
     await fiscalJob(makeJob('TODOS'))
-    expect(order).toEqual(['PGDAS', 'DIFAL', 'GNRE', 'DESTDA', 'EFDREINF'])
+    expect(order.indexOf('PGDAS')).toBeLessThan(order.indexOf('DIFAL'))
+    expect(order.indexOf('DIFAL')).toBeLessThan(order.indexOf('EFDREINF'))
   })
 
   it('PGDAS → não chama serviços não relacionados', async () => {
