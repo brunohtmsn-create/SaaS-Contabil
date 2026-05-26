@@ -71,6 +71,7 @@ vi.mock('@saas-contabil/shared', () => ({
       return parseFloat(this.v).toFixed(n)
     }
   },
+  nowBR: vi.fn(() => new Date('2025-01-01T10:00:00Z')),
 }))
 
 import { PortalOrchestrator } from '../portal-orchestrator.js'

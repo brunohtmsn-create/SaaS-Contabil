@@ -1,5 +1,5 @@
 import { getPrismaClient } from '@saas-contabil/database'
-import { Decimal } from '@saas-contabil/shared'
+import { Decimal, nowBR } from '@saas-contabil/shared'
 import { EcacPortal } from './ecac.portal.js'
 import { SimplesNacionalPortal } from './simples-nacional.portal.js'
 import { SefazSpPortal } from './sefaz-sp.portal.js'
@@ -33,7 +33,7 @@ export class PortalOrchestrator {
         credencialId: job.credencialId,
         prioridade: job.prioridade,
         status: 'EM_EXECUCAO',
-        iniciadoEm: new Date(),
+        iniciadoEm: nowBR(),
       },
     })
 
@@ -122,14 +122,14 @@ export class PortalOrchestrator {
 
       await this.db.portalJob.update({
         where: { id: dbJob.id },
-        data: { status: 'CONCLUIDO', resultado: resultado as any, concluidoEm: new Date() },
+        data: { status: 'CONCLUIDO', resultado: resultado as any, concluidoEm: nowBR() },
       })
 
       return resultado
     } catch (err) {
       await this.db.portalJob.update({
         where: { id: dbJob.id },
-        data: { status: 'ERRO', erro: String(err), concluidoEm: new Date() },
+        data: { status: 'ERRO', erro: String(err), concluidoEm: nowBR() },
       })
       throw err
     }

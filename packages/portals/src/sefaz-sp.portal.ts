@@ -13,7 +13,7 @@ import { chromium, Browser, Page } from 'playwright'
 import { AuditService } from '@saas-contabil/audit'
 import { StorageService, S3KeyBuilder } from '@saas-contabil/storage'
 import { getPrismaClient } from '@saas-contabil/database'
-import { Decimal } from '@saas-contabil/shared'
+import { Decimal, nowBR } from '@saas-contabil/shared'
 
 const SPED_SP_URL = 'https://www.sped.fazenda.sp.gov.br/spedsp/jsp/login.jsf'
 const GNRE_SP_URL = 'https://www.gnre.pe.gov.br/gnre/portal/consultarGuia.do'
@@ -124,7 +124,7 @@ export class SefazSpPortal {
       const resultado: ResultadoDeSTDA = {
         protocolo,
         recibo,
-        dataTransmissao: new Date(),
+        dataTransmissao: nowBR(),
       }
 
       await this.audit.registrar({
