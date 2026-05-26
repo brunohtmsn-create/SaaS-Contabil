@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
 
@@ -18,7 +18,17 @@ const PERFIL_COR: Record<string, string> = {
   CLIENTE: 'bg-slate-100 text-slate-600',
 }
 
+type UsuarioAdmin = {
+  id: string
+  nome: string
+  email: string
+  perfil: string
+  ativo: boolean
+  criadoEm: string
+}
+
 export default function ConfiguracoesPage() {
+  const qc = useQueryClient()
   const { logout } = useAuthStore()
   const [senhaAtual, setSenhaAtual] = useState('')
   const [novaSenha, setNovaSenha] = useState('')
@@ -26,6 +36,9 @@ export default function ConfiguracoesPage() {
   const [senhaMsg, setSenhaMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   const [nomeEdit, setNomeEdit] = useState('')
   const [editandoNome, setEditandoNome] = useState(false)
+  const [novoUser, setNovoUser] = useState({ nome: '', email: '', senha: '', perfil: 'AUXILIAR' })
+  const [criarUserOpen, setCriarUserOpen] = useState(false)
+  const [criarUserErr, setCriarUserErr] = useState('')
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['configuracoes-perfil'],
@@ -40,6 +53,37 @@ export default function ConfiguracoesPage() {
     onSuccess: () => {
       refetch()
       setEditandoNome(false)
+    },
+  })
+
+  const { data: usuariosAdmin = [] } = useQuery<UsuarioAdmin[]>({
+    queryKey: ['config-usuarios'],
+    queryFn: () => api.get('/configuracoes/usuarios').then((r) => r.data),
+    enabled: (data as any)?.usuario?.perfil === 'ADMIN',
+  })
+
+  const toggleAtivo = useMutation({
+    mutationFn: ({ id, ativo }: { id: string; ativo: boolean }) =>
+      api.patch(`/configuracoes/usuarios/${id}`, { ativo }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['config-usuarios'] }),
+  })
+
+  const criarUsuario = useMutation({
+    mutationFn: () =>
+      api.post('/configuracoes/usuarios', {
+        nome: novoUser.nome,
+        email: novoUser.email,
+        senha: novoUser.senha,
+        perfilNovo: novoUser.perfil,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['config-usuarios'] })
+      setCriarUserOpen(false)
+      setNovoUser({ nome: '', email: '', senha: '', perfil: 'AUXILIAR' })
+      setCriarUserErr('')
+    },
+    onError: (err: any) => {
+      setCriarUserErr(err.response?.data?.error ?? 'Erro ao criar usuário')
     },
   })
 
@@ -273,6 +317,112 @@ export default function ConfiguracoesPage() {
           </div>
         </dl>
       </section>
+
+      {/* Gerenciamento de usuários (somente ADMIN) */}
+      {usuario?.perfil === 'ADMIN' && (
+        <section className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900">Usuários do Escritório</h2>
+            <button
+              onClick={() => setCriarUserOpen((v) => !v)}
+              className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700"
+            >
+              + Novo usuário
+            </button>
+          </div>
+
+          {criarUserOpen && (
+            <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
+              <h3 className="text-sm font-medium text-slate-700">Criar novo usuário</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  placeholder="Nome completo"
+                  value={novoUser.nome}
+                  onChange={(e) => setNovoUser((u) => ({ ...u, nome: e.target.value }))}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm col-span-2"
+                />
+                <input
+                  type="email"
+                  placeholder="E-mail"
+                  value={novoUser.email}
+                  onChange={(e) => setNovoUser((u) => ({ ...u, email: e.target.value }))}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <input
+                  type="password"
+                  placeholder="Senha (mín. 8 chars)"
+                  value={novoUser.senha}
+                  onChange={(e) => setNovoUser((u) => ({ ...u, senha: e.target.value }))}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <select
+                  value={novoUser.perfil}
+                  onChange={(e) => setNovoUser((u) => ({ ...u, perfil: e.target.value }))}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="AUXILIAR">Auxiliar</option>
+                  <option value="CONTADOR">Contador</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="CLIENTE">Cliente</option>
+                </select>
+              </div>
+              {criarUserErr && <p className="text-xs text-red-600">{criarUserErr}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => criarUsuario.mutate()}
+                  disabled={
+                    criarUsuario.isPending ||
+                    !novoUser.nome ||
+                    !novoUser.email ||
+                    novoUser.senha.length < 8
+                  }
+                  className="bg-blue-600 text-white text-xs px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {criarUsuario.isPending ? 'Criando...' : 'Criar'}
+                </button>
+                <button
+                  onClick={() => {
+                    setCriarUserOpen(false)
+                    setCriarUserErr('')
+                  }}
+                  className="text-slate-500 text-xs px-3 py-2"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="divide-y divide-slate-100">
+            {(usuariosAdmin as UsuarioAdmin[]).map((u) => (
+              <div key={u.id} className="flex items-center gap-3 py-3">
+                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
+                  {u.nome.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">{u.nome}</p>
+                  <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                </div>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${PERFIL_COR[u.perfil] ?? 'bg-slate-100 text-slate-600'}`}
+                >
+                  {u.perfil}
+                </span>
+                <button
+                  onClick={() => toggleAtivo.mutate({ id: u.id, ativo: !u.ativo })}
+                  disabled={toggleAtivo.isPending}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${u.ativo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
+                >
+                  {u.ativo ? 'Desativar' : 'Ativar'}
+                </button>
+              </div>
+            ))}
+            {(usuariosAdmin as UsuarioAdmin[]).length === 0 && (
+              <p className="text-sm text-slate-400 py-4 text-center">Nenhum usuário encontrado.</p>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Sair */}
       <div className="flex justify-end pb-6">
