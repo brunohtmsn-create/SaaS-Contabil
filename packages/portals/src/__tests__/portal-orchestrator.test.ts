@@ -328,18 +328,12 @@ describe('PortalOrchestrator — SEFAZ SP', () => {
     )
   })
 
-  it('SEFAZ_SP:EMITIR_GNRE sem dados → usa defaults (SP, 0, 10008-0)', async () => {
+  it('SEFAZ_SP:EMITIR_GNRE sem valor → lança erro (evita GNRE R$0,00)', async () => {
     const orch = new PortalOrchestrator()
-    await orch.executar(makeJob('SEFAZ_SP', 'EMITIR_GNRE', { competencia: '2025-01' }), CRED_BUF)
-    expect(mockSefazSp.emitirGNRE).toHaveBeenCalledWith(
-      't-1',
-      'emp-1',
-      '11111111000111',
-      '2025-01',
-      'SP',
-      expect.objectContaining({ toFixed: expect.any(Function) }),
-      '10008-0'
-    )
+    await expect(
+      orch.executar(makeJob('SEFAZ_SP', 'EMITIR_GNRE', { competencia: '2025-01' }), CRED_BUF)
+    ).rejects.toThrow('GNRE requer campo valor')
+    expect(mockSefazSp.emitirGNRE).not.toHaveBeenCalled()
   })
 
   it('SEFAZ_SP:EMITIR_GNRE_LOTE → chama emitirGNRELote com array mapeado', async () => {
