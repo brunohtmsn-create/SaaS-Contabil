@@ -8,6 +8,7 @@ import {
   ESocialService,
   DCTFWebService,
   FGTSDigitalService,
+  DMSService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -24,6 +25,7 @@ type FiscalJobData = {
     | 'ESOCIAL'
     | 'DCTFWEB'
     | 'FGTS'
+    | 'DMS'
     | 'TODOS'
 }
 
@@ -71,6 +73,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
       await fgts.apurar(tenantId, empresaId, competencia)
       break
     }
+    case 'DMS': {
+      const dms = new DMSService()
+      await dms.apurar(tenantId, empresaId, competencia)
+      break
+    }
     case 'TODOS': {
       const pgdas = new PGDASService()
       const difal = new DifalService()
@@ -80,11 +87,17 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
       const eSocial = new ESocialService()
       const dctf = new DCTFWebService()
       const fgts = new FGTSDigitalService()
+      const dms = new DMSService()
       await pgdas.apurar(tenantId, empresaId, competencia)
       await difal.calcular(tenantId, empresaId, competencia)
       await gnre.gerar(tenantId, empresaId, competencia)
       await destda.gerar(tenantId, empresaId, competencia)
       await reinf.processar(tenantId, empresaId, competencia)
+      try {
+        await dms.apurar(tenantId, empresaId, competencia)
+      } catch {
+        // empresa sem NFSe no período — ignora
+      }
       try {
         await eSocial.processar(tenantId, empresaId, competencia)
       } catch {

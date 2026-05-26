@@ -68,7 +68,7 @@ export class DMSService {
     const porMunicipio = new Map<string, { total: Decimal; ids: string[] }>()
 
     for (const doc of nfse) {
-      const ibge = (doc.dadosAdicionais as any)?.municipioIBGE ?? 'DESCONHECIDO'
+      const ibge = doc.municipioIBGE ?? doc.ibgeEmitente ?? 'DESCONHECIDO'
       const valor = new Decimal(doc.valorTotal?.toString() ?? '0')
 
       const atual = porMunicipio.get(ibge) ?? { total: new Decimal(0), ids: [] }
@@ -118,17 +118,6 @@ export class DMSService {
           vencimento,
           status: 'PENDENTE',
           valor: totalISS.toFixed(2),
-          dados: {
-            totalNFSe: nfse.length,
-            totalServicos: totalServicos.toFixed(2),
-            totalISS: totalISS.toFixed(2),
-            porMunicipio: municipios.map((m) => ({
-              municipioIBGE: m.municipioIBGE,
-              totalServicos: m.totalServicos.toFixed(2),
-              aliquotaISS: m.aliquotaISS.toFixed(4),
-              totalISS: m.totalISS.toFixed(2),
-            })),
-          },
         },
       })
     }

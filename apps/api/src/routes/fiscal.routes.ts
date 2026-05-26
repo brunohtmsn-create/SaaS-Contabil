@@ -32,6 +32,7 @@ const OPERACOES_FISCAIS = [
   'ESOCIAL',
   'DCTFWEB',
   'FGTS',
+  'DMS',
   'TODOS',
 ] as const
 

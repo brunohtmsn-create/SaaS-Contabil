@@ -487,6 +487,7 @@ enum TipoAlerta {
   FATOR_R_MUDOU
   PGDAS_PENDENTE
   CERTIFICADO_VENCENDO
+  CONFIGURACAO_ISS
 }
 
 // ─── BEM DO ATIVO IMOBILIZADO ─────────────────────────────────────────────
@@ -615,6 +616,7 @@ enum TipoEventoAudit {
   ALERTA_MARCADO_ENVIADO
   RISCO_EXCLUSAO_SN_DETECTADO
   CALENDARIO_ANUAL_GERADO
+  DMS_APURADA
 }
 
 enum TipoResponsavel {
