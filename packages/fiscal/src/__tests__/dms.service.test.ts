@@ -73,7 +73,8 @@ function makeNFSe(id: string, valor: string, ibge = '3550308') {
     tipo: 'NFSE_EMITIDA',
     status: 'CONCILIADO',
     valorTotal: new Decimal(valor),
-    dadosAdicionais: { municipioIBGE: ibge },
+    municipioIBGE: ibge,
+    ibgeEmitente: null,
   }
 }
 
