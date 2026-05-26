@@ -9,6 +9,7 @@
  *  - EFDREINF → chama EFDReinfService.processar()
  *  - ESOCIAL → chama ESocialService.processar()
  *  - DCTFWEB → chama DCTFWebService.gerar()
+ *  - DMS → chama DMSService.apurar()
  *  - TODOS → chama todos os serviços em sequência
  */
 
@@ -26,6 +27,7 @@ const mockEFDReinf = { processar: vi.fn() }
 const mockESocial = { processar: vi.fn() }
 const mockDCTFWeb = { gerar: vi.fn() }
 const mockFGTS = { apurar: vi.fn() }
+const mockDMS = { apurar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -36,6 +38,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   ESocialService: vi.fn(() => mockESocial),
   DCTFWebService: vi.fn(() => mockDCTFWeb),
   FGTSDigitalService: vi.fn(() => mockFGTS),
+  DMSService: vi.fn(() => mockDMS),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -111,6 +114,12 @@ describe('fiscalJob — roteamento de operações', () => {
     expect(mockFGTS.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
   })
 
+  it('DMS → chama DMSService.apurar', async () => {
+    await fiscalJob(makeJob('DMS'))
+    expect(mockDMS.apurar).toHaveBeenCalledOnce()
+    expect(mockDMS.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
+  })
+
   it('TODOS → chama todos os serviços principais', async () => {
     await fiscalJob(makeJob('TODOS'))
     expect(mockPGDAS.apurar).toHaveBeenCalledOnce()
@@ -120,7 +129,8 @@ describe('fiscalJob — roteamento de operações', () => {
     expect(mockEFDReinf.processar).toHaveBeenCalledOnce()
   })
 
-  it('TODOS → tenta eSocial, FGTS e DCTFWeb (continua se falhar)', async () => {
+  it('TODOS → tenta DMS, eSocial, FGTS e DCTFWeb (continua se falhar)', async () => {
+    mockDMS.apurar.mockRejectedValueOnce(new Error('sem NFSe no período'))
     mockESocial.processar.mockRejectedValueOnce(new Error('sem empregados'))
     mockFGTS.apurar.mockRejectedValueOnce(new Error('sem folha'))
     mockDCTFWeb.gerar.mockRejectedValueOnce(new Error('EFD não fechado'))
