@@ -21,10 +21,13 @@ import {
   formatCompetencia,
   nowBR,
   addDays,
+  addMeses,
+  competencias12Meses,
   differenceInCalendarDays,
 } from '../utils/date.js'
 import { sha256 } from '../utils/crypto.js'
 import { MAPA_CFOP_CONTA } from '../constants/cfop.js'
+import { validarCNPJ, formatarCNPJ, limparCNPJ } from '../utils/cnpj.js'
 
 // ---------------------------------------------------------------------------
 // parsePeriodo
@@ -311,5 +314,131 @@ describe('differenceInCalendarDays()', () => {
     const start = new Date('2024-01-01T12:00:00.000Z')
     const end = new Date('2024-12-31T12:00:00.000Z')
     expect(differenceInCalendarDays(end, start)).toBe(365)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// addMeses
+// ---------------------------------------------------------------------------
+
+describe('addMeses()', () => {
+  it('adiciona 1 mês corretamente', () => {
+    const base = new Date(2025, 0, 15) // jan 2025
+    const result = addMeses(base, 1)
+    expect(result.getMonth()).toBe(1) // fev
+    expect(result.getFullYear()).toBe(2025)
+  })
+
+  it('adiciona meses cruzando ano', () => {
+    const base = new Date(2025, 11, 15) // dez 2025
+    const result = addMeses(base, 1)
+    expect(result.getMonth()).toBe(0) // jan
+    expect(result.getFullYear()).toBe(2026)
+  })
+
+  it('adiciona 12 meses = mesmo mês do ano seguinte', () => {
+    const base = new Date(2025, 4, 1) // mai 2025
+    const result = addMeses(base, 12)
+    expect(result.getMonth()).toBe(4)
+    expect(result.getFullYear()).toBe(2026)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// competencias12Meses
+// ---------------------------------------------------------------------------
+
+describe('competencias12Meses()', () => {
+  it('retorna 12 competências', () => {
+    const result = competencias12Meses('2025-05')
+    expect(result).toHaveLength(12)
+  })
+
+  it('todas as entradas têm formato YYYY-MM', () => {
+    const result = competencias12Meses('2025-12')
+    result.forEach((c) => {
+      expect(c).toMatch(/^\d{4}-\d{2}$/)
+    })
+  })
+
+  it('resultado tem 12 entradas ordenadas crescentemente', () => {
+    const result = competencias12Meses('2025-06')
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i]! > result[i - 1]!).toBe(true)
+    }
+  })
+
+  it('intervalo entre primeiro e último é de 11 meses', () => {
+    const result = competencias12Meses('2025-06')
+    const first = result[0]!
+    const last = result[11]!
+    const [fy, fm] = first.split('-').map(Number) as [number, number]
+    const [ly, lm] = last.split('-').map(Number) as [number, number]
+    const diffMonths = (ly - fy) * 12 + (lm - fm)
+    expect(diffMonths).toBe(11)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// validarCNPJ
+// ---------------------------------------------------------------------------
+
+describe('validarCNPJ()', () => {
+  it('CNPJ válido formatado retorna true', () => {
+    expect(validarCNPJ('11.222.333/0001-81')).toBe(true)
+  })
+
+  it('CNPJ válido sem formatação retorna true', () => {
+    expect(validarCNPJ('11222333000181')).toBe(true)
+  })
+
+  it('CNPJ com dígitos verificadores errados retorna false', () => {
+    expect(validarCNPJ('11222333000100')).toBe(false)
+  })
+
+  it('CNPJ com todos dígitos iguais retorna false', () => {
+    expect(validarCNPJ('11111111111111')).toBe(false)
+    expect(validarCNPJ('00000000000000')).toBe(false)
+  })
+
+  it('CNPJ com menos de 14 dígitos retorna false', () => {
+    expect(validarCNPJ('1122233300018')).toBe(false)
+  })
+
+  it('string vazia retorna false', () => {
+    expect(validarCNPJ('')).toBe(false)
+  })
+
+  it('outro CNPJ válido conhecido', () => {
+    // 00.000.000/0001-91 é válido (Banco do Brasil)
+    expect(validarCNPJ('00000000000191')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatarCNPJ
+// ---------------------------------------------------------------------------
+
+describe('formatarCNPJ()', () => {
+  it('formata 14 dígitos no padrão XX.XXX.XXX/XXXX-XX', () => {
+    expect(formatarCNPJ('11222333000181')).toBe('11.222.333/0001-81')
+  })
+
+  it('aceita CNPJ já formatado como entrada', () => {
+    expect(formatarCNPJ('11.222.333/0001-81')).toBe('11.222.333/0001-81')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// limparCNPJ
+// ---------------------------------------------------------------------------
+
+describe('limparCNPJ()', () => {
+  it('remove pontuação e retorna apenas dígitos', () => {
+    expect(limparCNPJ('11.222.333/0001-81')).toBe('11222333000181')
+  })
+
+  it('CNPJ sem pontuação permanece igual', () => {
+    expect(limparCNPJ('11222333000181')).toBe('11222333000181')
   })
 })
