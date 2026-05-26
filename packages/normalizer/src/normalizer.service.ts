@@ -1,5 +1,5 @@
 import { getPrismaClient, DocumentoFiscal as PrismaDoc } from '@saas-contabil/database'
-import { sha256, limparCNPJ, formatCompetencia, startOfMonth, Decimal } from '@saas-contabil/shared'
+import { sha256, limparCNPJ, formatCompetencia, parsePeriodo, Decimal } from '@saas-contabil/shared'
 import { AuditService } from '@saas-contabil/audit'
 import type { DocumentoRaw } from './types.js'
 
@@ -22,7 +22,7 @@ export class NormalizerService {
       return existing
     }
 
-    const dataCompetencia = new Date(raw.dataEmissao.getFullYear(), raw.dataEmissao.getMonth(), 1)
+    const { inicio: dataCompetencia } = parsePeriodo(formatCompetencia(raw.dataEmissao))
 
     const doc = await this.db.documentoFiscal.create({
       data: {
