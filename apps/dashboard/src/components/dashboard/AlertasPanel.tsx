@@ -89,10 +89,7 @@ export function AlertasPanel({ alertas }: { alertas: Alerta[] }) {
           </div>
         ) : (
           alertas.slice(0, 10).map((alerta) => (
-            <div
-              key={alerta.id}
-              className="px-5 py-3.5 hover:bg-slate-50 transition-colors group"
-            >
+            <div key={alerta.id} className="px-5 py-3.5 hover:bg-slate-50 transition-colors group">
               <div className="flex items-start gap-2.5">
                 <span className="text-base flex-shrink-0 mt-0.5">
                   {TIPO_ICON[alerta.tipo] ?? '🔔'}
@@ -104,7 +101,9 @@ export function AlertasPanel({ alertas }: { alertas: Alerta[] }) {
                     >
                       {alerta.tipo.replace(/_/g, ' ')}
                     </span>
-                    <span className="text-xs text-slate-400">{formatTimestamp(alerta.criadoEm)}</span>
+                    <span className="text-xs text-slate-400">
+                      {formatTimestamp(alerta.criadoEm)}
+                    </span>
                   </div>
                   <p className="text-sm text-slate-700 mt-1 line-clamp-2 leading-snug">
                     {alerta.mensagem}

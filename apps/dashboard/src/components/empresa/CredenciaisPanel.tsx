@@ -284,9 +284,7 @@ export function CredenciaisPanel({ empresaId, cnpj }: Props) {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {cred.validade
-                      ? new Date(cred.validade).toLocaleDateString('pt-BR')
-                      : '—'}
+                    {cred.validade ? new Date(cred.validade).toLocaleDateString('pt-BR') : '—'}
                   </td>
                   <td className="px-4 py-3 text-slate-500 text-xs">
                     {cred.ultimoUso
@@ -297,7 +295,9 @@ export function CredenciaisPanel({ empresaId, cnpj }: Props) {
                     {cred.status === 'ATIVO' && (
                       <button
                         onClick={() => {
-                          if (confirm('Revogar esta credencial? Esta ação não pode ser desfeita.')) {
+                          if (
+                            confirm('Revogar esta credencial? Esta ação não pode ser desfeita.')
+                          ) {
                             revogar.mutate(cred.id)
                           }
                         }}

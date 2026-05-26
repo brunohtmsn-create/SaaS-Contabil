@@ -379,11 +379,7 @@ describe('POST /fiscal/obrigacoes/calendario/:empresaId/:ano', () => {
     const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
 
     expect(res.statusCode).toBe(200)
-    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(
-      TENANT_ID,
-      EMPRESA_ID,
-      2025
-    )
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, 2025)
   })
 
   it('ano inválido (texto) → 400', async () => {

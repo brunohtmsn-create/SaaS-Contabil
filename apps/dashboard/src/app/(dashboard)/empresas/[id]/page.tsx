@@ -11,7 +11,9 @@ import { CredenciaisPanel } from '@/components/empresa/CredenciaisPanel'
 
 export default function EmpresaDetailPage({ params }: { params: { id: string } }) {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<'documentos' | 'fiscal' | 'fechamento' | 'credenciais' | 'auditoria'>('documentos')
+  const [tab, setTab] = useState<
+    'documentos' | 'fiscal' | 'fechamento' | 'credenciais' | 'auditoria'
+  >('documentos')
   const [competencia, setCompetencia] = useState(() => new Date().toISOString().slice(0, 7))
 
   const { data: empresa } = useQuery({

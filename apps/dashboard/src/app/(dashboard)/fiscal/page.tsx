@@ -149,14 +149,19 @@ export default function FiscalPage() {
         </button>
         {batchResult && (
           <div className="text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
-            <span className="text-green-600 font-semibold">{batchResult.total} jobs</span> enfileirados
+            <span className="text-green-600 font-semibold">{batchResult.total} jobs</span>{' '}
+            enfileirados
             {batchResult.semCredencial > 0 && (
-              <span className="text-yellow-600 ml-2">({batchResult.semCredencial} sem credencial)</span>
+              <span className="text-yellow-600 ml-2">
+                ({batchResult.semCredencial} sem credencial)
+              </span>
             )}
           </div>
         )}
         {fechamentoBatch.isError && (
-          <span className="text-sm text-red-600 font-medium">Erro ao enfileirar. Tente novamente.</span>
+          <span className="text-sm text-red-600 font-medium">
+            Erro ao enfileirar. Tente novamente.
+          </span>
         )}
       </div>
 
