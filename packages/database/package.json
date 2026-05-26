@@ -7,7 +7,7 @@
     "build": "tsc",
     "db:migrate": "prisma migrate dev",
     "db:migrate:prod": "prisma migrate deploy",
-    "db:seed": "ts-node src/seed.ts",
+    "db:seed": "tsx src/seed.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "db:reset": "prisma migrate reset"
@@ -20,8 +20,8 @@
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "prisma": "^5.16.0",
+    "tsx": "^4.16.0",
     "typescript": "^5.5.0",
-    "ts-node": "^10.9.2",
     "@types/node": "^22.0.0"
   }
 }
