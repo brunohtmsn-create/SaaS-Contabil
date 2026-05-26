@@ -13,6 +13,7 @@ import {
   FatorRService,
   FGTSDigitalService,
   EFDReinfService,
+  DMSService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -272,6 +273,14 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const service = new EFDReinfService()
     return service.processar(tenantId, empresaId, competencia)
+  })
+
+  app.post('/dms/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new DMSService()
+    return service.apurar(tenantId, empresaId, competencia)
   })
 
   // Enfileira job fiscal para uma empresa específica

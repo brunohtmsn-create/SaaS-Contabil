@@ -9,6 +9,8 @@ export { AlertasVencimentosService } from './alertas-vencimentos.service.js'
 export { DCTFWebService } from './dctfweb.service.js'
 export { ESocialService } from './esocial.service.js'
 export { FGTSDigitalService } from './fgts-digital.service.js'
+export { DMSService } from './dms.service.js'
+export type { ResultadoDMS, MunicipioISS } from './dms.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

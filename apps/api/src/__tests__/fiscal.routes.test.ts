@@ -34,6 +34,7 @@ const mockMonitoramento = {
 const mockFatorR = { calcular: vi.fn() }
 const mockFGTS = { apurar: vi.fn() }
 const mockEFDReinf = { processar: vi.fn() }
+const mockDMS = { apurar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -46,6 +47,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   FatorRService: vi.fn(() => mockFatorR),
   FGTSDigitalService: vi.fn(() => mockFGTS),
   EFDReinfService: vi.fn(() => mockEFDReinf),
+  DMSService: vi.fn(() => mockDMS),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -901,5 +903,40 @@ describe('GET /fiscal/monitoramento/vencimentos', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json()).toHaveLength(0)
     expect(mockMonitoramento.verificarVencimentos).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/dms/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/dms/:empresaId/:competencia', () => {
+  it('chama DMSService.apurar e retorna resultado', async () => {
+    const resultado = {
+      competencia: COMPETENCIA,
+      cnpj: '11222333000181',
+      totalNFSe: 3,
+      totalServicos: '15000.00',
+      totalISS: '300.00',
+      porMunicipio: [],
+    }
+    mockDMS.apurar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/dms/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockDMS.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().totalNFSe).toBe(3)
+    expect(res.json().totalISS).toBe('300.00')
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/dms/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/dms/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
   })
 })
