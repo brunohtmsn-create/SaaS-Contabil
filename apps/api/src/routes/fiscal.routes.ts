@@ -339,4 +339,61 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const service = new MonitoramentoSNService()
     return service.gerarCalendarioAnual(tenantId, empresaId, Number(ano ?? nowBR().getFullYear()))
   })
+
+  // Verificação de risco de exclusão do Simples Nacional (últimos 12 meses)
+  app.get('/monitoramento/risco-exclusao/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    const service = new MonitoramentoSNService()
+    await service.verificarRiscoExclusao(tenantId, empresaId, competencia)
+
+    const alertas = await db.alerta.findMany({
+      where: {
+        tenantId,
+        empresaId,
+        tipo: { in: ['RISCO_EXCLUSAO_SN', 'SUBLIMITE_ESTADUAL'] },
+      },
+      orderBy: { criadoEm: 'desc' },
+      take: 5,
+    })
+
+    return { empresaId, cnpj: empresa.cnpj, competencia, alertas }
+  })
+
+  // Verificação de vencimentos de todas as empresas ativas do tenant
+  app.get('/monitoramento/vencimentos', async (request) => {
+    const { tenantId } = request.user as any
+    const { competencia, diasAntecedencia } = request.query as {
+      competencia?: string
+      diasAntecedencia?: string
+    }
+
+    const comp = competencia ?? nowBR().toISOString().slice(0, 7)
+    const dias = Number(diasAntecedencia ?? '7')
+
+    const service = new MonitoramentoSNService()
+
+    const empresas = await db.empresaCliente.findMany({
+      where: { tenantId, ativa: true },
+      select: { id: true, cnpj: true, razaoSocial: true },
+    })
+
+    const resultados = await Promise.all(
+      empresas.map(async (emp) => {
+        const obrigacoes = await service.verificarVencimentos(tenantId, emp.id, comp)
+        const vencendoEm = nowBR()
+        vencendoEm.setDate(vencendoEm.getDate() + dias)
+        const proximas = obrigacoes.filter(
+          (o) => o.status === 'PENDENTE' && new Date(o.vencimento) <= vencendoEm
+        )
+        return { ...emp, obrigacoesProximas: proximas.length, obrigacoes: proximas }
+      })
+    )
+
+    return resultados
+  })
 }

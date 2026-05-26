@@ -26,7 +26,11 @@ const mockGNRE = { gerar: vi.fn() }
 const mockDeSTDA = { gerar: vi.fn() }
 const mockDCTFWeb = { gerar: vi.fn() }
 const mockESocial = { processar: vi.fn() }
-const mockMonitoramento = { gerarCalendarioAnual: vi.fn() }
+const mockMonitoramento = {
+  gerarCalendarioAnual: vi.fn(),
+  verificarRiscoExclusao: vi.fn(),
+  verificarVencimentos: vi.fn(),
+}
 const mockFatorR = { calcular: vi.fn() }
 const mockFGTS = { apurar: vi.fn() }
 const mockEFDReinf = { processar: vi.fn() }
@@ -61,6 +65,9 @@ const { mockDb, mockQueue } = vi.hoisted(() => ({
     },
     empresaCliente: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
+    alerta: {
       findMany: vi.fn(),
     },
   },
@@ -661,5 +668,238 @@ describe('POST /fiscal/batch/:competencia', () => {
   it('competencia inválida → 400', async () => {
     const res = await req('POST', '/fiscal/batch/202505', {})
     expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/monitoramento/risco-exclusao/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/monitoramento/risco-exclusao/:empresaId/:competencia', () => {
+  const url = `/fiscal/monitoramento/risco-exclusao/${EMPRESA_ID}/${COMPETENCIA}`
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/empresa não encontrada/i)
+    expect(mockMonitoramento.verificarRiscoExclusao).not.toHaveBeenCalled()
+  })
+
+  it('empresa encontrada → chama verificarRiscoExclusao com tenantId e competencia', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+    mockMonitoramento.verificarRiscoExclusao.mockResolvedValueOnce(undefined)
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    expect(mockMonitoramento.verificarRiscoExclusao).toHaveBeenCalledWith(
+      TENANT_ID,
+      EMPRESA_ID,
+      COMPETENCIA
+    )
+  })
+
+  it('retorna empresaId, cnpj, competencia e alertas', async () => {
+    const cnpj = '11222333000181'
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({ id: EMPRESA_ID, cnpj })
+    mockMonitoramento.verificarRiscoExclusao.mockResolvedValueOnce(undefined)
+    mockDb.alerta.findMany.mockResolvedValueOnce([
+      { id: 'al-1', tipo: 'RISCO_EXCLUSAO_SN', mensagem: 'Receita excedida' },
+    ])
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.empresaId).toBe(EMPRESA_ID)
+    expect(body.cnpj).toBe(cnpj)
+    expect(body.competencia).toBe(COMPETENCIA)
+    expect(body.alertas).toHaveLength(1)
+    expect(body.alertas[0].tipo).toBe('RISCO_EXCLUSAO_SN')
+  })
+
+  it('alerta.findMany filtra por tenantId e empresaId (isolamento)', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+    mockMonitoramento.verificarRiscoExclusao.mockResolvedValueOnce(undefined)
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const { where } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('alerta.findMany filtra tipos RISCO_EXCLUSAO_SN e SUBLIMITE_ESTADUAL', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+    mockMonitoramento.verificarRiscoExclusao.mockResolvedValueOnce(undefined)
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const { where } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(where.tipo.in).toContain('RISCO_EXCLUSAO_SN')
+    expect(where.tipo.in).toContain('SUBLIMITE_ESTADUAL')
+  })
+
+  it('empresaId não-UUID → 400', async () => {
+    const res = await req('GET', `/fiscal/monitoramento/risco-exclusao/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('GET', `/fiscal/monitoramento/risco-exclusao/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/monitoramento/vencimentos
+// ===========================================================================
+
+describe('GET /fiscal/monitoramento/vencimentos', () => {
+  const OBRIGACAO_PENDENTE = {
+    id: 'obr-1',
+    tipo: 'DAS',
+    status: 'PENDENTE',
+    vencimento: new Date('2025-06-05T00:00:00Z'),
+  }
+  const OBRIGACAO_FUTURA = {
+    id: 'obr-2',
+    tipo: 'EFD_REINF',
+    status: 'PENDENTE',
+    vencimento: new Date('2025-06-30T00:00:00Z'),
+  }
+
+  it('retorna empresas ativas com obrigações próximas', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([OBRIGACAO_PENDENTE])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(Array.isArray(body)).toBe(true)
+    expect(body).toHaveLength(1)
+    expect(body[0].cnpj).toBe('11222333000181')
+  })
+
+  it('filtra obrigações com vencimento dentro do prazo padrão (7 dias)', async () => {
+    // nowBR mocked to 2025-06-01 → vencendoEm = 2025-06-08
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([
+      OBRIGACAO_PENDENTE, // 2025-06-05 → dentro do prazo
+      OBRIGACAO_FUTURA, // 2025-06-30 → fora do prazo
+    ])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    const body = res.json()
+    expect(body[0].obrigacoesProximas).toBe(1)
+    expect(body[0].obrigacoes).toHaveLength(1)
+    expect(body[0].obrigacoes[0].tipo).toBe('DAS')
+  })
+
+  it('filtra por tenantId do JWT (isolamento)', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+  })
+
+  it('respeita ?diasAntecedencia=1 (apenas vencimento amanhã)', async () => {
+    // nowBR = 2025-06-01 → vencendoEm com 1 dia = 2025-06-02
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([
+      OBRIGACAO_PENDENTE, // 2025-06-05 → fora do prazo de 1 dia
+    ])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos?diasAntecedencia=1')
+
+    const body = res.json()
+    expect(body[0].obrigacoesProximas).toBe(0)
+    expect(body[0].obrigacoes).toHaveLength(0)
+  })
+
+  it('usa competencia atual quando não informada', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    // nowBR mocked to '2025-06-01' → competencia = '2025-06'
+    expect(mockMonitoramento.verificarVencimentos).toHaveBeenCalledWith(
+      TENANT_ID,
+      'emp-1',
+      '2025-06'
+    )
+  })
+
+  it('respeita ?competencia=YYYY-MM passada na query', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-2', cnpj: '99888777000166', razaoSocial: 'Beta LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/monitoramento/vencimentos?competencia=2025-03')
+
+    expect(mockMonitoramento.verificarVencimentos).toHaveBeenCalledWith(
+      TENANT_ID,
+      'emp-2',
+      '2025-03'
+    )
+  })
+
+  it('processa múltiplas empresas em paralelo', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme' },
+      { id: 'emp-2', cnpj: '99888777000166', razaoSocial: 'Beta' },
+      { id: 'emp-3', cnpj: '55444333000122', razaoSocial: 'Gama' },
+    ])
+    mockMonitoramento.verificarVencimentos
+      .mockResolvedValueOnce([OBRIGACAO_PENDENTE])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([OBRIGACAO_PENDENTE, OBRIGACAO_PENDENTE])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    expect(res.statusCode).toBe(200)
+    expect(mockMonitoramento.verificarVencimentos).toHaveBeenCalledTimes(3)
+    const body = res.json()
+    expect(body).toHaveLength(3)
+    expect(body[2].obrigacoesProximas).toBe(2)
+  })
+
+  it('sem empresas ativas → retorna array vazio', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(0)
+    expect(mockMonitoramento.verificarVencimentos).not.toHaveBeenCalled()
   })
 })
