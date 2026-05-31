@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { type FastifyError } from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
@@ -68,7 +68,7 @@ app.addHook('onRequest', async (request, reply) => {
   }
 })
 
-app.setErrorHandler((error, _request, reply) => {
+app.setErrorHandler((error: FastifyError, _request, reply) => {
   if (error instanceof ZodError) {
     return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.errors })
   }
