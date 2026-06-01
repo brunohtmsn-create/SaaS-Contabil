@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
-import { validarCNPJ } from '@saas-contabil/shared'
+import { validarCNPJ, nowBR } from '@saas-contabil/shared'
+import { MonitoramentoSNService } from '@saas-contabil/fiscal'
 
 const createEmpresaSchema = z.object({
   cnpj: z.string().length(14).refine(validarCNPJ, { message: 'CNPJ inválido' }),
@@ -42,7 +43,7 @@ export async function empresaRoutes(app: FastifyInstance) {
     if (existing) return reply.code(409).send({ error: 'CNPJ já cadastrado' })
 
     const { nomeFantasia, ...requiredFields } = data
-    return db.empresaCliente.create({
+    const empresa = await db.empresaCliente.create({
       data: {
         ...requiredFields,
         tenantId,
@@ -50,6 +51,17 @@ export async function empresaRoutes(app: FastifyInstance) {
         ...(nomeFantasia !== undefined && { nomeFantasia }),
       },
     })
+
+    // Gera calendário anual automaticamente para SN e MEI no ano corrente
+    if (data.regime === 'SIMPLES_NACIONAL' || data.regime === 'MEI') {
+      const ano = nowBR().getFullYear()
+      const sn = new MonitoramentoSNService()
+      await sn.gerarCalendarioAnual(tenantId, empresa.id, ano).catch(() => {
+        // Falha não bloqueia o cadastro — calendário pode ser gerado manualmente
+      })
+    }
+
+    return empresa
   })
 
   app.patch('/:id', async (request, reply) => {

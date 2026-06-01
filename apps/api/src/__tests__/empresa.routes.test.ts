@@ -39,6 +39,17 @@ vi.mock('@saas-contabil/database', () => ({
   getPrismaClient: vi.fn(() => mockDb),
 }))
 
+const mockMonitoramento = { gerarCalendarioAnual: vi.fn().mockResolvedValue([]) }
+
+vi.mock('@saas-contabil/fiscal', () => ({
+  MonitoramentoSNService: vi.fn(() => mockMonitoramento),
+}))
+
+vi.mock('@saas-contabil/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@saas-contabil/shared')>()
+  return { ...actual, nowBR: vi.fn(() => new Date('2025-06-01T12:00:00Z')) }
+})
+
 import { empresaRoutes } from '../routes/empresa.routes.js'
 
 // ---------------------------------------------------------------------------
@@ -78,6 +89,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockMonitoramento.gerarCalendarioAnual.mockResolvedValue([])
 })
 
 function req(method: string, url: string, payload?: unknown) {
@@ -262,6 +274,45 @@ describe('POST /empresas', () => {
     const res = await req('POST', '/empresas', payload) // sem nomeFantasia
 
     expect(res.statusCode).toBe(200)
+  })
+
+  it('SN → gera calendário anual automaticamente após criação', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-sn' })
+
+    await req('POST', '/empresas', { ...payload, regime: 'SIMPLES_NACIONAL' })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledOnce()
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-sn', 2025)
+  })
+
+  it('MEI → gera calendário anual automaticamente após criação', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-mei' })
+
+    await req('POST', '/empresas', { ...payload, regime: 'MEI' })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledOnce()
+  })
+
+  it('LUCRO_PRESUMIDO → não gera calendário SN', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-lp' })
+
+    await req('POST', '/empresas', { ...payload, regime: 'LUCRO_PRESUMIDO' })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).not.toHaveBeenCalled()
+  })
+
+  it('falha no calendário não bloqueia cadastro da empresa', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-sn2' })
+    mockMonitoramento.gerarCalendarioAnual.mockRejectedValueOnce(new Error('DB error'))
+
+    const res = await req('POST', '/empresas', payload)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().id).toBe('emp-sn2')
   })
 })
 
