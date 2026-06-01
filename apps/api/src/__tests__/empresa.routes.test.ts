@@ -40,9 +40,11 @@ vi.mock('@saas-contabil/database', () => ({
 }))
 
 const mockMonitoramento = { gerarCalendarioAnual: vi.fn().mockResolvedValue([]) }
+const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn().mockResolvedValue([]) }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   MonitoramentoSNService: vi.fn(() => mockMonitoramento),
+  CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
 }))
 
 vi.mock('@saas-contabil/shared', async (importOriginal) => {
@@ -90,6 +92,7 @@ afterAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks()
   mockMonitoramento.gerarCalendarioAnual.mockResolvedValue([])
+  mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValue([])
 })
 
 function req(method: string, url: string, payload?: unknown) {
@@ -295,16 +298,40 @@ describe('POST /empresas', () => {
     expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledOnce()
   })
 
-  it('LUCRO_PRESUMIDO → não gera calendário SN', async () => {
+  it('LUCRO_PRESUMIDO → gera calendário LP/LR (não SN)', async () => {
     mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
     mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-lp' })
 
     await req('POST', '/empresas', { ...payload, regime: 'LUCRO_PRESUMIDO' })
 
     expect(mockMonitoramento.gerarCalendarioAnual).not.toHaveBeenCalled()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledOnce()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-lp', 2025)
   })
 
-  it('falha no calendário não bloqueia cadastro da empresa', async () => {
+  it('LUCRO_REAL → gera calendário LP/LR automaticamente', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-lr' })
+
+    await req('POST', '/empresas', { ...payload, regime: 'LUCRO_REAL' })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).not.toHaveBeenCalled()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledOnce()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-lr', 2025)
+  })
+
+  it('falha no calendário LP/LR não bloqueia cadastro da empresa', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-lp2' })
+    mockCalendarioLPLR.gerarCalendarioAnual.mockRejectedValueOnce(new Error('DB error'))
+
+    const res = await req('POST', '/empresas', { ...payload, regime: 'LUCRO_PRESUMIDO' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().id).toBe('emp-lp2')
+  })
+
+  it('falha no calendário SN não bloqueia cadastro da empresa', async () => {
     mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
     mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-sn2' })
     mockMonitoramento.gerarCalendarioAnual.mockRejectedValueOnce(new Error('DB error'))

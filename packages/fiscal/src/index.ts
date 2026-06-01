@@ -13,6 +13,7 @@ export { DMSService } from './dms.service.js'
 export type { ResultadoDMS, MunicipioISS } from './dms.service.js'
 export { DasnService } from './dasn.service.js'
 export type { ResultadoDasn, ReceitaMensalDasn } from './dasn.service.js'
+export { CalendarioLPLRService } from './calendario-lplr.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,
