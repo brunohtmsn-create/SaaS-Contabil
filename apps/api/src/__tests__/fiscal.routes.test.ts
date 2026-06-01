@@ -1201,3 +1201,82 @@ describe('GET /fiscal/dasn/:empresaId/:ano', () => {
     expect(where.tipo).toBe('DASN')
   })
 })
+
+// ---------------------------------------------------------------------------
+// GET /fiscal/compliance/resumo
+// ---------------------------------------------------------------------------
+
+describe('GET /fiscal/compliance/resumo', () => {
+  const url = '/fiscal/compliance/resumo?competencia=2025-01'
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna totais e lista de empresas → 200', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      {
+        id: EMPRESA_ID,
+        cnpj: '11111111000111',
+        razaoSocial: 'Empresa A',
+        regime: 'SIMPLES_NACIONAL',
+      },
+    ])
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([
+      { id: 'o1', tipo: 'DAS', vencimento: new Date('2025-01-20'), status: 'PAGA' },
+    ])
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.competencia).toBe('2025-01')
+    expect(body.totais.totalEmpresas).toBe(1)
+    expect(body.empresas).toHaveLength(1)
+    expect(body.empresas[0].statusGeral).toBe('EM_DIA')
+    expect(body.empresas[0].cumpridas).toBe(1)
+  })
+
+  it('empresa com obrigação atrasada → statusGeral ATRASADA', async () => {
+    // nowBR mocked to 2025-06-01T12:00:00Z — usar data anterior ao mock
+    const vencidaOntem = new Date('2025-05-20T12:00:00Z')
+
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      {
+        id: EMPRESA_ID,
+        cnpj: '11111111000111',
+        razaoSocial: 'Empresa B',
+        regime: 'SIMPLES_NACIONAL',
+      },
+    ])
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([
+      { id: 'o2', tipo: 'DAS', vencimento: vencidaOntem, status: 'PENDENTE' },
+    ])
+
+    const res = await req('GET', url)
+
+    const empresa = res.json().empresas[0]
+    expect(empresa.statusGeral).toBe('ATRASADA')
+    expect(empresa.atrasadas).toBe(1)
+    expect(res.json().totais.totalAtrasadas).toBe(1)
+  })
+
+  it('sem obrigações → statusGeral SEM_OBRIGACOES', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, cnpj: '11111111000111', razaoSocial: 'Empresa C', regime: 'MEI' },
+    ])
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([])
+
+    const res = await req('GET', url)
+
+    expect(res.json().empresas[0].statusGeral).toBe('SEM_OBRIGACOES')
+  })
+
+  it('filtra obrigações pelo tenantId', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const where = mockDb.empresaCliente.findMany.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+  })
+})

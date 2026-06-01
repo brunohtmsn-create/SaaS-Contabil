@@ -494,4 +494,76 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     return obrigacao
   })
+
+  // ─── Compliance Resumo ────────────────────────────────────────────────────
+
+  // GET /fiscal/compliance/resumo?competencia=YYYY-MM
+  // Retorna painel de compliance de todas as empresas ativas do tenant
+  app.get('/compliance/resumo', async (request) => {
+    const { tenantId } = request.user as any
+    const { competencia } = request.query as { competencia?: string }
+    const comp = competencia ?? nowBR().toISOString().slice(0, 7)
+    const hoje = nowBR()
+
+    const empresas = await db.empresaCliente.findMany({
+      where: { tenantId, ativa: true },
+      select: { id: true, cnpj: true, razaoSocial: true, regime: true },
+      orderBy: { razaoSocial: 'asc' },
+    })
+
+    const resumosPorEmpresa = await Promise.all(
+      empresas.map(async (emp) => {
+        const obrigacoes = await db.obrigacao.findMany({
+          where: { tenantId, empresaId: emp.id, competencia: comp },
+          orderBy: { vencimento: 'asc' },
+        })
+
+        const pendentes = obrigacoes.filter((o) => o.status === 'PENDENTE')
+        const atrasadas = pendentes.filter((o) => new Date(o.vencimento) < hoje)
+        const proximasHoje = pendentes.filter((o) => {
+          const diff = new Date(o.vencimento).getTime() - hoje.getTime()
+          return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000
+        })
+        const cumpridas = obrigacoes.filter((o) => ['TRANSMITIDA', 'PAGA'].includes(o.status))
+
+        return {
+          empresa: emp,
+          totalObrigacoes: obrigacoes.length,
+          pendentes: pendentes.length,
+          atrasadas: atrasadas.length,
+          proximasSemana: proximasHoje.length,
+          cumpridas: cumpridas.length,
+          statusGeral:
+            atrasadas.length > 0
+              ? 'ATRASADA'
+              : proximasHoje.length > 0
+                ? 'PROXIMA'
+                : pendentes.length > 0
+                  ? 'PENDENTE'
+                  : obrigacoes.length === 0
+                    ? 'SEM_OBRIGACOES'
+                    : 'EM_DIA',
+          proximaObrigacao:
+            pendentes.length > 0
+              ? pendentes.sort(
+                  (a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime()
+                )[0]
+              : null,
+        }
+      })
+    )
+
+    const totalEmpresas = resumosPorEmpresa.length
+    const totalAtrasadas = resumosPorEmpresa.filter((r) => r.atrasadas > 0).length
+    const totalProximas = resumosPorEmpresa.filter(
+      (r) => r.atrasadas === 0 && r.proximasSemana > 0
+    ).length
+    const totalEmDia = resumosPorEmpresa.filter((r) => r.statusGeral === 'EM_DIA').length
+
+    return {
+      competencia: comp,
+      totais: { totalEmpresas, totalAtrasadas, totalProximas, totalEmDia },
+      empresas: resumosPorEmpresa,
+    }
+  })
 }
