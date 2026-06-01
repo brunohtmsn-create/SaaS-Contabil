@@ -83,100 +83,138 @@ infra/
 - [x] **DCTFWebService** — geração pós EFD-Reinf+eSocial
 - [x] **FGTSDigitalService** — apuração FGTS Digital
 - [x] **DMSService** — apuração DMS municipal
-- [x] **DasnService** — DASN/DEFIS (Declaração Anual SN) ← **adicionado nesta sessão**
+- [x] **DasnService** — DASN/DEFIS (Declaração Anual SN)
   - Valida regime SIMPLES_NACIONAL ou MEI
   - Agrega receita mensal de documentos CONCILIADOS
   - Cria/reutiliza Obrigação com vencimento 31/03 do ano seguinte
   - Registra evento `DASN_GERADA` no audit
+- [x] **MonitoramentoSNService** — verificação de vencimentos, risco exclusão SN, gerarCalendarioAnual
+- [x] **AlertasVencimentosService** — cria alertas para obrigações próximas do vencimento
+- [x] **FatorRService** — cálculo do Fator R para determinar Anexo III/V
 
-### API (apps/api)
+### API (apps/api) — Endpoints Implementados
 
-- [x] **auth.routes.ts** — login + refresh token com rate limit
-- [x] **fiscal.routes.ts** — todos endpoints fiscais incluindo:
-  - `POST /fiscal/pgdas/:empresaId/:competencia`
-  - `POST /fiscal/difal/:empresaId/:competencia`
-  - `POST /fiscal/gnre/:empresaId/:competencia`
-  - `POST /fiscal/destda/:empresaId/:competencia`
-  - `POST /fiscal/efdreinf/:empresaId/:competencia`
-  - `POST /fiscal/esocial/:empresaId/:competencia`
-  - `POST /fiscal/dctfweb/:empresaId/:competencia`
-  - `POST /fiscal/fgts/:empresaId/:competencia`
-  - `POST /fiscal/dms/:empresaId/:competencia`
-  - `POST /fiscal/dasn/:empresaId/:ano` ← **adicionado nesta sessão**
-  - `GET  /fiscal/dasn/:empresaId/:ano` ← **adicionado nesta sessão**
+- [x] **auth.routes.ts** — `POST /login`, `POST /refresh` com rate limit 10 req/min
+- [x] **empresa.routes.ts** — CRUD completo + auto-geração de calendário ao cadastrar SN/MEI
+- [x] **documento.routes.ts** — CRUD de documentos fiscais com status tracking
+- [x] **conciliacao.routes.ts** — conciliação com aprovação manual para score < 80
+- [x] **credencial.routes.ts** — cofre AES-256-GCM de certificados
+- [x] **fechamento.routes.ts** — `POST /fechamento/run/:empresaId/:competencia`, batch
+- [x] **portal.routes.ts** — transmissão para e-CAC, SN, SEFAZ
+- [x] **dashboard.routes.ts** — resumo, timeline, volume, alertas
+- [x] **relatorio.routes.ts** — CSV consolidado mensal via S3
+- [x] **audit.routes.ts** — consulta eventos com aprovação humana
+- [x] **fiscal.routes.ts** — todos endpoints fiscais:
+  - PGDAS: `POST/GET /fiscal/pgdas/:empresaId/:competencia`
+  - PGDAS transmissão: `POST /fiscal/pgdas/transmitir/:empresaId/:competencia`
+  - DIFAL: `POST/GET /fiscal/difal/:empresaId/:competencia`
+  - GNRE: `POST/GET /fiscal/gnre/:empresaId/:competencia`
+  - DeSTDA: `POST/GET /fiscal/destda/:empresaId/:competencia`
+  - EFD-Reinf: `GET /fiscal/efdreinf/:empresaId/:competencia`
+  - DMS: `GET /fiscal/dms/:empresaId/:competencia`
+  - Fator R: `GET /fiscal/fator-r/:empresaId/:competencia`
+  - eSocial: `POST /fiscal/esocial/:empresaId/:competencia`
+  - DCTFWeb: `POST /fiscal/dctfweb/:empresaId/:competencia`
+  - FGTS: `POST /fiscal/fgts/:empresaId/:competencia`
+  - DASN: `POST/GET /fiscal/dasn/:empresaId/:ano`
+  - Obrigações: `GET/PATCH /fiscal/obrigacoes`
+  - Calendário: `POST /fiscal/obrigacoes/calendario/:empresaId/:ano`
+  - **Calendário Batch**: `POST /fiscal/obrigacoes/calendario/batch/:ano`
+  - Monitoramento: `GET /fiscal/monitoramento/vencimentos`
+  - **Compliance**: `GET /fiscal/compliance/resumo?competencia=YYYY-MM`
+  - Batch fiscal: `POST /fiscal/batch/:competencia`
 
 ### Worker (apps/worker)
 
-- [x] **fiscal.job.ts** — roteamento de operações fiscais incluindo DASN ← **atualizado nesta sessão**
+- [x] **fiscal.job.ts** — todos os 10 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, TODOS)
 - [x] **fechamento.job.ts** — fechamento mensal completo (15 etapas)
 - [x] **scraper.job.ts** — captura NF-e, NFC-e, NFSe
 - [x] **bancario.job.ts** — conciliação bancária
 - [x] **portal.job.ts** — transmissão portais (e-CAC, SN, SEFAZ)
-- [x] **monitoramento.job.ts** — monitoramento de obrigações
-- [x] **relatorio.job.ts** — geração de relatórios
+- [x] **monitoramento.job.ts** — monitoramento diário (cron 7h BRT)
+- [x] **relatorio.job.ts** — geração CSV consolidado mensal
+- [x] **Crons:** monitoramento 7h BRT diário, bancário 3h BRT diário
 
 ### Dashboard (apps/dashboard)
 
-- [x] **Página DASN** (`/fiscal/dasn`) ← **adicionado nesta sessão**
-  - Seletor de empresa (filtrado SN/MEI)
-  - Seletor de ano-base
-  - Botão gerar/regenerar DASN
-  - Badge completo/incompleto
-  - Cards de resumo
-  - Tabela mensal com flags PGDAS
+- [x] `/dashboard` — Painel principal com cards, gráfico de receita, alertas
+- [x] `/empresas` — Lista com filtros + detalhe + nova empresa
+- [x] `/empresas/nova` — Formulário com validação CNPJ, regime, IBGE
+- [x] `/documentos` — Documentos fiscais com filtros
+- [x] `/fiscal` — Página central de operações fiscais (PGDAS, DIFAL, etc.)
+- [x] `/fiscal/dasn` — DASN/DEFIS: seletor empresa/ano, tabela mensal, badge status
+- [x] `/obrigacoes` — Obrigações com filtros, calendário individual + **batch para todas**
+- [x] `/fgts` — FGTS Digital com apuração mensal
+- [x] `/conciliacao` — Conciliação com aprovação/rejeição manual
+- [x] `/contabil` — Lançamentos contábeis
+- [x] `/portais` — Transmissão para portais governamentais
+- [x] `/auditoria` — Eventos de auditoria imutáveis
+- [x] `/relatorios` — Geração e download de CSV consolidado
+- [x] `/credenciais` — Gerenciamento de certificados
+- [x] `/configuracoes` — Configurações do escritório
+- [x] **`/compliance`** — **Painel de compliance por empresa** (status ATRASADA/PROXIMA/PENDENTE/EM_DIA)
+- [x] **Sidebar** — Menu lateral com todos os módulos incluindo Compliance e DASN
 
 ### Banco de Dados (packages/database)
 
 - [x] **Schema Prisma** completo com RLS por tenantId
-- [x] **Enum TipoObrigacao** inclui `DASN` ← **adicionado nesta sessão**
-- [x] **Enum TipoEventoAudit** inclui `DASN_GERADA` ← **adicionado nesta sessão**
+- [x] **Enums:** TipoObrigacao (inclui DASN, FGTS_DIGITAL, DMS, ECD, ECF), TipoEventoAudit (inclui DASN_GERADA, CALENDARIO_ANUAL_GERADO, DMS_APURADA)
+- [x] **Prisma Client** regenerado após adição de DASN
 
-### Testes
+### Testes (Total: 1.344 testes passando)
 
-| Pacote          | Testes                    | Status      |
-| --------------- | ------------------------- | ----------- |
-| packages/fiscal | 11 testes DasnService     | ✅ passando |
-| apps/api        | 332 testes (incl. 8 DASN) | ✅ passando |
-| apps/worker     | 85 testes (incl. 1 DASN)  | ✅ passando |
+| Pacote                 | Testes | Status |
+| ---------------------- | ------ | ------ |
+| packages/shared        | 57     | ✅     |
+| packages/credentials   | 45     | ✅     |
+| packages/audit         | 22     | ✅     |
+| packages/normalizer    | 34     | ✅     |
+| packages/conciliation  | 42     | ✅     |
+| packages/notifications | 56     | ✅     |
+| packages/storage       | 59     | ✅     |
+| packages/fiscal        | 284    | ✅     |
+| packages/portals       | 58     | ✅     |
+| packages/contabil      | 94     | ✅     |
+| packages/scraper       | 44     | ✅     |
+| apps/worker            | 85     | ✅     |
+| apps/api               | 344    | ✅     |
 
 ---
 
 ## O Que Falta Implementar
 
-### Fase 1 — Fiscal + Captura (MVP) — Em Andamento
+### Fase 1 — Fiscal + Captura (MVP) — Pendente Complexo
 
-- [ ] **Transmissão DASN ao Portal SN** — integração Playwright no portals/
-- [ ] **DMS automático** por prefeitura — adapters faltando para a maioria das cidades
-- [ ] **Monitoramento de débitos** no e-CAC — alertas automáticos
-- [ ] **Calendário fiscal automático** — geração de Obrigacao p/ todo o ano na onboarding
-- [ ] **Notificações por e-mail** — vencimentos próximos, obrigações em atraso
-- [ ] **Dashboard de compliance** — visão geral de todas empresas com pendências
+- [ ] **Transmissão DASN ao Portal SN** — integração Playwright (requer credenciais e-CAC reais)
+- [ ] **DMS automático** por prefeitura — adapters Playwright city-specific (requer página por prefeitura)
+- [ ] **Monitoramento de débitos e-CAC** — scraper Playwright com autenticação por certificado
+- [ ] **Adapters de prefeitura** — `prefeitura-{ibge}.adapter.ts` para cada cidade com NFSe
 
 ### Fase 2 — e-Social + FGTS Digital
 
 - [ ] **Folha de pagamento** — processamento mensal S-1200, S-1210
-- [ ] **eSocial transmissão** — integração com portal eSocial
-- [ ] **FGTS Digital transmissão** — GFIP digital
-- [ ] **DCTFWeb automático** — após EFD-Reinf + eSocial fechados
+- [ ] **eSocial transmissão** — integração com portal eSocial (Playwright)
+- [ ] **FGTS Digital transmissão** — GFIP digital via portal
+- [ ] **DCTFWeb automático** — transmissão após EFD-Reinf + eSocial fechados
 
 ### Fase 3 — Lucro Presumido e Real
 
-- [ ] **ECF** — Escrituração Contábil Fiscal (LP/LR)
-- [ ] **ECD** — Escrituração Contábil Digital (LP/LR)
+- [ ] **ECF** — Escrituração Contábil Fiscal
+- [ ] **ECD** — Escrituração Contábil Digital (LP/LR — annual, 30/06)
 - [ ] **IRPJ/CSLL** — apuração trimestral/anual
-- [ ] **DCTF mensal** — (LP/LR — diferente de DCTFWeb)
-- [ ] **SPED Fiscal** — EFD ICMS/IPI (LP/LR)
-- [ ] **SPED Contribuições** — EFD PIS/COFINS (LP/LR)
+- [ ] **DCTF mensal** — LP/LR (diferente de DCTFWeb)
+- [ ] **SPED Fiscal** — EFD ICMS/IPI
+- [ ] **SPED Contribuições** — EFD PIS/COFINS
+- [ ] **CalendarioFiscalService para LP/LR** — obrigações mensais com vencimentos diferentes
 
 ### Melhorias Técnicas Pendentes
 
-- [ ] **Open Finance** — integração para conciliação bancária automatizada
-- [ ] **2Captcha/AntiCaptcha** — implementar fallback automático
+- [ ] **Open Finance** — integração real para conciliação bancária automatizada
+- [ ] **2Captcha/AntiCaptcha** — fallback automático implementado (serviços definidos, não integrados)
 - [ ] **Healthcheck de scrapers** — `pnpm scraper:health-check --ibge={codigo}`
-- [ ] **Testes E2E** — Playwright para o dashboard
-- [ ] **Migrations com rollback** — down scripts para todas as migrations
-- [ ] **Onboarding de empresa** — wizard de cadastro + upload certificado digital
-- [ ] **Multi-tenant self-service** — cadastro de escritório de contabilidade
+- [ ] **Testes E2E** — Playwright para o dashboard (apenas unit tests atualmente)
+- [ ] **Migrations com rollback** — down scripts para todas as migrations existentes
+- [ ] **Multi-tenant self-service** — cadastro de escritório (tenant) via interface pública
 
 ---
 
@@ -217,12 +255,15 @@ infra/
 
 ## Histórico de Decisões Técnicas
 
-| Data    | Decisão                       | Motivo                                        |
-| ------- | ----------------------------- | --------------------------------------------- |
-| 2026-06 | Fastify v4 → v5               | CVEs críticos no jwt e multipart              |
-| 2026-06 | Next.js 14.2.5 → 14.2.35      | Patches de segurança críticos                 |
-| 2026-06 | nodemailer v6 → v7            | CVEs corrigidos                               |
-| 2026-06 | Rate limit global 300 req/min | Proteção contra DDoS                          |
-| 2026-06 | Rate limit login 10 req/min   | Proteção contra força bruta                   |
-| 2026-06 | `--ignore-unfixable` no CI    | CVEs do Next.js 14 sem fix (requer v15)       |
-| 2026-06 | `Date.UTC()` para vencimentos | `date-fns-tz` não disponível no pacote fiscal |
+| Data    | Decisão                                     | Motivo                                        |
+| ------- | ------------------------------------------- | --------------------------------------------- |
+| 2026-06 | Fastify v4 → v5                             | CVEs críticos no jwt e multipart              |
+| 2026-06 | Next.js 14.2.5 → 14.2.35                    | Patches de segurança críticos                 |
+| 2026-06 | nodemailer v6 → v7                          | CVEs corrigidos                               |
+| 2026-06 | Rate limit global 300 req/min               | Proteção contra DDoS                          |
+| 2026-06 | Rate limit login 10 req/min                 | Proteção contra força bruta                   |
+| 2026-06 | `--ignore-unfixable` no CI                  | CVEs do Next.js 14 sem fix (requer v15)       |
+| 2026-06 | `Date.UTC()` para vencimentos               | `date-fns-tz` não disponível no pacote fiscal |
+| 2026-06 | Auto-calendário no cadastro SN/MEI          | UX: evitar passo manual no onboarding         |
+| 2026-06 | `Promise.allSettled` no batch               | Não bloqueia na primeira falha de empresa     |
+| 2026-06 | `nowBR` mocked para `2025-06-01` nos testes | Data fixa para comparações de vencimento      |
