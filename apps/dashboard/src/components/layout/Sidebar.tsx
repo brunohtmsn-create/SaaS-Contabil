@@ -6,9 +6,11 @@ import { clsx } from 'clsx'
 
 const navItems = [
   { href: '/dashboard', label: 'Painel', icon: '◉' },
+  { href: '/compliance', label: 'Compliance', icon: '✅' },
   { href: '/empresas', label: 'Empresas', icon: '🏢' },
   { href: '/documentos', label: 'Documentos', icon: '📄' },
   { href: '/fiscal', label: 'Fiscal', icon: '💰' },
+  { href: '/fiscal/dasn', label: 'DASN / DEFIS', icon: '📋' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },
@@ -19,6 +21,13 @@ const navItems = [
   { href: '/credenciais', label: 'Credenciais', icon: '🔐' },
   { href: '/configuracoes', label: 'Configurações', icon: '⚙️' },
 ]
+
+function isActive(href: string, pathname: string): boolean {
+  if (pathname === href) return true
+  // Para rotas sem sub-páginas com mesmo prefixo, verificar startsWith
+  if (href !== '/fiscal' && pathname.startsWith(href + '/')) return true
+  return false
+}
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -37,7 +46,7 @@ export function Sidebar() {
             href={item.href}
             className={clsx(
               'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors',
-              pathname === item.href || pathname.startsWith(item.href + '/')
+              isActive(item.href, pathname)
                 ? 'bg-blue-600 text-white'
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white'
             )}
