@@ -94,9 +94,7 @@ export default function DasnPage() {
     },
   })
 
-  const snEmpresas = empresas?.filter(
-    (e) => e.regime === 'SIMPLES_NACIONAL' || e.regime === 'MEI'
-  )
+  const snEmpresas = empresas?.filter((e) => e.regime === 'SIMPLES_NACIONAL' || e.regime === 'MEI')
 
   return (
     <div className="space-y-6">
