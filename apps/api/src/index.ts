@@ -2,6 +2,7 @@ import Fastify, { type FastifyError } from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
+import rateLimit from '@fastify/rate-limit'
 import websocket from '@fastify/websocket'
 import { Redis as IORedis } from 'ioredis'
 import { ZodError } from 'zod'
@@ -39,6 +40,18 @@ const app = Fastify({
 await app.register(cors, {
   origin: process.env['FRONTEND_URL'] ?? 'http://localhost:3001',
   credentials: true,
+})
+
+// Rate limiting global — protege contra força bruta e DoS
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  // Rota de login tem limite muito mais restritivo
+  keyGenerator: (request) => {
+    const ip = request.ip
+    return `${ip}:${request.url}`
+  },
 })
 
 await app.register(jwt, {

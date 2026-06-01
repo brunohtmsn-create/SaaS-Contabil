@@ -617,6 +617,7 @@ enum TipoEventoAudit {
   RISCO_EXCLUSAO_SN_DETECTADO
   CALENDARIO_ANUAL_GERADO
   DMS_APURADA
+  DASN_GERADA
 }
 
 enum TipoResponsavel {

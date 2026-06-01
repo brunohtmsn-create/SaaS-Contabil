@@ -14,6 +14,7 @@ import {
   FGTSDigitalService,
   EFDReinfService,
   DMSService,
+  DasnService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -460,5 +461,37 @@ export async function fiscalRoutes(app: FastifyInstance) {
     )
 
     return resultados
+  })
+
+  // ─── DASN / DEFIS ─────────────────────────────────────────────────────────
+
+  // POST /fiscal/dasn/:empresaId/:ano — gera DASN para o ano fiscal
+  app.post('/dasn/:empresaId/:ano', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, ano: anoStr } = request.params as { empresaId: string; ano: string }
+    const ano = Number(anoStr)
+
+    if (!Number.isInteger(ano) || ano < 2006 || ano > 2100) {
+      return reply.code(400).send({ error: 'Ano inválido' })
+    }
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    const service = new DasnService()
+    return service.gerar(tenantId, empresaId, ano)
+  })
+
+  // GET /fiscal/dasn/:empresaId/:ano — consulta DASN gerada
+  app.get('/dasn/:empresaId/:ano', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, ano: anoStr } = request.params as { empresaId: string; ano: string }
+
+    const obrigacao = await db.obrigacao.findFirst({
+      where: { tenantId, empresaId, tipo: 'DASN', competencia: anoStr },
+    })
+    if (!obrigacao) return reply.code(404).send({ error: 'DASN não gerada para este ano' })
+
+    return obrigacao
   })
 }

@@ -35,6 +35,7 @@ const mockFatorR = { calcular: vi.fn() }
 const mockFGTS = { apurar: vi.fn() }
 const mockEFDReinf = { processar: vi.fn() }
 const mockDMS = { apurar: vi.fn() }
+const mockDasn = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -48,6 +49,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   FGTSDigitalService: vi.fn(() => mockFGTS),
   EFDReinfService: vi.fn(() => mockEFDReinf),
   DMSService: vi.fn(() => mockDMS),
+  DasnService: vi.fn(() => mockDasn),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -1097,5 +1099,105 @@ describe('GET /fiscal/efdreinf/:empresaId/:competencia', () => {
   it('competencia inválida → 400', async () => {
     const res = await req('GET', `/fiscal/efdreinf/${EMPRESA_ID}/202505`)
     expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST + GET /fiscal/dasn/:empresaId/:ano
+// ===========================================================================
+
+describe('POST /fiscal/dasn/:empresaId/:ano', () => {
+  const ANO = '2024'
+  const url = `/fiscal/dasn/${EMPRESA_ID}/${ANO}`
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockDb.empresaCliente.findFirst.mockResolvedValue({
+      id: EMPRESA_ID,
+      regime: 'SIMPLES_NACIONAL',
+    })
+  })
+
+  it('retorna resultado do DasnService → 200', async () => {
+    const resultado = {
+      cnpj: '12345678000195',
+      ano: 2024,
+      receitaMensal: [],
+      receitaAnualTotal: '120000.00',
+      mesesComPGDAS: 12,
+      mesesCompletos: true,
+      obrigacaoId: 'obrig-1',
+      vencimento: '2025-03-31T12:00:00.000Z',
+    }
+    mockDasn.gerar.mockResolvedValue(resultado)
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().mesesCompletos).toBe(true)
+    expect(res.json().receitaAnualTotal).toBe('120000.00')
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/dasn/${EMPRESA_ID}/abc`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('passa tenantId para isolamento multi-tenant', async () => {
+    mockDasn.gerar.mockResolvedValue({ mesesCompletos: true, receitaAnualTotal: '0' })
+
+    await req('POST', url)
+
+    expect(mockDb.empresaCliente.findFirst.mock.calls[0][0].where.tenantId).toBe(TENANT_ID)
+  })
+})
+
+describe('GET /fiscal/dasn/:empresaId/:ano', () => {
+  const ANO = '2024'
+  const url = `/fiscal/dasn/${EMPRESA_ID}/${ANO}`
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna obrigacao DASN → 200', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({
+      id: 'obrig-1',
+      tipo: 'DASN',
+      competencia: ANO,
+      status: 'PENDENTE',
+    })
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DASN')
+  })
+
+  it('DASN não gerada → 404', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('filtra por tenantId (isolamento)', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({
+      id: 'obrig-1',
+      tipo: 'DASN',
+    })
+
+    await req('GET', url)
+
+    const where = mockDb.obrigacao.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('DASN')
   })
 })
