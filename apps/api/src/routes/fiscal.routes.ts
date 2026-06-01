@@ -278,6 +278,43 @@ export async function fiscalRoutes(app: FastifyInstance) {
     return service.gerarCalendarioAnual(tenantId, empresaId, Number(ano))
   })
 
+  // POST /fiscal/obrigacoes/calendario/batch/:ano
+  // Gera calendário anual para todas as empresas SN/MEI ativas do tenant em paralelo
+  app.post('/obrigacoes/calendario/batch/:ano', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { ano: anoStr } = z.object({ ano: z.string().regex(/^\d{4}$/) }).parse(request.params)
+    const ano = Number(anoStr)
+
+    const empresas = await db.empresaCliente.findMany({
+      where: {
+        tenantId,
+        ativa: true,
+        regime: { in: ['SIMPLES_NACIONAL', 'MEI'] },
+      },
+      select: { id: true, razaoSocial: true },
+    })
+
+    const service = new MonitoramentoSNService()
+
+    const resultados = await Promise.allSettled(
+      empresas.map((emp) => service.gerarCalendarioAnual(tenantId, emp.id, ano))
+    )
+
+    const sucesso = resultados.filter((r) => r.status === 'fulfilled').length
+    const erros = resultados
+      .map((r, i) =>
+        r.status === 'rejected' ? { empresaId: empresas[i]!.id, erro: r.reason?.message } : null
+      )
+      .filter(Boolean)
+
+    return reply.code(200).send({
+      ano,
+      totalEmpresas: empresas.length,
+      sucesso,
+      erros,
+    })
+  })
+
   app.get('/fator-r/:empresaId/:competencia', async (request) => {
     const { tenantId } = request.user as any
     const { empresaId, competencia } = params.parse(request.params)

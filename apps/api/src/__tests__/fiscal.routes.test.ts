@@ -425,6 +425,65 @@ describe('POST /fiscal/obrigacoes/calendario/:empresaId/:ano', () => {
 })
 
 // ===========================================================================
+// POST /fiscal/obrigacoes/calendario/batch/:ano
+// ===========================================================================
+
+describe('POST /fiscal/obrigacoes/calendario/batch/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('gera calendário para todas as empresas SN/MEI ativas → 200 com totais', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, razaoSocial: 'Empresa A' },
+      { id: '550e8400-e29b-41d4-a716-446655440001', razaoSocial: 'Empresa B' },
+    ])
+    mockMonitoramento.gerarCalendarioAnual.mockResolvedValue([])
+
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch/2025')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.ano).toBe(2025)
+    expect(body.totalEmpresas).toBe(2)
+    expect(body.sucesso).toBe(2)
+    expect(body.erros).toHaveLength(0)
+  })
+
+  it('empresa com erro → retorna no array erros mas conta sucesso correto', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, razaoSocial: 'Empresa OK' },
+      { id: '550e8400-e29b-41d4-a716-446655440001', razaoSocial: 'Empresa Erro' },
+    ])
+    mockMonitoramento.gerarCalendarioAnual
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('DB timeout'))
+
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch/2025')
+
+    const body = res.json()
+    expect(body.sucesso).toBe(1)
+    expect(body.erros).toHaveLength(1)
+    expect(body.erros[0].erro).toContain('timeout')
+  })
+
+  it('filtra por tenantId, ativa=true e regime SN/MEI', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('POST', '/fiscal/obrigacoes/calendario/batch/2025')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+    expect(where.regime.in).toContain('SIMPLES_NACIONAL')
+    expect(where.regime.in).toContain('MEI')
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch/XYZ')
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
 // PATCH /fiscal/obrigacoes/:id
 // ===========================================================================
 

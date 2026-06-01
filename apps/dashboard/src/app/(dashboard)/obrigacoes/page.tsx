@@ -151,10 +151,19 @@ export default function ObrigacoesPage() {
     queryFn: () => api.get('/empresas').then((r) => r.data),
   })
 
-  // Mutation para gerar calendário anual
+  // Mutation para gerar calendário anual de uma empresa
   const gerarCalendario = useMutation({
     mutationFn: ({ empresaId, ano }: { empresaId: string; ano: number }) =>
       api.post(`/fiscal/obrigacoes/calendario/${empresaId}/${ano}`).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
+    },
+  })
+
+  // Mutation para gerar calendário de TODAS as empresas SN/MEI
+  const gerarCalendarioTodas = useMutation({
+    mutationFn: (ano: number) =>
+      api.post(`/fiscal/obrigacoes/calendario/batch/${ano}`).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
     },
@@ -244,6 +253,26 @@ export default function ObrigacoesPage() {
         {gerarCalendario.isError && (
           <span className="text-sm text-red-600 font-medium">Erro ao gerar calendário.</span>
         )}
+
+        <div className="border-l border-slate-200 pl-4 ml-2 flex items-center gap-3">
+          <button
+            disabled={gerarCalendarioTodas.isPending}
+            onClick={() => gerarCalendarioTodas.mutate(anoAtual)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {gerarCalendarioTodas.isPending ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <CalendarDays className="w-4 h-4" />
+            )}
+            Gerar para Todas ({anoAtual})
+          </button>
+          {gerarCalendarioTodas.isSuccess && (
+            <span className="text-sm text-green-600 font-medium">
+              {(gerarCalendarioTodas.data as any)?.sucesso} empresa(s) gerada(s)!
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Filtro por status */}
