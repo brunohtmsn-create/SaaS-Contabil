@@ -9,6 +9,7 @@ import {
   DCTFWebService,
   FGTSDigitalService,
   DMSService,
+  DasnService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -26,6 +27,7 @@ type FiscalJobData = {
     | 'DCTFWEB'
     | 'FGTS'
     | 'DMS'
+    | 'DASN'
     | 'TODOS'
 }
 
@@ -76,6 +78,12 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'DMS': {
       const dms = new DMSService()
       await dms.apurar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'DASN': {
+      // competencia contém apenas o ano, ex: "2024"
+      const dasn = new DasnService()
+      await dasn.gerar(tenantId, empresaId, Number(competencia))
       break
     }
     case 'TODOS': {

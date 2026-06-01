@@ -28,6 +28,7 @@ const mockESocial = { processar: vi.fn() }
 const mockDCTFWeb = { gerar: vi.fn() }
 const mockFGTS = { apurar: vi.fn() }
 const mockDMS = { apurar: vi.fn() }
+const mockDasn = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -39,6 +40,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   DCTFWebService: vi.fn(() => mockDCTFWeb),
   FGTSDigitalService: vi.fn(() => mockFGTS),
   DMSService: vi.fn(() => mockDMS),
+  DasnService: vi.fn(() => mockDasn),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -136,6 +138,22 @@ describe('fiscalJob — roteamento de operações', () => {
     mockDCTFWeb.gerar.mockRejectedValueOnce(new Error('EFD não fechado'))
     await expect(fiscalJob(makeJob('TODOS'))).resolves.toBeUndefined()
     expect(mockPGDAS.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('DASN → chama DasnService.gerar com ano numérico', async () => {
+    mockDasn.gerar.mockResolvedValue({ mesesCompletos: true, receitaAnualTotal: '120000.00' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2024',
+        operacao: 'DASN',
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockDasn.gerar).toHaveBeenCalledOnce()
+    expect(mockDasn.gerar).toHaveBeenCalledWith('t-1', 'emp-1', 2024)
   })
 
   it('TODOS → mantém ordem: PGDAS antes de DIFAL antes de EFD-Reinf', async () => {
