@@ -18,6 +18,8 @@ export { IrpjCsllLPService } from './irpj-csll-lp.service.js'
 export type { ResultadoIrpjCsllLP } from './irpj-csll-lp.service.js'
 export { PisCofinsLPService } from './pis-cofins-lp.service.js'
 export type { ResultadoPisCofinsLP } from './pis-cofins-lp.service.js'
+export { ECFService } from './ecf.service.js'
+export type { ResultadoECF, TrimestralECF } from './ecf.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

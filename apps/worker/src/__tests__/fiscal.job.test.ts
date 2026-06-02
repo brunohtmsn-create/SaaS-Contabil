@@ -36,6 +36,7 @@ const mockMonitoramento = { gerarCalendarioAnual: vi.fn() }
 const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
 const mockIrpjCsllLP = { apurar: vi.fn() }
 const mockPisCofinsLP = { apurar: vi.fn() }
+const mockECF = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -52,6 +53,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
   IrpjCsllLPService: vi.fn(() => mockIrpjCsllLP),
   PisCofinsLPService: vi.fn(() => mockPisCofinsLP),
+  ECFService: vi.fn(() => mockECF),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -211,6 +213,22 @@ describe('fiscalJob — roteamento de operações', () => {
     await fiscalJob(makeJob('PIS_COFINS_LP'))
     expect(mockPisCofinsLP.apurar).toHaveBeenCalledOnce()
     expect(mockPisCofinsLP.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
+  })
+
+  it('ECF → chama ECFService.gerar com ano numérico', async () => {
+    mockECF.gerar.mockResolvedValue({ ano: 2025, totalDevidoAnual: '0' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'ECF',
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockECF.gerar).toHaveBeenCalledOnce()
+    expect(mockECF.gerar).toHaveBeenCalledWith('t-1', 'emp-1', 2025)
   })
 
   it('TODOS → mantém ordem: PGDAS antes de DIFAL antes de EFD-Reinf', async () => {

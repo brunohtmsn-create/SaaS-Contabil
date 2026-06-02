@@ -338,6 +338,7 @@ enum TipoApuracao {
   PIS
   COFINS
   ECD
+  ECF
 }
 
 enum StatusApuracao {
@@ -620,6 +621,7 @@ enum TipoEventoAudit {
   DASN_GERADA
   IRPJ_CSLL_LP_APURADO
   PIS_COFINS_LP_APURADO
+  ECF_GERADO
 }
 
 enum TipoResponsavel {

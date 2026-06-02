@@ -14,6 +14,7 @@ import {
   CalendarioLPLRService,
   IrpjCsllLPService,
   PisCofinsLPService,
+  ECFService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -36,6 +37,7 @@ type FiscalJobData = {
     | 'CALENDARIO_LPLR'
     | 'IRPJ_CSLL_LP'
     | 'PIS_COFINS_LP'
+    | 'ECF'
     | 'TODOS'
 }
 
@@ -114,6 +116,12 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'PIS_COFINS_LP': {
       const pisCofins = new PisCofinsLPService()
       await pisCofins.apurar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'ECF': {
+      // competencia contém apenas o ano, ex: "2025"
+      const ecf = new ECFService()
+      await ecf.gerar(tenantId, empresaId, Number(competencia))
       break
     }
     case 'TODOS': {

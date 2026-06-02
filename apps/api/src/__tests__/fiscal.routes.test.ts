@@ -39,6 +39,7 @@ const mockDasn = { gerar: vi.fn() }
 const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
 const mockIrpjCsllLP = { apurar: vi.fn() }
 const mockPisCofinsLP = { apurar: vi.fn() }
+const mockECF = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -56,6 +57,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
   IrpjCsllLPService: vi.fn(() => mockIrpjCsllLP),
   PisCofinsLPService: vi.fn(() => mockPisCofinsLP),
+  ECFService: vi.fn(() => mockECF),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -547,6 +549,77 @@ describe('GET /fiscal/pis-cofins-lp/:empresaId/:competencia', () => {
     mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
 
     const res = await req('GET', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/ecf/:empresaId/:ano
+// ===========================================================================
+
+describe('POST /fiscal/ecf/:empresaId/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama ECFService.gerar e retorna 201', async () => {
+    const ecfData = {
+      cnpj: '12345678000195',
+      ano: 2025,
+      regime: 'LUCRO_PRESUMIDO',
+      receitaBrutaAnual: '500000',
+      totalDevidoAnual: '15000',
+      dataEntrega: '2026-07-31',
+      situacao: 'GERADO',
+      trimestres: [],
+    }
+    mockECF.gerar.mockResolvedValueOnce(ecfData)
+
+    const res = await req('POST', `/fiscal/ecf/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockECF.gerar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, 2025)
+    expect(res.json().ano).toBe(2025)
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/ecf/${EMPRESA_ID}/abc`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('ECFService lança erro → propaga exceção', async () => {
+    mockECF.gerar.mockRejectedValueOnce(new Error('ECF é obrigatória apenas para Lucro Presumido'))
+
+    const res = await req('POST', `/fiscal/ecf/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(500)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/ecf/:empresaId/:ano
+// ===========================================================================
+
+describe('GET /fiscal/ecf/:empresaId/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna ECF existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ecf-1',
+      tipo: 'ECF',
+      competencia: '2025',
+      dados: { ano: 2025, totalDevidoAnual: '15000' },
+    })
+
+    const res = await req('GET', `/fiscal/ecf/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('ECF')
+  })
+
+  it('ECF não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/ecf/${EMPRESA_ID}/2025`)
 
     expect(res.statusCode).toBe(404)
   })

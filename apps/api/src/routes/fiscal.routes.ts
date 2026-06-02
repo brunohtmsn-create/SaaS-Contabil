@@ -18,6 +18,7 @@ import {
   CalendarioLPLRService,
   IrpjCsllLPService,
   PisCofinsLPService,
+  ECFService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -442,6 +443,32 @@ export async function fiscalRoutes(app: FastifyInstance) {
       where: { tenantId, empresaId, competencia, tipo: 'PIS' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'Apuração PIS/COFINS LP não encontrada' })
+    return apuracao
+  })
+
+  // POST /fiscal/ecf/:empresaId/:ano — gera ECF anual para LP/LR
+  app.post('/ecf/:empresaId/:ano', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, ano } = z
+      .object({ empresaId: z.string().uuid(), ano: z.string().regex(/^\d{4}$/) })
+      .parse(request.params)
+
+    const service = new ECFService()
+    const resultado = await service.gerar(tenantId, empresaId, parseInt(ano, 10))
+    return reply.code(201).send(resultado)
+  })
+
+  // GET /fiscal/ecf/:empresaId/:ano — busca ECF gerada
+  app.get('/ecf/:empresaId/:ano', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, ano } = z
+      .object({ empresaId: z.string().uuid(), ano: z.string().regex(/^\d{4}$/) })
+      .parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia: ano, tipo: 'ECF' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'ECF não encontrada para este ano' })
     return apuracao
   })
 
