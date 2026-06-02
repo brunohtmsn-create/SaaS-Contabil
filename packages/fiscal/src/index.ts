@@ -20,6 +20,8 @@ export { PisCofinsLPService } from './pis-cofins-lp.service.js'
 export type { ResultadoPisCofinsLP } from './pis-cofins-lp.service.js'
 export { ECFService } from './ecf.service.js'
 export type { ResultadoECF, TrimestralECF } from './ecf.service.js'
+export { DCTFMensalService } from './dctf-mensal.service.js'
+export type { ResultadoDCTFMensal, ItemDCTF } from './dctf-mensal.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

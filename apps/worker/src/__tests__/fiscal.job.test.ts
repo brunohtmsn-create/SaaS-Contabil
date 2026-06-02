@@ -37,6 +37,7 @@ const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
 const mockIrpjCsllLP = { apurar: vi.fn() }
 const mockPisCofinsLP = { apurar: vi.fn() }
 const mockECF = { gerar: vi.fn() }
+const mockDCTFMensal = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -54,6 +55,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   IrpjCsllLPService: vi.fn(() => mockIrpjCsllLP),
   PisCofinsLPService: vi.fn(() => mockPisCofinsLP),
   ECFService: vi.fn(() => mockECF),
+  DCTFMensalService: vi.fn(() => mockDCTFMensal),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -213,6 +215,13 @@ describe('fiscalJob — roteamento de operações', () => {
     await fiscalJob(makeJob('PIS_COFINS_LP'))
     expect(mockPisCofinsLP.apurar).toHaveBeenCalledOnce()
     expect(mockPisCofinsLP.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
+  })
+
+  it('DCTF_MENSAL → chama DCTFMensalService.gerar com competencia', async () => {
+    mockDCTFMensal.gerar.mockResolvedValue({ totalDebitos: '3650', saldoDevedor: '3650' })
+    await fiscalJob(makeJob('DCTF_MENSAL'))
+    expect(mockDCTFMensal.gerar).toHaveBeenCalledOnce()
+    expect(mockDCTFMensal.gerar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
   })
 
   it('ECF → chama ECFService.gerar com ano numérico', async () => {

@@ -19,6 +19,7 @@ import {
   IrpjCsllLPService,
   PisCofinsLPService,
   ECFService,
+  DCTFMensalService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -456,6 +457,28 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const service = new ECFService()
     const resultado = await service.gerar(tenantId, empresaId, parseInt(ano, 10))
     return reply.code(201).send(resultado)
+  })
+
+  // POST /fiscal/dctf-mensal/:empresaId/:competencia — gera DCTF Mensal LP/LR
+  app.post('/dctf-mensal/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new DCTFMensalService()
+    const resultado = await service.gerar(tenantId, empresaId, competencia)
+    return reply.code(201).send(resultado)
+  })
+
+  // GET /fiscal/dctf-mensal/:empresaId/:competencia — busca DCTF gerada
+  app.get('/dctf-mensal/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'DCTFWEB' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'DCTF Mensal não encontrada' })
+    return apuracao
   })
 
   // GET /fiscal/ecf/:empresaId/:ano — busca ECF gerada

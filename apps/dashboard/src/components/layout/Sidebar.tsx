@@ -12,6 +12,7 @@ const navItems = [
   { href: '/fiscal', label: 'Fiscal', icon: '💰' },
   { href: '/fiscal/dasn', label: 'DASN / DEFIS', icon: '📋' },
   { href: '/fiscal/lplr', label: 'LP / LR', icon: '🏛️' },
+  { href: '/fiscal/ecf', label: 'ECF', icon: '📑' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },

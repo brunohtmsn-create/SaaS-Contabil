@@ -15,6 +15,7 @@ import {
   IrpjCsllLPService,
   PisCofinsLPService,
   ECFService,
+  DCTFMensalService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -38,6 +39,7 @@ type FiscalJobData = {
     | 'IRPJ_CSLL_LP'
     | 'PIS_COFINS_LP'
     | 'ECF'
+    | 'DCTF_MENSAL'
     | 'TODOS'
 }
 
@@ -122,6 +124,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
       // competencia contém apenas o ano, ex: "2025"
       const ecf = new ECFService()
       await ecf.gerar(tenantId, empresaId, Number(competencia))
+      break
+    }
+    case 'DCTF_MENSAL': {
+      const dctf = new DCTFMensalService()
+      await dctf.gerar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {

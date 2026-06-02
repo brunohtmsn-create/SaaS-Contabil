@@ -40,6 +40,7 @@ const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
 const mockIrpjCsllLP = { apurar: vi.fn() }
 const mockPisCofinsLP = { apurar: vi.fn() }
 const mockECF = { gerar: vi.fn() }
+const mockDCTFMensal = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -58,6 +59,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   IrpjCsllLPService: vi.fn(() => mockIrpjCsllLP),
   PisCofinsLPService: vi.fn(() => mockPisCofinsLP),
   ECFService: vi.fn(() => mockECF),
+  DCTFMensalService: vi.fn(() => mockDCTFMensal),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -549,6 +551,75 @@ describe('GET /fiscal/pis-cofins-lp/:empresaId/:competencia', () => {
     mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
 
     const res = await req('GET', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/dctf-mensal/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/dctf-mensal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama DCTFMensalService.gerar e retorna 201', async () => {
+    const dctfData = {
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      regime: 'LUCRO_PRESUMIDO',
+      totalDebitos: '3650',
+      saldoDevedor: '3650',
+      prazoEntrega: '2025-07-15',
+      itens: [],
+    }
+    mockDCTFMensal.gerar.mockResolvedValueOnce(dctfData)
+
+    const res = await req('POST', `/fiscal/dctf-mensal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockDCTFMensal.gerar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/dctf-mensal/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('erro no serviço → propaga exceção', async () => {
+    mockDCTFMensal.gerar.mockRejectedValueOnce(
+      new Error('DCTF Mensal é obrigatória apenas para Lucro Presumido')
+    )
+    const res = await req('POST', `/fiscal/dctf-mensal/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(500)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/dctf-mensal/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/dctf-mensal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna DCTF existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'dctf-1',
+      tipo: 'DCTFWEB',
+      competencia: COMPETENCIA,
+      dados: { totalDebitos: '3650' },
+    })
+
+    const res = await req('GET', `/fiscal/dctf-mensal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DCTFWEB')
+  })
+
+  it('DCTF não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/dctf-mensal/${EMPRESA_ID}/${COMPETENCIA}`)
 
     expect(res.statusCode).toBe(404)
   })
