@@ -43,6 +43,7 @@ const mockECF = { gerar: vi.fn() }
 const mockDCTFMensal = { gerar: vi.fn() }
 const mockSpedFiscal = { gerar: vi.fn() }
 const mockSpedContrib = { gerar: vi.fn() }
+const mockIrpjCsllLR = { apurar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -64,6 +65,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   DCTFMensalService: vi.fn(() => mockDCTFMensal),
   SpedFiscalService: vi.fn(() => mockSpedFiscal),
   SpedContribuicoesService: vi.fn(() => mockSpedContrib),
+  IrpjCsllLRService: vi.fn(() => mockIrpjCsllLR),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -1847,5 +1849,50 @@ describe('GET /fiscal/compliance/resumo', () => {
     const where = mockDb.empresaCliente.findMany.mock.calls[0][0].where
     expect(where.tenantId).toBe(TENANT_ID)
     expect(where.ativa).toBe(true)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/irpj-csll-lr/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/irpj-csll-lr/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama IrpjCsllLRService.apurar e retorna 201', async () => {
+    mockIrpjCsllLR.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      trimestreLabel: '2025-T2',
+      irpjTotal: '19000',
+      csllTotal: '9000',
+      totalDevido: '28000',
+    })
+
+    const res = await req('POST', `/fiscal/irpj-csll-lr/${EMPRESA_ID}/${COMPETENCIA}`, {
+      lucroContabilTrimestral: '100000',
+      adicoesLALUR: '0',
+      exclusoesLALUR: '0',
+    })
+
+    expect(res.statusCode).toBe(201)
+    expect(mockIrpjCsllLR.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('body vazio usa defaults (lucro = 0)', async () => {
+    mockIrpjCsllLR.apurar.mockResolvedValueOnce({
+      irpjTotal: '0',
+      csllTotal: '0',
+      totalDevido: '0',
+    })
+
+    const res = await req('POST', `/fiscal/irpj-csll-lr/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(201)
+    expect(mockIrpjCsllLR.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/irpj-csll-lr/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
   })
 })

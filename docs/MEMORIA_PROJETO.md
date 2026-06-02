@@ -1,6 +1,6 @@
 # Memória do Projeto — SaaS Contábil Automatizado
 
-> Atualizado em: 2026-06-02
+> Atualizado em: 2026-06-02 (sessão 4)
 
 ---
 
@@ -88,6 +88,15 @@ infra/
 - [x] **DCTFMensalService** — DCTF Mensal para LP/LR
   - Agrega PIS e COFINS apurados; códigos diferentes LP (6912/2172) vs LR (5856/5960)
   - Prazo: dia 15 do M+2; registra `DCTFWEB_TRANSMITIDA` no audit
+- [x] **SpedFiscalService** — EFD ICMS/IPI para LP/LR
+  - Busca `valorIcms`/`valorIpi` direto do DocumentoFiscal (campos nativos)
+  - Gera blocos 0000, C100 (NF-e/NFC-e), E110 (apuração ICMS), 9999
+  - Prazo: dia 15 do M+2; tipo DESTDA no banco; evento DESTDA_GERADO no audit
+- [x] **SpedContribuicoesService** — EFD PIS/COFINS para LP/LR
+  - LP: PIS 0,65% / COFINS 3% (cumulativo); LR: PIS 1,65% / COFINS 7,6% (não-cumulativo)
+  - Gera blocos A100 (NFSe), C100 (NF-e/NFC-e), M001/M200/M600 (apurações), 9999
+  - Prazo: dia 10 do M+2 (diferente do SPED Fiscal — dia 15)
+  - tipo PIS no banco; evento PIS_COFINS_LP_APURADO no audit
 
 ### Módulo Fiscal — Fase 1 (packages/fiscal)
 
@@ -147,10 +156,12 @@ infra/
   - **PIS+COFINS LP**: `POST/GET /fiscal/pis-cofins-lp/:empresaId/:competencia`
   - **ECF**: `POST/GET /fiscal/ecf/:empresaId/:ano`
   - **DCTF Mensal**: `POST/GET /fiscal/dctf-mensal/:empresaId/:competencia`
+  - **SPED Fiscal**: `POST/GET /fiscal/sped-fiscal/:empresaId/:competencia`
+  - **SPED Contribuições**: `POST/GET /fiscal/sped-contribuicoes/:empresaId/:competencia`
 
 ### Worker (apps/worker)
 
-- [x] **fiscal.job.ts** — 16 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, IRPJ_CSLL_LP, PIS_COFINS_LP, ECF, DCTF_MENSAL, TODOS)
+- [x] **fiscal.job.ts** — 18 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, IRPJ_CSLL_LP, PIS_COFINS_LP, ECF, DCTF_MENSAL, SPED_FISCAL, SPED_CONTRIBUICOES, TODOS)
 - [x] **fechamento.job.ts** — fechamento mensal completo (15 etapas)
 - [x] **scraper.job.ts** — captura NF-e, NFC-e, NFSe
 - [x] **bancario.job.ts** — conciliação bancária
@@ -187,7 +198,7 @@ infra/
 - [x] **Enums:** TipoObrigacao (inclui DASN, FGTS_DIGITAL, DMS, ECD, ECF), TipoApuracao (inclui IRPJ_LP, CSLL_LP, PIS, COFINS, ECD, ECF), TipoEventoAudit (inclui DASN_GERADA, CALENDARIO_ANUAL_GERADO, DMS_APURADA, IRPJ_CSLL_LP_APURADO, PIS_COFINS_LP_APURADO, ECF_GERADO)
 - [x] **Prisma Client** regenerado após cada adição de enum
 
-### Testes (Total: ~1.535 testes passando)
+### Testes (Total: ~1.581 testes passando)
 
 | Pacote                 | Testes | Status |
 | ---------------------- | ------ | ------ |
@@ -198,12 +209,12 @@ infra/
 | packages/conciliation  | 42     | ✅     |
 | packages/notifications | 56     | ✅     |
 | packages/storage       | 59     | ✅     |
-| packages/fiscal        | 399    | ✅     |
+| packages/fiscal        | 445    | ✅     |
 | packages/portals       | 58     | ✅     |
 | packages/contabil      | 97     | ✅     |
 | packages/scraper       | 44     | ✅     |
-| apps/worker            | 91     | ✅     |
-| apps/api               | 373    | ✅     |
+| apps/worker            | 93     | ✅     |
+| apps/api               | 380    | ✅     |
 
 ---
 
@@ -232,9 +243,10 @@ infra/
 - [x] **DCTFMensalService** — DCTF mensal agregando PIS+COFINS com prazo M+2/dia 15
 - [x] **ECDService (contabil)** — geração arquivo SPED Contábil; validação regime LP/LR
 - [x] **Páginas dashboard:** `/fiscal/lplr` (IRPJ+CSLL, PIS+COFINS), `/fiscal/ecf` (ECF anual)
-- [ ] **SPED Fiscal** — EFD ICMS/IPI (para LP/LR com operações tributadas)
-- [ ] **SPED Contribuições** — EFD PIS/COFINS (regime não-cumulativo LR)
+- [x] **SPED Fiscal** — EFD ICMS/IPI para LP/LR (23 testes)
+- [x] **SPED Contribuições** — EFD PIS/COFINS LP/LR (23 testes)
 - [ ] **IRPJ/CSLL Lucro Real** — ajustes de lucro contábil (apuração diferente do LP)
+- [ ] **Páginas dashboard SPED** — `/fiscal/sped-fiscal` e `/fiscal/sped-contribuicoes`
 
 ### Melhorias Técnicas Pendentes
 
@@ -301,3 +313,5 @@ infra/
 | 2026-06 | ECDService no pacote contabil (não fiscal)       | Arquitetura: ECD é obrigação contábil; fiscal seria duplicação errada              |
 | 2026-06 | DCTFMensal usa tipo DCTFWEB no banco             | TipoApuracao não tem DCTF_MENSAL; DCTFWEB é o tipo unificado                       |
 | 2026-06 | Código de receita PIS LP=6912, LR=5856           | DCTF Mensal diferencia LP (cumulativo) de LR (não-cumulativo)                      |
+| 2026-06 | SPED Contribuições prazo dia 10 (não dia 15)     | EFD PIS/COFINS tem prazo diferente do SPED Fiscal (dia 15) e DCTF (dia 15)         |
+| 2026-06 | SpedFiscalService usa tipo DESTDA no banco       | TipoApuracao não tem SPED_FISCAL; DESTDA é o tipo mais próximo disponível          |

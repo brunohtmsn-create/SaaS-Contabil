@@ -18,6 +18,7 @@ import {
   DCTFMensalService,
   SpedFiscalService,
   SpedContribuicoesService,
+  IrpjCsllLRService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -44,6 +45,7 @@ type FiscalJobData = {
     | 'DCTF_MENSAL'
     | 'SPED_FISCAL'
     | 'SPED_CONTRIBUICOES'
+    | 'IRPJ_CSLL_LR'
     | 'TODOS'
 }
 
@@ -143,6 +145,21 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'SPED_CONTRIBUICOES': {
       const spedContrib = new SpedContribuicoesService()
       await spedContrib.gerar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'IRPJ_CSLL_LR': {
+      // lucroContabilTrimestral é passado como metadado adicional do job
+      const { Decimal } = await import('@saas-contabil/shared')
+      const meta = (job.data as any).meta ?? {}
+      const irpjLr = new IrpjCsllLRService()
+      await irpjLr.apurar(
+        tenantId,
+        empresaId,
+        competencia,
+        new Decimal(meta.lucroContabilTrimestral ?? '0'),
+        new Decimal(meta.adicoesLALUR ?? '0'),
+        new Decimal(meta.exclusoesLALUR ?? '0')
+      )
       break
     }
     case 'TODOS': {

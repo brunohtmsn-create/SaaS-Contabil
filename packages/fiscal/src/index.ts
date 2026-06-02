@@ -26,6 +26,8 @@ export { SpedFiscalService } from './sped-fiscal.service.js'
 export type { ResultadoSpedFiscal } from './sped-fiscal.service.js'
 export { SpedContribuicoesService } from './sped-contribuicoes.service.js'
 export type { ResultadoSpedContribuicoes } from './sped-contribuicoes.service.js'
+export { IrpjCsllLRService } from './irpj-csll-lr.service.js'
+export type { ResultadoIrpjCsllLR } from './irpj-csll-lr.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

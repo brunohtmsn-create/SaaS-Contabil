@@ -22,6 +22,7 @@ import {
   DCTFMensalService,
   SpedFiscalService,
   SpedContribuicoesService,
+  IrpjCsllLRService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -538,6 +539,45 @@ export async function fiscalRoutes(app: FastifyInstance) {
       where: { tenantId, empresaId, competencia: ano, tipo: 'ECF' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'ECF não encontrada para este ano' })
+    return apuracao
+  })
+
+  // POST /fiscal/irpj-csll-lr/:empresaId/:competencia — apura IRPJ+CSLL Lucro Real
+  app.post('/irpj-csll-lr/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const body = z
+      .object({
+        lucroContabilTrimestral: z.string().default('0'),
+        adicoesLALUR: z.string().default('0'),
+        exclusoesLALUR: z.string().default('0'),
+      })
+      .parse(request.body ?? {})
+
+    const { Decimal } = await import('@saas-contabil/shared')
+    const service = new IrpjCsllLRService()
+    const resultado = await service.apurar(
+      tenantId,
+      empresaId,
+      competencia,
+      new Decimal(body.lucroContabilTrimestral),
+      new Decimal(body.adicoesLALUR),
+      new Decimal(body.exclusoesLALUR)
+    )
+    return reply.code(201).send(resultado)
+  })
+
+  // GET /fiscal/irpj-csll-lr/:empresaId/:competencia — consulta apuração LR
+  app.get('/irpj-csll-lr/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, tipo: 'IRPJ_LR' },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'Apuração IRPJ LR não encontrada' })
     return apuracao
   })
 
