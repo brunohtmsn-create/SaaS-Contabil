@@ -36,6 +36,7 @@ const mockFGTS = { apurar: vi.fn() }
 const mockEFDReinf = { processar: vi.fn() }
 const mockDMS = { apurar: vi.fn() }
 const mockDasn = { gerar: vi.fn() }
+const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -50,6 +51,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   EFDReinfService: vi.fn(() => mockEFDReinf),
   DMSService: vi.fn(() => mockDMS),
   DasnService: vi.fn(() => mockDasn),
+  CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -404,13 +406,69 @@ describe('GET /fiscal/fator-r/:empresaId/:competencia', () => {
 // ===========================================================================
 
 describe('POST /fiscal/obrigacoes/calendario/:empresaId/:ano', () => {
-  it('ano válido → chama MonitoramentoSNService.gerarCalendarioAnual', async () => {
-    mockMonitoramento.gerarCalendarioAnual.mockResolvedValueOnce({ criados: 12 })
+  beforeEach(() => vi.clearAllMocks())
+
+  it('empresa SN → chama MonitoramentoSNService.gerarCalendarioAnual', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      regime: 'SIMPLES_NACIONAL',
+    })
+    mockMonitoramento.gerarCalendarioAnual.mockResolvedValueOnce([])
 
     const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
 
     expect(res.statusCode).toBe(200)
     expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, 2025)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).not.toHaveBeenCalled()
+  })
+
+  it('empresa MEI → chama MonitoramentoSNService.gerarCalendarioAnual', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({ id: EMPRESA_ID, regime: 'MEI' })
+    mockMonitoramento.gerarCalendarioAnual.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledOnce()
+  })
+
+  it('empresa LP → chama CalendarioLPLRService.gerarCalendarioAnual', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      regime: 'LUCRO_PRESUMIDO',
+    })
+    mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith(
+      TENANT_ID,
+      EMPRESA_ID,
+      2025
+    )
+    expect(mockMonitoramento.gerarCalendarioAnual).not.toHaveBeenCalled()
+  })
+
+  it('empresa LR → chama CalendarioLPLRService.gerarCalendarioAnual', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      regime: 'LUCRO_REAL',
+    })
+    mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledOnce()
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(404)
   })
 
   it('ano inválido (texto) → 400', async () => {
@@ -479,6 +537,65 @@ describe('POST /fiscal/obrigacoes/calendario/batch/:ano', () => {
 
   it('ano inválido → 400', async () => {
     const res = await req('POST', '/fiscal/obrigacoes/calendario/batch/XYZ')
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/obrigacoes/calendario/batch-lplr/:ano
+// ===========================================================================
+
+describe('POST /fiscal/obrigacoes/calendario/batch-lplr/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('gera calendário para todas as empresas LP/LR ativas → 200 com totais', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, razaoSocial: 'Empresa LP' },
+      { id: '550e8400-e29b-41d4-a716-446655440002', razaoSocial: 'Empresa LR' },
+    ])
+    mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValue([])
+
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch-lplr/2025')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.ano).toBe(2025)
+    expect(body.totalEmpresas).toBe(2)
+    expect(body.sucesso).toBe(2)
+    expect(body.erros).toHaveLength(0)
+  })
+
+  it('empresa com erro → retorna no array erros mas conta sucesso correto', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, razaoSocial: 'Empresa OK' },
+      { id: '550e8400-e29b-41d4-a716-446655440002', razaoSocial: 'Empresa Erro' },
+    ])
+    mockCalendarioLPLR.gerarCalendarioAnual
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('regime inválido'))
+
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch-lplr/2025')
+
+    const body = res.json()
+    expect(body.sucesso).toBe(1)
+    expect(body.erros).toHaveLength(1)
+    expect(body.erros[0].erro).toContain('regime')
+  })
+
+  it('filtra por tenantId, ativa=true e regime LP/LR', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('POST', '/fiscal/obrigacoes/calendario/batch-lplr/2025')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+    expect(where.regime.in).toContain('LUCRO_PRESUMIDO')
+    expect(where.regime.in).toContain('LUCRO_REAL')
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch-lplr/XYZ')
     expect(res.statusCode).toBe(400)
   })
 })

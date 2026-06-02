@@ -169,6 +169,15 @@ export default function ObrigacoesPage() {
     },
   })
 
+  // Mutation para gerar calendário de TODAS as empresas LP/LR
+  const gerarCalendarioTodasLPLR = useMutation({
+    mutationFn: (ano: number) =>
+      api.post(`/fiscal/obrigacoes/calendario/batch-lplr/${ano}`).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
+    },
+  })
+
   // Mutation para atualizar status da obrigação
   const atualizarStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: StatusObrigacao }) =>
@@ -254,24 +263,48 @@ export default function ObrigacoesPage() {
           <span className="text-sm text-red-600 font-medium">Erro ao gerar calendário.</span>
         )}
 
-        <div className="border-l border-slate-200 pl-4 ml-2 flex items-center gap-3">
-          <button
-            disabled={gerarCalendarioTodas.isPending}
-            onClick={() => gerarCalendarioTodas.mutate(anoAtual)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {gerarCalendarioTodas.isPending ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <CalendarDays className="w-4 h-4" />
+        <div className="border-l border-slate-200 pl-4 ml-2 flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-slate-500 font-medium">SN / MEI</span>
+            <button
+              disabled={gerarCalendarioTodas.isPending}
+              onClick={() => gerarCalendarioTodas.mutate(anoAtual)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {gerarCalendarioTodas.isPending ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <CalendarDays className="w-4 h-4" />
+              )}
+              Gerar Todas ({anoAtual})
+            </button>
+            {gerarCalendarioTodas.isSuccess && (
+              <span className="text-xs text-green-600 font-medium">
+                {(gerarCalendarioTodas.data as any)?.sucesso} empresa(s) gerada(s)!
+              </span>
             )}
-            Gerar para Todas ({anoAtual})
-          </button>
-          {gerarCalendarioTodas.isSuccess && (
-            <span className="text-sm text-green-600 font-medium">
-              {(gerarCalendarioTodas.data as any)?.sucesso} empresa(s) gerada(s)!
-            </span>
-          )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-slate-500 font-medium">LP / LR</span>
+            <button
+              disabled={gerarCalendarioTodasLPLR.isPending}
+              onClick={() => gerarCalendarioTodasLPLR.mutate(anoAtual)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {gerarCalendarioTodasLPLR.isPending ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <CalendarDays className="w-4 h-4" />
+              )}
+              Gerar Todas ({anoAtual})
+            </button>
+            {gerarCalendarioTodasLPLR.isSuccess && (
+              <span className="text-xs text-green-600 font-medium">
+                {(gerarCalendarioTodasLPLR.data as any)?.sucesso} empresa(s) gerada(s)!
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

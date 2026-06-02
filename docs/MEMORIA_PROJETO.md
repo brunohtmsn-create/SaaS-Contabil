@@ -1,6 +1,6 @@
 # Memória do Projeto — SaaS Contábil Automatizado
 
-> Atualizado em: 2026-06-01
+> Atualizado em: 2026-06-02
 
 ---
 
@@ -91,6 +91,7 @@ infra/
 - [x] **MonitoramentoSNService** — verificação de vencimentos, risco exclusão SN, gerarCalendarioAnual
 - [x] **AlertasVencimentosService** — cria alertas para obrigações próximas do vencimento
 - [x] **FatorRService** — cálculo do Fator R para determinar Anexo III/V
+- [x] **CalendarioLPLRService** — 82 obrigações anuais LP/LR: 6 mensais × 12, IRPJ+CSLL trimestrais (T1-T4), ECD 30/06, ECF 31/07
 
 ### API (apps/api) — Endpoints Implementados
 
@@ -119,14 +120,16 @@ infra/
   - DASN: `POST/GET /fiscal/dasn/:empresaId/:ano`
   - Obrigações: `GET/PATCH /fiscal/obrigacoes`
   - Calendário: `POST /fiscal/obrigacoes/calendario/:empresaId/:ano`
-  - **Calendário Batch**: `POST /fiscal/obrigacoes/calendario/batch/:ano`
+  - **Calendário Batch SN/MEI**: `POST /fiscal/obrigacoes/calendario/batch/:ano`
+  - **Calendário Batch LP/LR**: `POST /fiscal/obrigacoes/calendario/batch-lplr/:ano`
+  - Calendário individual (auto-detecta regime): `POST /fiscal/obrigacoes/calendario/:empresaId/:ano`
   - Monitoramento: `GET /fiscal/monitoramento/vencimentos`
   - **Compliance**: `GET /fiscal/compliance/resumo?competencia=YYYY-MM`
   - Batch fiscal: `POST /fiscal/batch/:competencia`
 
 ### Worker (apps/worker)
 
-- [x] **fiscal.job.ts** — todos os 10 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, TODOS)
+- [x] **fiscal.job.ts** — 12 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, TODOS)
 - [x] **fechamento.job.ts** — fechamento mensal completo (15 etapas)
 - [x] **scraper.job.ts** — captura NF-e, NFC-e, NFSe
 - [x] **bancario.job.ts** — conciliação bancária
@@ -143,7 +146,7 @@ infra/
 - [x] `/documentos` — Documentos fiscais com filtros
 - [x] `/fiscal` — Página central de operações fiscais (PGDAS, DIFAL, etc.)
 - [x] `/fiscal/dasn` — DASN/DEFIS: seletor empresa/ano, tabela mensal, badge status
-- [x] `/obrigacoes` — Obrigações com filtros, calendário individual + **batch para todas**
+- [x] `/obrigacoes` — Obrigações com filtros, calendário individual + **batch SN/MEI e batch LP/LR**
 - [x] `/fgts` — FGTS Digital com apuração mensal
 - [x] `/conciliacao` — Conciliação com aprovação/rejeição manual
 - [x] `/contabil` — Lançamentos contábeis
@@ -161,7 +164,7 @@ infra/
 - [x] **Enums:** TipoObrigacao (inclui DASN, FGTS_DIGITAL, DMS, ECD, ECF), TipoEventoAudit (inclui DASN_GERADA, CALENDARIO_ANUAL_GERADO, DMS_APURADA)
 - [x] **Prisma Client** regenerado após adição de DASN
 
-### Testes (Total: 1.344 testes passando)
+### Testes (Total: 1.397 testes passando)
 
 | Pacote                 | Testes | Status |
 | ---------------------- | ------ | ------ |
@@ -172,12 +175,12 @@ infra/
 | packages/conciliation  | 42     | ✅     |
 | packages/notifications | 56     | ✅     |
 | packages/storage       | 59     | ✅     |
-| packages/fiscal        | 284    | ✅     |
+| packages/fiscal        | 316    | ✅     |
 | packages/portals       | 58     | ✅     |
 | packages/contabil      | 94     | ✅     |
 | packages/scraper       | 44     | ✅     |
-| apps/worker            | 85     | ✅     |
-| apps/api               | 344    | ✅     |
+| apps/worker            | 87     | ✅     |
+| apps/api               | 354    | ✅     |
 
 ---
 
@@ -199,13 +202,13 @@ infra/
 
 ### Fase 3 — Lucro Presumido e Real
 
-- [ ] **ECF** — Escrituração Contábil Fiscal
-- [ ] **ECD** — Escrituração Contábil Digital (LP/LR — annual, 30/06)
-- [ ] **IRPJ/CSLL** — apuração trimestral/anual
-- [ ] **DCTF mensal** — LP/LR (diferente de DCTFWeb)
+- [x] **CalendarioLPLRService** — 82 obrigações anuais (6 mensais × 12 + IRPJ/CSLL trimestrais + ECD/ECF)
+- [ ] **ECF** — Escrituração Contábil Fiscal (geração do arquivo SPED)
+- [ ] **ECD** — Escrituração Contábil Digital (geração do arquivo SPED, LP/LR — 30/06)
+- [ ] **IRPJ/CSLL** — apuração trimestral/anual (cálculo sobre lucro)
+- [ ] **DCTF mensal** — LP/LR (diferente de DCTFWeb — sem retenções na fonte)
 - [ ] **SPED Fiscal** — EFD ICMS/IPI
 - [ ] **SPED Contribuições** — EFD PIS/COFINS
-- [ ] **CalendarioFiscalService para LP/LR** — obrigações mensais com vencimentos diferentes
 
 ### Melhorias Técnicas Pendentes
 
@@ -267,3 +270,5 @@ infra/
 | 2026-06 | Auto-calendário no cadastro SN/MEI          | UX: evitar passo manual no onboarding         |
 | 2026-06 | `Promise.allSettled` no batch               | Não bloqueia na primeira falha de empresa     |
 | 2026-06 | `nowBR` mocked para `2025-06-01` nos testes | Data fixa para comparações de vencimento      |
+| 2026-06 | Calendário LP/LR auto-detecta regime no endpoint | Endpoint único `/calendario/:id/:ano` chama serviço correto |
+| 2026-06 | T4 LP pode vencer em fevereiro | 31/01 pode cair em fds, deslocando para 02/02 — teste usa `toBeLessThanOrEqual(1)` |

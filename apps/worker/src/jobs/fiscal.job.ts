@@ -10,6 +10,8 @@ import {
   FGTSDigitalService,
   DMSService,
   DasnService,
+  MonitoramentoSNService,
+  CalendarioLPLRService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -28,6 +30,8 @@ type FiscalJobData = {
     | 'FGTS'
     | 'DMS'
     | 'DASN'
+    | 'CALENDARIO_SN'
+    | 'CALENDARIO_LPLR'
     | 'TODOS'
 }
 
@@ -84,6 +88,18 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
       // competencia contém apenas o ano, ex: "2024"
       const dasn = new DasnService()
       await dasn.gerar(tenantId, empresaId, Number(competencia))
+      break
+    }
+    case 'CALENDARIO_SN': {
+      // competencia contém apenas o ano, ex: "2025"
+      const sn = new MonitoramentoSNService()
+      await sn.gerarCalendarioAnual(tenantId, empresaId, Number(competencia))
+      break
+    }
+    case 'CALENDARIO_LPLR': {
+      // competencia contém apenas o ano, ex: "2025"
+      const lplr = new CalendarioLPLRService()
+      await lplr.gerarCalendarioAnual(tenantId, empresaId, Number(competencia))
       break
     }
     case 'TODOS': {

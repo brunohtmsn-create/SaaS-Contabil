@@ -15,6 +15,7 @@ import {
   EFDReinfService,
   DMSService,
   DasnService,
+  CalendarioLPLRService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -274,8 +275,17 @@ export async function fiscalRoutes(app: FastifyInstance) {
       .object({ empresaId: z.string().uuid(), ano: z.string().regex(/^\d{4}$/) })
       .parse(request.params)
 
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    const anoNum = Number(ano)
+    if (empresa.regime === 'LUCRO_PRESUMIDO' || empresa.regime === 'LUCRO_REAL') {
+      const service = new CalendarioLPLRService()
+      return service.gerarCalendarioAnual(tenantId, empresaId, anoNum)
+    }
+
     const service = new MonitoramentoSNService()
-    return service.gerarCalendarioAnual(tenantId, empresaId, Number(ano))
+    return service.gerarCalendarioAnual(tenantId, empresaId, anoNum)
   })
 
   // POST /fiscal/obrigacoes/calendario/batch/:ano
@@ -295,6 +305,43 @@ export async function fiscalRoutes(app: FastifyInstance) {
     })
 
     const service = new MonitoramentoSNService()
+
+    const resultados = await Promise.allSettled(
+      empresas.map((emp) => service.gerarCalendarioAnual(tenantId, emp.id, ano))
+    )
+
+    const sucesso = resultados.filter((r) => r.status === 'fulfilled').length
+    const erros = resultados
+      .map((r, i) =>
+        r.status === 'rejected' ? { empresaId: empresas[i]!.id, erro: r.reason?.message } : null
+      )
+      .filter(Boolean)
+
+    return reply.code(200).send({
+      ano,
+      totalEmpresas: empresas.length,
+      sucesso,
+      erros,
+    })
+  })
+
+  // POST /fiscal/obrigacoes/calendario/batch-lplr/:ano
+  // Gera calendário anual para todas as empresas LP/LR ativas do tenant em paralelo
+  app.post('/obrigacoes/calendario/batch-lplr/:ano', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { ano: anoStr } = z.object({ ano: z.string().regex(/^\d{4}$/) }).parse(request.params)
+    const ano = Number(anoStr)
+
+    const empresas = await db.empresaCliente.findMany({
+      where: {
+        tenantId,
+        ativa: true,
+        regime: { in: ['LUCRO_PRESUMIDO', 'LUCRO_REAL'] },
+      },
+      select: { id: true, razaoSocial: true },
+    })
+
+    const service = new CalendarioLPLRService()
 
     const resultados = await Promise.allSettled(
       empresas.map((emp) => service.gerarCalendarioAnual(tenantId, emp.id, ano))

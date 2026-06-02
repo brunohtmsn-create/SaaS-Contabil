@@ -10,6 +10,9 @@
  *  - ESOCIAL → chama ESocialService.processar()
  *  - DCTFWEB → chama DCTFWebService.gerar()
  *  - DMS → chama DMSService.apurar()
+ *  - DASN → chama DasnService.gerar() com ano numérico
+ *  - CALENDARIO_SN → chama MonitoramentoSNService.gerarCalendarioAnual() com ano numérico
+ *  - CALENDARIO_LPLR → chama CalendarioLPLRService.gerarCalendarioAnual() com ano numérico
  *  - TODOS → chama todos os serviços em sequência
  */
 
@@ -29,6 +32,8 @@ const mockDCTFWeb = { gerar: vi.fn() }
 const mockFGTS = { apurar: vi.fn() }
 const mockDMS = { apurar: vi.fn() }
 const mockDasn = { gerar: vi.fn() }
+const mockMonitoramento = { gerarCalendarioAnual: vi.fn() }
+const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -41,6 +46,8 @@ vi.mock('@saas-contabil/fiscal', () => ({
   FGTSDigitalService: vi.fn(() => mockFGTS),
   DMSService: vi.fn(() => mockDMS),
   DasnService: vi.fn(() => mockDasn),
+  MonitoramentoSNService: vi.fn(() => mockMonitoramento),
+  CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -154,6 +161,38 @@ describe('fiscalJob — roteamento de operações', () => {
     await fiscalJob(job)
     expect(mockDasn.gerar).toHaveBeenCalledOnce()
     expect(mockDasn.gerar).toHaveBeenCalledWith('t-1', 'emp-1', 2024)
+  })
+
+  it('CALENDARIO_SN → chama MonitoramentoSNService.gerarCalendarioAnual com ano numérico', async () => {
+    mockMonitoramento.gerarCalendarioAnual.mockResolvedValue([])
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'CALENDARIO_SN',
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledOnce()
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith('t-1', 'emp-1', 2025)
+  })
+
+  it('CALENDARIO_LPLR → chama CalendarioLPLRService.gerarCalendarioAnual com ano numérico', async () => {
+    mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValue([])
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'CALENDARIO_LPLR',
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledOnce()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith('t-1', 'emp-1', 2025)
   })
 
   it('TODOS → mantém ordem: PGDAS antes de DIFAL antes de EFD-Reinf', async () => {
