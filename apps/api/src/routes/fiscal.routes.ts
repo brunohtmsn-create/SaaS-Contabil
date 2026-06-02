@@ -21,6 +21,7 @@ import {
   ECFService,
   DCTFMensalService,
   SpedFiscalService,
+  SpedContribuicoesService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -478,6 +479,28 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const service = new SpedFiscalService()
     const resultado = await service.gerar(tenantId, empresaId, competencia)
     return reply.code(201).send(resultado)
+  })
+
+  // POST /fiscal/sped-contribuicoes/:empresaId/:competencia — gera EFD PIS/COFINS
+  app.post('/sped-contribuicoes/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new SpedContribuicoesService()
+    const resultado = await service.gerar(tenantId, empresaId, competencia)
+    return reply.code(201).send(resultado)
+  })
+
+  // GET /fiscal/sped-contribuicoes/:empresaId/:competencia — busca EFD PIS/COFINS
+  app.get('/sped-contribuicoes/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'PIS' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'EFD PIS/COFINS não encontrada' })
+    return apuracao
   })
 
   // GET /fiscal/sped-fiscal/:empresaId/:competencia — busca EFD gerada

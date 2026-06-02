@@ -17,6 +17,7 @@ import {
   ECFService,
   DCTFMensalService,
   SpedFiscalService,
+  SpedContribuicoesService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -42,6 +43,7 @@ type FiscalJobData = {
     | 'ECF'
     | 'DCTF_MENSAL'
     | 'SPED_FISCAL'
+    | 'SPED_CONTRIBUICOES'
     | 'TODOS'
 }
 
@@ -136,6 +138,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'SPED_FISCAL': {
       const spedFiscal = new SpedFiscalService()
       await spedFiscal.gerar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'SPED_CONTRIBUICOES': {
+      const spedContrib = new SpedContribuicoesService()
+      await spedContrib.gerar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {

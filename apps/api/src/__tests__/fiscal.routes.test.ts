@@ -42,6 +42,7 @@ const mockPisCofinsLP = { apurar: vi.fn() }
 const mockECF = { gerar: vi.fn() }
 const mockDCTFMensal = { gerar: vi.fn() }
 const mockSpedFiscal = { gerar: vi.fn() }
+const mockSpedContrib = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -62,6 +63,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   ECFService: vi.fn(() => mockECF),
   DCTFMensalService: vi.fn(() => mockDCTFMensal),
   SpedFiscalService: vi.fn(() => mockSpedFiscal),
+  SpedContribuicoesService: vi.fn(() => mockSpedContrib),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -555,6 +557,34 @@ describe('GET /fiscal/pis-cofins-lp/:empresaId/:competencia', () => {
     const res = await req('GET', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
 
     expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/sped-contribuicoes/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/sped-contribuicoes/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama SpedContribuicoesService.gerar e retorna 201', async () => {
+    mockSpedContrib.gerar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalPIS: '650',
+      totalCOFINS: '3000',
+      prazoEntrega: '2025-07-10',
+    })
+
+    const res = await req('POST', `/fiscal/sped-contribuicoes/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockSpedContrib.gerar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/sped-contribuicoes/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
   })
 })
 
