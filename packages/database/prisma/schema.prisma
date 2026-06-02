@@ -619,6 +619,7 @@ enum TipoEventoAudit {
   DMS_APURADA
   DASN_GERADA
   IRPJ_CSLL_LP_APURADO
+  PIS_COFINS_LP_APURADO
 }
 
 enum TipoResponsavel {

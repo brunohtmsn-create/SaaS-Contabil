@@ -38,6 +38,7 @@ const mockDMS = { apurar: vi.fn() }
 const mockDasn = { gerar: vi.fn() }
 const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
 const mockIrpjCsllLP = { apurar: vi.fn() }
+const mockPisCofinsLP = { apurar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -54,6 +55,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   DasnService: vi.fn(() => mockDasn),
   CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
   IrpjCsllLPService: vi.fn(() => mockIrpjCsllLP),
+  PisCofinsLPService: vi.fn(() => mockPisCofinsLP),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -482,6 +484,71 @@ describe('GET /fiscal/irpj-csll-lp/:empresaId/:competencia', () => {
     const { where } = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0]
     expect(where.tenantId).toBe(TENANT_ID)
     expect(where.tipo).toBe('IRPJ_LP')
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/pis-cofins-lp/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/pis-cofins-lp/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('apura PIS e COFINS para empresa LP → 200 com valores', async () => {
+    const { Decimal } = await import('@saas-contabil/shared')
+    mockPisCofinsLP.apurar.mockResolvedValueOnce({
+      cnpj: '77666555000144',
+      competencia: COMPETENCIA,
+      receitaBruta: new Decimal('100000'),
+      baseCalculo: new Decimal('100000'),
+      pis: new Decimal('650'),
+      cofins: new Decimal('3000'),
+      totalDevido: new Decimal('3650'),
+    })
+
+    const res = await req('POST', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.pis).toBe('650.00')
+    expect(body.cofins).toBe('3000.00')
+    expect(body.totalDevido).toBe('3650.00')
+    expect(mockPisCofinsLP.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/pis-cofins-lp/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/pis-cofins-lp/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna apuração existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-pis-1',
+      tipo: 'PIS',
+      competencia: COMPETENCIA,
+      dados: {},
+    })
+
+    const res = await req('GET', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('PIS')
+  })
+
+  it('apuração não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
   })
 })
 

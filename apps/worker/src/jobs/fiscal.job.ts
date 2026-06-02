@@ -13,6 +13,7 @@ import {
   MonitoramentoSNService,
   CalendarioLPLRService,
   IrpjCsllLPService,
+  PisCofinsLPService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -34,6 +35,7 @@ type FiscalJobData = {
     | 'CALENDARIO_SN'
     | 'CALENDARIO_LPLR'
     | 'IRPJ_CSLL_LP'
+    | 'PIS_COFINS_LP'
     | 'TODOS'
 }
 
@@ -107,6 +109,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'IRPJ_CSLL_LP': {
       const irpj = new IrpjCsllLPService()
       await irpj.apurar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'PIS_COFINS_LP': {
+      const pisCofins = new PisCofinsLPService()
+      await pisCofins.apurar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {

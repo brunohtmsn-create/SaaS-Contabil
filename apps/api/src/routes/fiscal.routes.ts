@@ -17,6 +17,7 @@ import {
   DasnService,
   CalendarioLPLRService,
   IrpjCsllLPService,
+  PisCofinsLPService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -411,6 +412,36 @@ export async function fiscalRoutes(app: FastifyInstance) {
       where: { tenantId, empresaId, competencia, tipo: 'IRPJ_LP' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'Apuração IRPJ/CSLL LP não encontrada' })
+    return apuracao
+  })
+
+  // POST /fiscal/pis-cofins-lp/:empresaId/:competencia — apura PIS e COFINS (regime cumulativo LP/LR)
+  app.post('/pis-cofins-lp/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new PisCofinsLPService()
+    const resultado = await service.apurar(tenantId, empresaId, competencia)
+    return {
+      empresaId,
+      competencia: resultado.competencia,
+      receitaBruta: resultado.receitaBruta.toFixed(2),
+      baseCalculo: resultado.baseCalculo.toFixed(2),
+      pis: resultado.pis.toFixed(2),
+      cofins: resultado.cofins.toFixed(2),
+      totalDevido: resultado.totalDevido.toFixed(2),
+    }
+  })
+
+  // GET /fiscal/pis-cofins-lp/:empresaId/:competencia — busca apuração existente
+  app.get('/pis-cofins-lp/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'PIS' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'Apuração PIS/COFINS LP não encontrada' })
     return apuracao
   })
 
