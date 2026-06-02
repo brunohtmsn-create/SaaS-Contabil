@@ -34,6 +34,7 @@ const mockDMS = { apurar: vi.fn() }
 const mockDasn = { gerar: vi.fn() }
 const mockMonitoramento = { gerarCalendarioAnual: vi.fn() }
 const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
+const mockIrpjCsllLP = { apurar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -48,6 +49,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   DasnService: vi.fn(() => mockDasn),
   MonitoramentoSNService: vi.fn(() => mockMonitoramento),
   CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
+  IrpjCsllLPService: vi.fn(() => mockIrpjCsllLP),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -193,6 +195,13 @@ describe('fiscalJob — roteamento de operações', () => {
     await fiscalJob(job)
     expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledOnce()
     expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith('t-1', 'emp-1', 2025)
+  })
+
+  it('IRPJ_CSLL_LP → chama IrpjCsllLPService.apurar com competencia', async () => {
+    mockIrpjCsllLP.apurar.mockResolvedValue({ irpjTotal: '0', csllTotal: '0' })
+    await fiscalJob(makeJob('IRPJ_CSLL_LP'))
+    expect(mockIrpjCsllLP.apurar).toHaveBeenCalledOnce()
+    expect(mockIrpjCsllLP.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
   })
 
   it('TODOS → mantém ordem: PGDAS antes de DIFAL antes de EFD-Reinf', async () => {

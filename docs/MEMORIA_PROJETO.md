@@ -258,17 +258,17 @@ infra/
 
 ## Histórico de Decisões Técnicas
 
-| Data    | Decisão                                     | Motivo                                        |
-| ------- | ------------------------------------------- | --------------------------------------------- |
-| 2026-06 | Fastify v4 → v5                             | CVEs críticos no jwt e multipart              |
-| 2026-06 | Next.js 14.2.5 → 14.2.35                    | Patches de segurança críticos                 |
-| 2026-06 | nodemailer v6 → v7                          | CVEs corrigidos                               |
-| 2026-06 | Rate limit global 300 req/min               | Proteção contra DDoS                          |
-| 2026-06 | Rate limit login 10 req/min                 | Proteção contra força bruta                   |
-| 2026-06 | `--ignore-unfixable` no CI                  | CVEs do Next.js 14 sem fix (requer v15)       |
-| 2026-06 | `Date.UTC()` para vencimentos               | `date-fns-tz` não disponível no pacote fiscal |
-| 2026-06 | Auto-calendário no cadastro SN/MEI          | UX: evitar passo manual no onboarding         |
-| 2026-06 | `Promise.allSettled` no batch               | Não bloqueia na primeira falha de empresa     |
-| 2026-06 | `nowBR` mocked para `2025-06-01` nos testes | Data fixa para comparações de vencimento      |
-| 2026-06 | Calendário LP/LR auto-detecta regime no endpoint | Endpoint único `/calendario/:id/:ano` chama serviço correto |
-| 2026-06 | T4 LP pode vencer em fevereiro | 31/01 pode cair em fds, deslocando para 02/02 — teste usa `toBeLessThanOrEqual(1)` |
+| Data    | Decisão                                          | Motivo                                                                             |
+| ------- | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| 2026-06 | Fastify v4 → v5                                  | CVEs críticos no jwt e multipart                                                   |
+| 2026-06 | Next.js 14.2.5 → 14.2.35                         | Patches de segurança críticos                                                      |
+| 2026-06 | nodemailer v6 → v7                               | CVEs corrigidos                                                                    |
+| 2026-06 | Rate limit global 300 req/min                    | Proteção contra DDoS                                                               |
+| 2026-06 | Rate limit login 10 req/min                      | Proteção contra força bruta                                                        |
+| 2026-06 | `--ignore-unfixable` no CI                       | CVEs do Next.js 14 sem fix (requer v15)                                            |
+| 2026-06 | `Date.UTC()` para vencimentos                    | `date-fns-tz` não disponível no pacote fiscal                                      |
+| 2026-06 | Auto-calendário no cadastro SN/MEI               | UX: evitar passo manual no onboarding                                              |
+| 2026-06 | `Promise.allSettled` no batch                    | Não bloqueia na primeira falha de empresa                                          |
+| 2026-06 | `nowBR` mocked para `2025-06-01` nos testes      | Data fixa para comparações de vencimento                                           |
+| 2026-06 | Calendário LP/LR auto-detecta regime no endpoint | Endpoint único `/calendario/:id/:ano` chama serviço correto                        |
+| 2026-06 | T4 LP pode vencer em fevereiro                   | 31/01 pode cair em fds, deslocando para 02/02 — teste usa `toBeLessThanOrEqual(1)` |

@@ -618,6 +618,7 @@ enum TipoEventoAudit {
   CALENDARIO_ANUAL_GERADO
   DMS_APURADA
   DASN_GERADA
+  IRPJ_CSLL_LP_APURADO
 }
 
 enum TipoResponsavel {

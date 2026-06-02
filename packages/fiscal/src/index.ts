@@ -14,6 +14,8 @@ export type { ResultadoDMS, MunicipioISS } from './dms.service.js'
 export { DasnService } from './dasn.service.js'
 export type { ResultadoDasn, ReceitaMensalDasn } from './dasn.service.js'
 export { CalendarioLPLRService } from './calendario-lplr.service.js'
+export { IrpjCsllLPService } from './irpj-csll-lp.service.js'
+export type { ResultadoIrpjCsllLP } from './irpj-csll-lp.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

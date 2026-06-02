@@ -12,6 +12,7 @@ import {
   DasnService,
   MonitoramentoSNService,
   CalendarioLPLRService,
+  IrpjCsllLPService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -32,6 +33,7 @@ type FiscalJobData = {
     | 'DASN'
     | 'CALENDARIO_SN'
     | 'CALENDARIO_LPLR'
+    | 'IRPJ_CSLL_LP'
     | 'TODOS'
 }
 
@@ -100,6 +102,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
       // competencia contém apenas o ano, ex: "2025"
       const lplr = new CalendarioLPLRService()
       await lplr.gerarCalendarioAnual(tenantId, empresaId, Number(competencia))
+      break
+    }
+    case 'IRPJ_CSLL_LP': {
+      const irpj = new IrpjCsllLPService()
+      await irpj.apurar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {

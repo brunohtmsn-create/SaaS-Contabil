@@ -16,6 +16,7 @@ import {
   DMSService,
   DasnService,
   CalendarioLPLRService,
+  IrpjCsllLPService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -374,6 +375,43 @@ export async function fiscalRoutes(app: FastifyInstance) {
       fatorR: resultado.fatorR.toFixed(2),
       anexo: resultado.anexo,
     }
+  })
+
+  // POST /fiscal/irpj-csll-lp/:empresaId/:competencia — apura IRPJ+CSLL para LP
+  app.post('/irpj-csll-lp/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new IrpjCsllLPService()
+    const resultado = await service.apurar(tenantId, empresaId, competencia)
+    return {
+      empresaId,
+      competencia: resultado.competencia,
+      trimestreLabel: resultado.trimestreLabel,
+      categoria: resultado.categoria,
+      percentualPresuncaoIRPJ: resultado.percentualPresuncaoIRPJ,
+      percentualPresuncaoCSLL: resultado.percentualPresuncaoCSLL,
+      receitaBrutaTrimestral: resultado.receitaBrutaTrimestral.toFixed(2),
+      baseCalculoIRPJ: resultado.baseCalculoIRPJ.toFixed(2),
+      baseCalculoCSLL: resultado.baseCalculoCSLL.toFixed(2),
+      irpjNormal: resultado.irpjNormal.toFixed(2),
+      irpjAdicional: resultado.irpjAdicional.toFixed(2),
+      irpjTotal: resultado.irpjTotal.toFixed(2),
+      csllTotal: resultado.csllTotal.toFixed(2),
+      totalDevido: resultado.totalDevido.toFixed(2),
+    }
+  })
+
+  // GET /fiscal/irpj-csll-lp/:empresaId/:competencia — busca apuração existente
+  app.get('/irpj-csll-lp/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'IRPJ_LP' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'Apuração IRPJ/CSLL LP não encontrada' })
+    return apuracao
   })
 
   app.post('/esocial/:empresaId/:competencia', async (request) => {

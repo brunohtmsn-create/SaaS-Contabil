@@ -37,6 +37,7 @@ const mockEFDReinf = { processar: vi.fn() }
 const mockDMS = { apurar: vi.fn() }
 const mockDasn = { gerar: vi.fn() }
 const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
+const mockIrpjCsllLP = { apurar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -52,6 +53,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   DMSService: vi.fn(() => mockDMS),
   DasnService: vi.fn(() => mockDasn),
   CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
+  IrpjCsllLPService: vi.fn(() => mockIrpjCsllLP),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -398,6 +400,88 @@ describe('GET /fiscal/fator-r/:empresaId/:competencia', () => {
     expect(body.competencia).toBe(COMPETENCIA)
     expect(body.fatorR).toBe('0.28')
     expect(body.anexo).toBe('III')
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/irpj-csll-lp/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/irpj-csll-lp/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama IrpjCsllLPService.apurar com tenantId e competencia → 200', async () => {
+    const { Decimal } = await import('@saas-contabil/shared')
+    mockIrpjCsllLP.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      trimestreLabel: '2025-T2',
+      categoria: 'servicos_gerais',
+      percentualPresuncaoIRPJ: 32,
+      percentualPresuncaoCSLL: 32,
+      receitaBrutaTrimestral: new Decimal('300000'),
+      baseCalculoIRPJ: new Decimal('96000'),
+      baseCalculoCSLL: new Decimal('96000'),
+      irpjNormal: new Decimal('14400'),
+      irpjAdicional: new Decimal('3600'),
+      irpjTotal: new Decimal('18000'),
+      csllTotal: new Decimal('8640'),
+      totalDevido: new Decimal('26640'),
+    })
+
+    const res = await req('POST', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.trimestreLabel).toBe('2025-T2')
+    expect(body.irpjTotal).toBe('18000.00')
+    expect(body.csllTotal).toBe('8640.00')
+    expect(mockIrpjCsllLP.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/2025-AB`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/irpj-csll-lp/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/irpj-csll-lp/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna apuração existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-irpj-1',
+      tipo: 'IRPJ_LP',
+      competencia: '2025-T2',
+      dados: {},
+    })
+
+    const res = await req('GET', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('IRPJ_LP')
+  })
+
+  it('apuração não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('busca com tenantId correto (isolamento multi-tenant)', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'ap-1', tipo: 'IRPJ_LP' })
+
+    await req('GET', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    const { where } = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('IRPJ_LP')
   })
 })
 
