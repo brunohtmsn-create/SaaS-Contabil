@@ -20,6 +20,7 @@ import {
   PisCofinsLPService,
   ECFService,
   DCTFMensalService,
+  SpedFiscalService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -467,6 +468,28 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const service = new DCTFMensalService()
     const resultado = await service.gerar(tenantId, empresaId, competencia)
     return reply.code(201).send(resultado)
+  })
+
+  // POST /fiscal/sped-fiscal/:empresaId/:competencia — gera EFD ICMS/IPI para LP/LR
+  app.post('/sped-fiscal/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new SpedFiscalService()
+    const resultado = await service.gerar(tenantId, empresaId, competencia)
+    return reply.code(201).send(resultado)
+  })
+
+  // GET /fiscal/sped-fiscal/:empresaId/:competencia — busca EFD gerada
+  app.get('/sped-fiscal/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'DESTDA' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'SPED Fiscal não encontrado' })
+    return apuracao
   })
 
   // GET /fiscal/dctf-mensal/:empresaId/:competencia — busca DCTF gerada

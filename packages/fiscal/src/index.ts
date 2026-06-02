@@ -22,6 +22,8 @@ export { ECFService } from './ecf.service.js'
 export type { ResultadoECF, TrimestralECF } from './ecf.service.js'
 export { DCTFMensalService } from './dctf-mensal.service.js'
 export type { ResultadoDCTFMensal, ItemDCTF } from './dctf-mensal.service.js'
+export { SpedFiscalService } from './sped-fiscal.service.js'
+export type { ResultadoSpedFiscal } from './sped-fiscal.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

@@ -16,6 +16,7 @@ import {
   PisCofinsLPService,
   ECFService,
   DCTFMensalService,
+  SpedFiscalService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -40,6 +41,7 @@ type FiscalJobData = {
     | 'PIS_COFINS_LP'
     | 'ECF'
     | 'DCTF_MENSAL'
+    | 'SPED_FISCAL'
     | 'TODOS'
 }
 
@@ -129,6 +131,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'DCTF_MENSAL': {
       const dctf = new DCTFMensalService()
       await dctf.gerar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'SPED_FISCAL': {
+      const spedFiscal = new SpedFiscalService()
+      await spedFiscal.gerar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {

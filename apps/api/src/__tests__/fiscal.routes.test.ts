@@ -41,6 +41,7 @@ const mockIrpjCsllLP = { apurar: vi.fn() }
 const mockPisCofinsLP = { apurar: vi.fn() }
 const mockECF = { gerar: vi.fn() }
 const mockDCTFMensal = { gerar: vi.fn() }
+const mockSpedFiscal = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -60,6 +61,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   PisCofinsLPService: vi.fn(() => mockPisCofinsLP),
   ECFService: vi.fn(() => mockECF),
   DCTFMensalService: vi.fn(() => mockDCTFMensal),
+  SpedFiscalService: vi.fn(() => mockSpedFiscal),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -551,6 +553,72 @@ describe('GET /fiscal/pis-cofins-lp/:empresaId/:competencia', () => {
     mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
 
     const res = await req('GET', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/sped-fiscal/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/sped-fiscal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama SpedFiscalService.gerar e retorna 201', async () => {
+    mockSpedFiscal.gerar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalDocumentos: 5,
+      totalICMS: '2760',
+      prazoEntrega: '2025-07-15',
+    })
+
+    const res = await req('POST', `/fiscal/sped-fiscal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockSpedFiscal.gerar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/sped-fiscal/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('regime inválido → propaga erro', async () => {
+    mockSpedFiscal.gerar.mockRejectedValueOnce(
+      new Error('SPED Fiscal é aplicável apenas para Lucro Presumido')
+    )
+    const res = await req('POST', `/fiscal/sped-fiscal/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(500)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/sped-fiscal/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/sped-fiscal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna SPED existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'sped-1',
+      tipo: 'DESTDA',
+      competencia: COMPETENCIA,
+      dados: { totalICMS: '2760' },
+    })
+
+    const res = await req('GET', `/fiscal/sped-fiscal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DESTDA')
+  })
+
+  it('SPED não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/sped-fiscal/${EMPRESA_ID}/${COMPETENCIA}`)
 
     expect(res.statusCode).toBe(404)
   })
