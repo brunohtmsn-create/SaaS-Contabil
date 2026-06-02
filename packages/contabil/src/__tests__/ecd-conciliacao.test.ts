@@ -87,6 +87,7 @@ const empresa = {
   cnpj: '11111111000111',
   razaoSocial: 'Acme LTDA',
   uf: 'SP',
+  regime: 'LUCRO_PRESUMIDO',
 }
 
 function makeLancamento(id: string, conta: string, valor: string, tipo: 'DEBITO' | 'CREDITO') {
@@ -126,6 +127,27 @@ describe('ECDService — gerar()', () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
     const service = new ECDService()
     await expect(service.gerar('t-1', 'emp-x', 2025)).rejects.toThrow('Empresa não encontrada')
+  })
+
+  it('regime SIMPLES_NACIONAL → lança erro', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      ...empresa,
+      regime: 'SIMPLES_NACIONAL',
+    })
+    const service = new ECDService()
+    await expect(service.gerar('t-1', 'emp-1', 2025)).rejects.toThrow('Lucro Presumido')
+  })
+
+  it('regime MEI → lança erro', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ ...empresa, regime: 'MEI' })
+    const service = new ECDService()
+    await expect(service.gerar('t-1', 'emp-1', 2025)).rejects.toThrow('Lucro Presumido')
+  })
+
+  it('regime LUCRO_REAL → aceito', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({ ...empresa, regime: 'LUCRO_REAL' })
+    const service = new ECDService()
+    await expect(service.gerar('t-1', 'emp-1', 2025)).resolves.not.toThrow()
   })
 
   it('arquivo ECD contém bloco 0000 com CNPJ', async () => {

@@ -12,6 +12,8 @@ export class ECDService {
   async gerar(tenantId: string, empresaId: string, ano: number): Promise<ResultadoECD> {
     const empresa = await this.db.empresaCliente.findUnique({ where: { id: empresaId } })
     if (!empresa) throw new Error('Empresa não encontrada')
+    if (empresa.regime !== 'LUCRO_PRESUMIDO' && empresa.regime !== 'LUCRO_REAL')
+      throw new Error('ECD é obrigatória apenas para Lucro Presumido ou Lucro Real')
 
     const lancamentos = await this.db.lancamentoContabil.findMany({
       where: {
