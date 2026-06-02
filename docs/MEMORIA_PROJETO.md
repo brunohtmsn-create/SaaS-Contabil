@@ -72,7 +72,24 @@ infra/
 - [x] **CI security workflow** — `pnpm audit --audit-level=high --ignore-unfixable`
 - [x] **`.gitignore`** — `*.tsbuildinfo` excluído do tracking
 
-### Módulo Fiscal (packages/fiscal)
+### Módulo Fiscal — Fase 3 LP/LR (packages/fiscal)
+
+- [x] **IrpjCsllLPService** — apuração trimestral IRPJ + CSLL para Lucro Presumido
+  - IRPJ 15% + adicional 10% sobre base > R$60.000/trimestre
+  - CSLL 9% sobre base de presunção
+  - Percentuais LP: comércio/indústria IRPJ 8%/CSLL 12%; serviços 32%/32%
+  - Upsert IRPJ_LP e CSLL_LP; registra `IRPJ_CSLL_LP_APURADO` no audit
+- [x] **PisCofinsLPService** — apuração mensal PIS (0,65%) e COFINS (3%) para LP/LR
+  - Regime cumulativo sem aproveitamento de créditos
+  - Upsert PIS e COFINS; registra `PIS_COFINS_LP_APURADO` no audit
+- [x] **ECFService** — Escrituração Contábil Fiscal anual para LP/LR
+  - Consolida 4 trimestres de IRPJ/CSLL; prazo 31/07 do ano seguinte
+  - Upsert ECF; registra `ECF_GERADO` no audit
+- [x] **DCTFMensalService** — DCTF Mensal para LP/LR
+  - Agrega PIS e COFINS apurados; códigos diferentes LP (6912/2172) vs LR (5856/5960)
+  - Prazo: dia 15 do M+2; registra `DCTFWEB_TRANSMITIDA` no audit
+
+### Módulo Fiscal — Fase 1 (packages/fiscal)
 
 - [x] **PGDASService** — apuração e transmissão ao Portal SN
 - [x] **DifalService** — cálculo DIFAL por UF (somente NF-e CONCILIADOS)
@@ -126,10 +143,14 @@ infra/
   - Monitoramento: `GET /fiscal/monitoramento/vencimentos`
   - **Compliance**: `GET /fiscal/compliance/resumo?competencia=YYYY-MM`
   - Batch fiscal: `POST /fiscal/batch/:competencia`
+  - **IRPJ+CSLL LP**: `POST/GET /fiscal/irpj-csll-lp/:empresaId/:competencia`
+  - **PIS+COFINS LP**: `POST/GET /fiscal/pis-cofins-lp/:empresaId/:competencia`
+  - **ECF**: `POST/GET /fiscal/ecf/:empresaId/:ano`
+  - **DCTF Mensal**: `POST/GET /fiscal/dctf-mensal/:empresaId/:competencia`
 
 ### Worker (apps/worker)
 
-- [x] **fiscal.job.ts** — 12 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, TODOS)
+- [x] **fiscal.job.ts** — 16 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, IRPJ_CSLL_LP, PIS_COFINS_LP, ECF, DCTF_MENSAL, TODOS)
 - [x] **fechamento.job.ts** — fechamento mensal completo (15 etapas)
 - [x] **scraper.job.ts** — captura NF-e, NFC-e, NFSe
 - [x] **bancario.job.ts** — conciliação bancária
@@ -146,6 +167,8 @@ infra/
 - [x] `/documentos` — Documentos fiscais com filtros
 - [x] `/fiscal` — Página central de operações fiscais (PGDAS, DIFAL, etc.)
 - [x] `/fiscal/dasn` — DASN/DEFIS: seletor empresa/ano, tabela mensal, badge status
+- [x] **`/fiscal/lplr`** — Apuração IRPJ+CSLL (trimestral) e PIS+COFINS (mensal) para LP/LR
+- [x] **`/fiscal/ecf`** — ECF anual com detalhamento por trimestre e tabela de resultados
 - [x] `/obrigacoes` — Obrigações com filtros, calendário individual + **batch SN/MEI e batch LP/LR**
 - [x] `/fgts` — FGTS Digital com apuração mensal
 - [x] `/conciliacao` — Conciliação com aprovação/rejeição manual
@@ -161,10 +184,10 @@ infra/
 ### Banco de Dados (packages/database)
 
 - [x] **Schema Prisma** completo com RLS por tenantId
-- [x] **Enums:** TipoObrigacao (inclui DASN, FGTS_DIGITAL, DMS, ECD, ECF), TipoEventoAudit (inclui DASN_GERADA, CALENDARIO_ANUAL_GERADO, DMS_APURADA)
-- [x] **Prisma Client** regenerado após adição de DASN
+- [x] **Enums:** TipoObrigacao (inclui DASN, FGTS_DIGITAL, DMS, ECD, ECF), TipoApuracao (inclui IRPJ_LP, CSLL_LP, PIS, COFINS, ECD, ECF), TipoEventoAudit (inclui DASN_GERADA, CALENDARIO_ANUAL_GERADO, DMS_APURADA, IRPJ_CSLL_LP_APURADO, PIS_COFINS_LP_APURADO, ECF_GERADO)
+- [x] **Prisma Client** regenerado após cada adição de enum
 
-### Testes (Total: 1.397 testes passando)
+### Testes (Total: ~1.535 testes passando)
 
 | Pacote                 | Testes | Status |
 | ---------------------- | ------ | ------ |
@@ -175,12 +198,12 @@ infra/
 | packages/conciliation  | 42     | ✅     |
 | packages/notifications | 56     | ✅     |
 | packages/storage       | 59     | ✅     |
-| packages/fiscal        | 316    | ✅     |
+| packages/fiscal        | 399    | ✅     |
 | packages/portals       | 58     | ✅     |
-| packages/contabil      | 94     | ✅     |
+| packages/contabil      | 97     | ✅     |
 | packages/scraper       | 44     | ✅     |
-| apps/worker            | 87     | ✅     |
-| apps/api               | 354    | ✅     |
+| apps/worker            | 91     | ✅     |
+| apps/api               | 373    | ✅     |
 
 ---
 
@@ -203,12 +226,15 @@ infra/
 ### Fase 3 — Lucro Presumido e Real
 
 - [x] **CalendarioLPLRService** — 82 obrigações anuais (6 mensais × 12 + IRPJ/CSLL trimestrais + ECD/ECF)
-- [ ] **ECF** — Escrituração Contábil Fiscal (geração do arquivo SPED)
-- [ ] **ECD** — Escrituração Contábil Digital (geração do arquivo SPED, LP/LR — 30/06)
-- [ ] **IRPJ/CSLL** — apuração trimestral/anual (cálculo sobre lucro)
-- [ ] **DCTF mensal** — LP/LR (diferente de DCTFWeb — sem retenções na fonte)
-- [ ] **SPED Fiscal** — EFD ICMS/IPI
-- [ ] **SPED Contribuições** — EFD PIS/COFINS
+- [x] **IrpjCsllLPService** — apuração trimestral IRPJ + CSLL (com adicional 10%)
+- [x] **PisCofinsLPService** — PIS 0,65% e COFINS 3% (regime cumulativo)
+- [x] **ECFService** — ECF anual consolidando os 4 trimestres; prazo 31/07
+- [x] **DCTFMensalService** — DCTF mensal agregando PIS+COFINS com prazo M+2/dia 15
+- [x] **ECDService (contabil)** — geração arquivo SPED Contábil; validação regime LP/LR
+- [x] **Páginas dashboard:** `/fiscal/lplr` (IRPJ+CSLL, PIS+COFINS), `/fiscal/ecf` (ECF anual)
+- [ ] **SPED Fiscal** — EFD ICMS/IPI (para LP/LR com operações tributadas)
+- [ ] **SPED Contribuições** — EFD PIS/COFINS (regime não-cumulativo LR)
+- [ ] **IRPJ/CSLL Lucro Real** — ajustes de lucro contábil (apuração diferente do LP)
 
 ### Melhorias Técnicas Pendentes
 
@@ -272,3 +298,6 @@ infra/
 | 2026-06 | `nowBR` mocked para `2025-06-01` nos testes      | Data fixa para comparações de vencimento                                           |
 | 2026-06 | Calendário LP/LR auto-detecta regime no endpoint | Endpoint único `/calendario/:id/:ano` chama serviço correto                        |
 | 2026-06 | T4 LP pode vencer em fevereiro                   | 31/01 pode cair em fds, deslocando para 02/02 — teste usa `toBeLessThanOrEqual(1)` |
+| 2026-06 | ECDService no pacote contabil (não fiscal)       | Arquitetura: ECD é obrigação contábil; fiscal seria duplicação errada              |
+| 2026-06 | DCTFMensal usa tipo DCTFWEB no banco             | TipoApuracao não tem DCTF_MENSAL; DCTFWEB é o tipo unificado                       |
+| 2026-06 | Código de receita PIS LP=6912, LR=5856           | DCTF Mensal diferencia LP (cumulativo) de LR (não-cumulativo)                      |
