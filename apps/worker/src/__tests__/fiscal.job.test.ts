@@ -42,6 +42,8 @@ const mockSpedFiscal = { gerar: vi.fn() }
 const mockSpedContrib = { gerar: vi.fn() }
 const mockIrpjCsllLR = { apurar: vi.fn() }
 const mockCreditosLR = { apurar: vi.fn() }
+const mockLALUR = { apurar: vi.fn() }
+const mockSimulador = { simular: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -64,6 +66,14 @@ vi.mock('@saas-contabil/fiscal', () => ({
   SpedContribuicoesService: vi.fn(() => mockSpedContrib),
   IrpjCsllLRService: vi.fn(() => mockIrpjCsllLR),
   CreditosPisCofinsLRService: vi.fn(() => mockCreditosLR),
+  RetencoesNaFonteService: vi.fn(() => ({ apurar: vi.fn() })),
+  IrpjCsllLREstimativaService: vi.fn(() => ({ apurar: vi.fn() })),
+  PrejuizosFiscaisLRService: vi.fn(() => ({ registrarPrejuizo: vi.fn(), compensar: vi.fn() })),
+  DepreciacaoLRService: vi.fn(() => ({ apurar: vi.fn() })),
+  INSSPatronalService: vi.fn(() => ({ calcular: vi.fn() })),
+  AjusteAnualLRService: vi.fn(() => ({ apurar: vi.fn() })),
+  LALURService: vi.fn(() => mockLALUR),
+  SimuladorTributarioService: vi.fn(() => mockSimulador),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -317,5 +327,55 @@ describe('fiscalJob — roteamento de operações', () => {
     await fiscalJob(makeJob('PGDAS'))
     expect(mockDifal.calcular).not.toHaveBeenCalled()
     expect(mockGNRE.gerar).not.toHaveBeenCalled()
+  })
+
+  it('LALUR → chama LALURService.apurar com meta', async () => {
+    mockLALUR.apurar.mockResolvedValue({ lucroReal: '150000', baseCSLL: '150000' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025-12',
+        operacao: 'LALUR',
+        meta: {
+          lucroLiquido: '200000',
+          adicoes: [{ descricao: 'Multa', valor: '10000' }],
+          exclusoes: [],
+        },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockLALUR.apurar).toHaveBeenCalledOnce()
+    const [tid, eid, comp] = mockLALUR.apurar.mock.calls[0]
+    expect(tid).toBe('t-1')
+    expect(eid).toBe('emp-1')
+    expect(comp).toBe('2025-12')
+  })
+
+  it('SIMULADOR_TRIBUTARIO → chama SimuladorTributarioService.simular com meta', async () => {
+    mockSimulador.simular.mockResolvedValue({
+      melhorRegime: 'SIMPLES_NACIONAL',
+      economiaAnual: '50000',
+    })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'SIMULADOR_TRIBUTARIO',
+        meta: {
+          receitaBrutaAnual: '500000',
+          atividade: 'comercio',
+          folhaPagamentoAnual: '100000',
+        },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockSimulador.simular).toHaveBeenCalledOnce()
+    const [tid, , atividade] = mockSimulador.simular.mock.calls[0]
+    expect(tid).toBe('t-1')
+    expect(atividade).toBe('comercio')
   })
 })
