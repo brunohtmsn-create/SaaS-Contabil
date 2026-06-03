@@ -18,6 +18,7 @@ const navItems = [
   { href: '/fiscal/sped-contribuicoes', label: 'EFD Contrib.', icon: '📊' },
   { href: '/fiscal/creditos-pis-cofins-lr', label: 'Créditos PIS/COFINS', icon: '💳' },
   { href: '/fiscal/retencoes-fonte', label: 'Retenções Fonte', icon: '✂️' },
+  { href: '/fiscal/ajuste-anual-lr', label: 'Ajuste Anual LR', icon: '🔄' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },
