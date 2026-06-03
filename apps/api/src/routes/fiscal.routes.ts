@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
-import { nowBR, parsePeriodo } from '@saas-contabil/shared'
+import { nowBR, parsePeriodo, Decimal } from '@saas-contabil/shared'
 import {
   PGDASService,
   DifalService,
@@ -30,6 +30,8 @@ import {
   DepreciacaoLRService,
   INSSPatronalService,
   AjusteAnualLRService,
+  LALURService,
+  SimuladorTributarioService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -1114,5 +1116,93 @@ export async function fiscalRoutes(app: FastifyInstance) {
       totais: { totalEmpresas, totalAtrasadas, totalProximas, totalEmDia },
       empresas: resumosPorEmpresa,
     }
+  })
+
+  // -------------------------------------------------------------------------
+  // LALUR — Livro de Apuração do Lucro Real
+  // -------------------------------------------------------------------------
+
+  const lalurBodySchema = z.object({
+    lucroLiquido: z.string(),
+    adicoes: z
+      .array(
+        z.object({
+          descricao: z.string(),
+          codigoECF: z.string().optional(),
+          valor: z.string(),
+        })
+      )
+      .default([]),
+    exclusoes: z
+      .array(
+        z.object({
+          descricao: z.string(),
+          codigoECF: z.string().optional(),
+          valor: z.string(),
+        })
+      )
+      .default([]),
+  })
+
+  app.post('/lalur/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const body = lalurBodySchema.parse(request.body)
+
+    const service = new LALURService()
+    return service.apurar(
+      tenantId,
+      empresaId,
+      competencia,
+      new Decimal(body.lucroLiquido),
+      body.adicoes.map((a) => ({
+        descricao: a.descricao,
+        valor: new Decimal(a.valor),
+        ...(a.codigoECF ? { codigoECF: a.codigoECF } : {}),
+      })),
+      body.exclusoes.map((e) => ({
+        descricao: e.descricao,
+        valor: new Decimal(e.valor),
+        ...(e.codigoECF ? { codigoECF: e.codigoECF } : {}),
+      }))
+    )
+  })
+
+  app.get('/lalur/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'IRPJ_LR' },
+      orderBy: { criadoEm: 'desc' },
+    })
+
+    if (!apuracao) return reply.code(404).send({ error: 'LALUR não encontrado' })
+    return apuracao
+  })
+
+  // -------------------------------------------------------------------------
+  // Simulador Tributário — Comparativo SN × LP × LR
+  // -------------------------------------------------------------------------
+
+  const simuladorBodySchema = z.object({
+    receitaBrutaAnual: z.string(),
+    atividade: z.string().default('servicos'),
+    folhaPagamentoAnual: z.string().default('0'),
+    lucroEstimadoAnual: z.string().optional(),
+  })
+
+  app.post('/simulador-tributario', async (request) => {
+    const { tenantId } = request.user as any
+    const body = simuladorBodySchema.parse(request.body)
+
+    const service = new SimuladorTributarioService()
+    return service.simular(
+      tenantId,
+      new Decimal(body.receitaBrutaAnual),
+      body.atividade,
+      new Decimal(body.folhaPagamentoAnual),
+      body.lucroEstimadoAnual ? new Decimal(body.lucroEstimadoAnual) : undefined
+    )
   })
 }

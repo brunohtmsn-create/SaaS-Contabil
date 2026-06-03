@@ -19,6 +19,8 @@ const navItems = [
   { href: '/fiscal/creditos-pis-cofins-lr', label: 'Créditos PIS/COFINS', icon: '💳' },
   { href: '/fiscal/retencoes-fonte', label: 'Retenções Fonte', icon: '✂️' },
   { href: '/fiscal/ajuste-anual-lr', label: 'Ajuste Anual LR', icon: '🔄' },
+  { href: '/fiscal/lalur', label: 'LALUR', icon: '📒' },
+  { href: '/fiscal/simulador-tributario', label: 'Simulador Tributário', icon: '🧮' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },

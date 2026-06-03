@@ -58,6 +58,8 @@ export { AjusteAnualLRService } from './ajuste-anual-lr.service.js'
 export type { ResultadoAjusteAnualLR, MesEstimativaIRPJ } from './ajuste-anual-lr.service.js'
 export { LALURService } from './lalur.service.js'
 export type { ResultadoLALUR, ItemAdicao, ItemExclusao, ItemCompensacao } from './lalur.service.js'
+export { SimuladorTributarioService } from './simulador-tributario.service.js'
+export type { ResultadoSimulacao, ResultadoRegime } from './simulador-tributario.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

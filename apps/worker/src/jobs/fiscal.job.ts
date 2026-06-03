@@ -26,6 +26,8 @@ import {
   DepreciacaoLRService,
   INSSPatronalService,
   AjusteAnualLRService,
+  LALURService,
+  SimuladorTributarioService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -60,6 +62,8 @@ type FiscalJobData = {
     | 'DEPRECIACAO_LR'
     | 'INSS_PATRONAL'
     | 'AJUSTE_ANUAL_LR'
+    | 'LALUR'
+    | 'SIMULADOR_TRIBUTARIO'
     | 'TODOS'
 }
 
@@ -247,6 +251,33 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
         new Decimal(meta.lucroRealAnual ?? '0'),
         new Decimal(meta.adicoesLALUR ?? '0'),
         new Decimal(meta.exclusoesLALUR ?? '0')
+      )
+      break
+    }
+    case 'LALUR': {
+      const { Decimal } = await import('@saas-contabil/shared')
+      const meta = (job.data as any).meta ?? {}
+      const lalur = new LALURService()
+      await lalur.apurar(
+        tenantId,
+        empresaId,
+        competencia,
+        new Decimal(meta.lucroLiquido ?? '0'),
+        (meta.adicoes ?? []).map((a: any) => ({ ...a, valor: new Decimal(a.valor) })),
+        (meta.exclusoes ?? []).map((e: any) => ({ ...e, valor: new Decimal(e.valor) }))
+      )
+      break
+    }
+    case 'SIMULADOR_TRIBUTARIO': {
+      const { Decimal } = await import('@saas-contabil/shared')
+      const meta = (job.data as any).meta ?? {}
+      const simulador = new SimuladorTributarioService()
+      await simulador.simular(
+        tenantId,
+        new Decimal(meta.receitaBrutaAnual ?? '0'),
+        meta.atividade ?? 'servicos',
+        new Decimal(meta.folhaPagamentoAnual ?? '0'),
+        meta.lucroEstimadoAnual ? new Decimal(meta.lucroEstimadoAnual) : undefined
       )
       break
     }
