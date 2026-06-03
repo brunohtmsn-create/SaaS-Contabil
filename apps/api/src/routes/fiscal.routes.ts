@@ -33,6 +33,7 @@ import {
   LALURService,
   SimuladorTributarioService,
   PlanejamentoTributarioService,
+  DiagnosticoFiscalService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -1255,5 +1256,17 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     if (!apuracao) return reply.code(404).send({ error: 'Planejamento tributário não encontrado' })
     return apuracao
+  })
+
+  // -------------------------------------------------------------------------
+  // Diagnóstico Fiscal — Saúde fiscal da empresa em uma competência
+  // -------------------------------------------------------------------------
+
+  app.get('/diagnostico/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new DiagnosticoFiscalService()
+    return service.diagnosticar(tenantId, empresaId, competencia)
   })
 }

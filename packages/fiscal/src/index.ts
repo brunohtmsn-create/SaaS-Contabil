@@ -65,6 +65,13 @@ export type {
   ResultadoPlanejamentoTributario,
   RiscoRégime,
 } from './planejamento-tributario.service.js'
+export { DiagnosticoFiscalService } from './diagnostico-fiscal.service.js'
+export type {
+  ResultadoDiagnosticoFiscal,
+  ItemDiagnostico,
+  IndicadorCompliance,
+  StatusItemDiagnostico,
+} from './diagnostico-fiscal.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,
