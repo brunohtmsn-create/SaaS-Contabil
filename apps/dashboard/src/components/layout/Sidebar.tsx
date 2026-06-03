@@ -21,6 +21,7 @@ const navItems = [
   { href: '/fiscal/ajuste-anual-lr', label: 'Ajuste Anual LR', icon: '🔄' },
   { href: '/fiscal/lalur', label: 'LALUR', icon: '📒' },
   { href: '/fiscal/simulador-tributario', label: 'Simulador Tributário', icon: '🧮' },
+  { href: '/fiscal/planejamento-tributario', label: 'Planejamento Tributário', icon: '📈' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },

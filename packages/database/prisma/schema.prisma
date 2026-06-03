@@ -339,6 +339,7 @@ enum TipoApuracao {
   COFINS
   ECD
   ECF
+  PLANEJAMENTO_TRIBUTARIO
 }
 
 enum StatusApuracao {
@@ -623,6 +624,7 @@ enum TipoEventoAudit {
   IRPJ_CSLL_LR_APURADO
   PIS_COFINS_LP_APURADO
   ECF_GERADO
+  PLANEJAMENTO_TRIBUTARIO_GERADO
 }
 
 enum TipoResponsavel {

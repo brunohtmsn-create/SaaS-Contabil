@@ -60,6 +60,11 @@ export { LALURService } from './lalur.service.js'
 export type { ResultadoLALUR, ItemAdicao, ItemExclusao, ItemCompensacao } from './lalur.service.js'
 export { SimuladorTributarioService } from './simulador-tributario.service.js'
 export type { ResultadoSimulacao, ResultadoRegime } from './simulador-tributario.service.js'
+export { PlanejamentoTributarioService } from './planejamento-tributario.service.js'
+export type {
+  ResultadoPlanejamentoTributario,
+  RiscoRégime,
+} from './planejamento-tributario.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

@@ -28,6 +28,7 @@ import {
   AjusteAnualLRService,
   LALURService,
   SimuladorTributarioService,
+  PlanejamentoTributarioService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -64,6 +65,7 @@ type FiscalJobData = {
     | 'AJUSTE_ANUAL_LR'
     | 'LALUR'
     | 'SIMULADOR_TRIBUTARIO'
+    | 'PLANEJAMENTO_TRIBUTARIO'
     | 'TODOS'
 }
 
@@ -278,6 +280,20 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
         meta.atividade ?? 'servicos',
         new Decimal(meta.folhaPagamentoAnual ?? '0'),
         meta.lucroEstimadoAnual ? new Decimal(meta.lucroEstimadoAnual) : undefined
+      )
+      break
+    }
+    case 'PLANEJAMENTO_TRIBUTARIO': {
+      const { Decimal } = await import('@saas-contabil/shared')
+      const meta = (job.data as any).meta ?? {}
+      const planejamento = new PlanejamentoTributarioService()
+      await planejamento.analisar(
+        tenantId,
+        empresaId,
+        Number(competencia), // competencia recebe o exercício (ex: "2025")
+        meta.receitaProjetadaAnual ? new Decimal(meta.receitaProjetadaAnual) : undefined,
+        meta.folhaProjetadaAnual ? new Decimal(meta.folhaProjetadaAnual) : undefined,
+        meta.lucroProjetadoAnual ? new Decimal(meta.lucroProjetadoAnual) : undefined
       )
       break
     }

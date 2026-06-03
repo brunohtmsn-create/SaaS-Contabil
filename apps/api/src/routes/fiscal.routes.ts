@@ -32,6 +32,7 @@ import {
   AjusteAnualLRService,
   LALURService,
   SimuladorTributarioService,
+  PlanejamentoTributarioService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -1204,5 +1205,55 @@ export async function fiscalRoutes(app: FastifyInstance) {
       new Decimal(body.folhaPagamentoAnual),
       body.lucroEstimadoAnual ? new Decimal(body.lucroEstimadoAnual) : undefined
     )
+  })
+
+  // -------------------------------------------------------------------------
+  // Planejamento Tributário — Relatório anual de recomendação de regime
+  // -------------------------------------------------------------------------
+
+  const planejamentoBodySchema = z.object({
+    exercicio: z.number().int().min(2020).max(2040),
+    receitaProjetadaAnual: z.string().optional(),
+    folhaProjetadaAnual: z.string().optional(),
+    lucroProjetadoAnual: z.string().optional(),
+  })
+
+  app.post('/planejamento-tributario/:empresaId', async (request) => {
+    const { tenantId } = request.user as any
+    const empresaId = z
+      .string()
+      .uuid()
+      .parse((request.params as any).empresaId)
+    const body = planejamentoBodySchema.parse(request.body)
+
+    const service = new PlanejamentoTributarioService()
+    return service.analisar(
+      tenantId,
+      empresaId,
+      body.exercicio,
+      body.receitaProjetadaAnual ? new Decimal(body.receitaProjetadaAnual) : undefined,
+      body.folhaProjetadaAnual ? new Decimal(body.folhaProjetadaAnual) : undefined,
+      body.lucroProjetadoAnual ? new Decimal(body.lucroProjetadoAnual) : undefined
+    )
+  })
+
+  app.get('/planejamento-tributario/:empresaId/:exercicio', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const empresaId = z
+      .string()
+      .uuid()
+      .parse((request.params as any).empresaId)
+    const exercicio = z
+      .string()
+      .regex(/^\d{4}$/)
+      .parse((request.params as any).exercicio)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia: exercicio, tipo: 'PLANEJAMENTO_TRIBUTARIO' },
+      orderBy: { criadoEm: 'desc' },
+    })
+
+    if (!apuracao) return reply.code(404).send({ error: 'Planejamento tributário não encontrado' })
+    return apuracao
   })
 }
