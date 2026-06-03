@@ -45,6 +45,8 @@ const mockSpedFiscal = { gerar: vi.fn() }
 const mockSpedContrib = { gerar: vi.fn() }
 const mockIrpjCsllLR = { apurar: vi.fn() }
 const mockCreditosLR = { apurar: vi.fn() }
+const mockLALUR = { apurar: vi.fn() }
+const mockSimulador = { simular: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -68,6 +70,14 @@ vi.mock('@saas-contabil/fiscal', () => ({
   SpedContribuicoesService: vi.fn(() => mockSpedContrib),
   IrpjCsllLRService: vi.fn(() => mockIrpjCsllLR),
   CreditosPisCofinsLRService: vi.fn(() => mockCreditosLR),
+  RetencoesNaFonteService: vi.fn(() => ({ apurar: vi.fn() })),
+  IrpjCsllLREstimativaService: vi.fn(() => ({ apurar: vi.fn() })),
+  PrejuizosFiscaisLRService: vi.fn(() => ({ registrarPrejuizo: vi.fn(), compensar: vi.fn() })),
+  DepreciacaoLRService: vi.fn(() => ({ apurar: vi.fn() })),
+  INSSPatronalService: vi.fn(() => ({ calcular: vi.fn() })),
+  AjusteAnualLRService: vi.fn(() => ({ apurar: vi.fn() })),
+  LALURService: vi.fn(() => mockLALUR),
+  SimuladorTributarioService: vi.fn(() => mockSimulador),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -1924,6 +1934,133 @@ describe('POST /fiscal/creditos-pis-cofins-lr/:empresaId/:competencia', () => {
 
   it('competencia inválida → 400', async () => {
     const res = await req('POST', `/fiscal/creditos-pis-cofins-lr/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/lalur/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/lalur/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama LALURService.apurar e retorna 201', async () => {
+    mockLALUR.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      lucroReal: '180000',
+      baseCSLL: '180000',
+    })
+
+    const res = await req('POST', `/fiscal/lalur/${EMPRESA_ID}/${COMPETENCIA}`, {
+      lucroLiquido: '200000',
+      adicoes: [{ descricao: 'Multa não dedutível', valor: '10000' }],
+      exclusoes: [{ descricao: 'Dividendos', valor: '30000' }],
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(mockLALUR.apurar).toHaveBeenCalledOnce()
+    const [tid, eid, comp] = mockLALUR.apurar.mock.calls[0]
+    expect(tid).toBe(TENANT_ID)
+    expect(eid).toBe(EMPRESA_ID)
+    expect(comp).toBe(COMPETENCIA)
+  })
+
+  it('sem adicoes/exclusoes (defaults) → 200', async () => {
+    mockLALUR.apurar.mockResolvedValueOnce({ lucroReal: '200000', baseCSLL: '200000' })
+
+    const res = await req('POST', `/fiscal/lalur/${EMPRESA_ID}/${COMPETENCIA}`, {
+      lucroLiquido: '200000',
+    })
+
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/lalur/${EMPRESA_ID}/2025-ZZ`, {
+      lucroLiquido: '100000',
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/lalur/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/lalur/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna apuração existente', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-1',
+      tipo: 'IRPJ_LR',
+      dados: { tipo: 'LALUR', lucroReal: '150000' },
+    })
+
+    const res = await req('GET', `/fiscal/lalur/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('404 quando não encontrado', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/lalur/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/simulador-tributario
+// ===========================================================================
+
+describe('POST /fiscal/simulador-tributario', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama SimuladorTributarioService.simular e retorna resultado', async () => {
+    mockSimulador.simular.mockResolvedValueOnce({
+      receitaBrutaAnual: '500000',
+      atividade: 'comercio',
+      resultados: [
+        { regime: 'SIMPLES_NACIONAL', totalTributos: '47500', cargaEfetiva: '0.095' },
+        { regime: 'LUCRO_PRESUMIDO', totalTributos: '91000', cargaEfetiva: '0.182' },
+        { regime: 'LUCRO_REAL', totalTributos: '100000', cargaEfetiva: '0.200' },
+      ],
+      melhorRegime: 'SIMPLES_NACIONAL',
+      economiaAnual: '52500',
+    })
+
+    const res = await req('POST', '/fiscal/simulador-tributario', {
+      receitaBrutaAnual: '500000',
+      atividade: 'comercio',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body)
+    expect(body.melhorRegime).toBe('SIMPLES_NACIONAL')
+    expect(mockSimulador.simular).toHaveBeenCalledOnce()
+    const [tid] = mockSimulador.simular.mock.calls[0]
+    expect(tid).toBe(TENANT_ID)
+  })
+
+  it('atividade default é servicos quando não informada', async () => {
+    mockSimulador.simular.mockResolvedValueOnce({
+      resultados: [],
+      melhorRegime: 'LUCRO_REAL',
+      economiaAnual: '0',
+    })
+
+    await req('POST', '/fiscal/simulador-tributario', { receitaBrutaAnual: '300000' })
+
+    const [, , atividade] = mockSimulador.simular.mock.calls[0]
+    expect(atividade).toBe('servicos')
+  })
+
+  it('body sem receitaBrutaAnual → 400', async () => {
+    const res = await req('POST', '/fiscal/simulador-tributario', {})
     expect(res.statusCode).toBe(400)
   })
 })
