@@ -103,7 +103,7 @@ export class CreditosPisCofinsLRService {
         empresaId,
         dataCompetencia: { gte: inicio, lte: fim },
         status: 'CONCILIADO',
-        direcao: { in: ['ENTRADA', 'TOMADO'] },
+        direcao: { in: ['ENTRADA'] },
         tipo: { in: ['NFE', 'NFSE_TOMADA', 'CTE'] },
       },
       orderBy: { dataEmissao: 'asc' },

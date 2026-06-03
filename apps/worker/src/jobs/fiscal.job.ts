@@ -22,6 +22,9 @@ import {
   CreditosPisCofinsLRService,
   RetencoesNaFonteService,
   IrpjCsllLREstimativaService,
+  PrejuizosFiscaisLRService,
+  DepreciacaoLRService,
+  INSSPatronalService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -52,6 +55,9 @@ type FiscalJobData = {
     | 'CREDITOS_PIS_COFINS_LR'
     | 'RETENCOES_FONTE'
     | 'IRPJ_CSLL_LR_ESTIMATIVA'
+    | 'PREJUIZOS_FISCAIS_LR'
+    | 'DEPRECIACAO_LR'
+    | 'INSS_PATRONAL'
     | 'TODOS'
 }
 
@@ -182,6 +188,50 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
       const meta = (job.data as any).meta ?? {}
       const estimativa = new IrpjCsllLREstimativaService()
       await estimativa.apurar(tenantId, empresaId, competencia, meta.atividadePrincipal)
+      break
+    }
+    case 'PREJUIZOS_FISCAIS_LR': {
+      const { Decimal } = await import('@saas-contabil/shared')
+      const meta = (job.data as any).meta ?? {}
+      const prejuizos = new PrejuizosFiscaisLRService()
+      if (meta.registrar) {
+        await prejuizos.registrarPrejuizo(
+          tenantId,
+          empresaId,
+          competencia,
+          new Decimal(meta.prejuizoIRPJ ?? '0'),
+          new Decimal(meta.prejuizoCSLL ?? '0')
+        )
+      } else {
+        await prejuizos.compensar(
+          tenantId,
+          empresaId,
+          competencia,
+          new Decimal(meta.lucroRealDoPeriodo ?? '0'),
+          new Decimal(meta.baseCSLLdoPeriodo ?? '0')
+        )
+      }
+      break
+    }
+    case 'DEPRECIACAO_LR': {
+      const meta = (job.data as any).meta ?? {}
+      const depreciacao = new DepreciacaoLRService()
+      await depreciacao.apurar(tenantId, empresaId, competencia, meta.bens ?? [])
+      break
+    }
+    case 'INSS_PATRONAL': {
+      const { Decimal } = await import('@saas-contabil/shared')
+      const meta = (job.data as any).meta ?? {}
+      const inss = new INSSPatronalService()
+      await inss.calcular(
+        tenantId,
+        empresaId,
+        competencia,
+        meta.funcionarios ?? [],
+        meta.grauRisco,
+        meta.fap ? new Decimal(meta.fap) : undefined,
+        meta.atividadeTerceiros
+      )
       break
     }
     case 'TODOS': {

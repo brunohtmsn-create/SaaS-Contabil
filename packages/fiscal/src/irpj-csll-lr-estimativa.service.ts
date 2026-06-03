@@ -97,7 +97,7 @@ export class IrpjCsllLREstimativaService {
         empresaId,
         dataCompetencia: { gte: inicio, lte: fim },
         status: 'CONCILIADO',
-        direcao: { in: ['SAIDA', 'EMITIDO'] },
+        direcao: { in: ['SAIDA'] },
         tipo: { in: ['NFE', 'NFCE', 'NFSE_EMITIDA'] },
       },
     })

@@ -94,7 +94,7 @@ export class RetencoesNaFonteService {
         dataCompetencia: { gte: inicio, lte: fim },
         status: 'CONCILIADO',
         tipo: { in: ['NFSE_TOMADA'] },
-        direcao: { in: ['TOMADO', 'ENTRADA'] },
+        direcao: { in: ['ENTRADA'] },
       },
       orderBy: { dataEmissao: 'asc' },
     })
