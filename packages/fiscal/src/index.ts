@@ -54,6 +54,8 @@ export type {
   FuncionarioINSS,
   ItemINSSPatronal,
 } from './inss-patronal.service.js'
+export { AjusteAnualLRService } from './ajuste-anual-lr.service.js'
+export type { ResultadoAjusteAnualLR, MesEstimativaIRPJ } from './ajuste-anual-lr.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

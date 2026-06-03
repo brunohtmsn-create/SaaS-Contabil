@@ -25,6 +25,7 @@ import {
   PrejuizosFiscaisLRService,
   DepreciacaoLRService,
   INSSPatronalService,
+  AjusteAnualLRService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -58,6 +59,7 @@ type FiscalJobData = {
     | 'PREJUIZOS_FISCAIS_LR'
     | 'DEPRECIACAO_LR'
     | 'INSS_PATRONAL'
+    | 'AJUSTE_ANUAL_LR'
     | 'TODOS'
 }
 
@@ -231,6 +233,20 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
         meta.grauRisco,
         meta.fap ? new Decimal(meta.fap) : undefined,
         meta.atividadeTerceiros
+      )
+      break
+    }
+    case 'AJUSTE_ANUAL_LR': {
+      const { Decimal } = await import('@saas-contabil/shared')
+      const meta = (job.data as any).meta ?? {}
+      const ajuste = new AjusteAnualLRService()
+      await ajuste.apurar(
+        tenantId,
+        empresaId,
+        Number(competencia), // competencia recebe o ano (ex: "2025")
+        new Decimal(meta.lucroRealAnual ?? '0'),
+        new Decimal(meta.adicoesLALUR ?? '0'),
+        new Decimal(meta.exclusoesLALUR ?? '0')
       )
       break
     }

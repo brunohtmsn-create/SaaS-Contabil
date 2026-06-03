@@ -29,6 +29,7 @@ import {
   PrejuizosFiscaisLRService,
   DepreciacaoLRService,
   INSSPatronalService,
+  AjusteAnualLRService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -581,7 +582,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const apuracao = await db.apuracaoFiscal.findFirst({
       where: { tenantId, empresaId, tipo: 'IRPJ_LR' },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { criadoEm: 'desc' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'Apuração IRPJ LR não encontrada' })
     return apuracao
@@ -604,7 +605,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const apuracao = await db.apuracaoFiscal.findFirst({
       where: { tenantId, empresaId, competencia, tipo: 'COFINS' },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { criadoEm: 'desc' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'Créditos PIS/COFINS LR não encontrados' })
     return apuracao
@@ -642,8 +643,8 @@ export async function fiscalRoutes(app: FastifyInstance) {
         id: f.id,
         nome: f.nome,
         salarioBase: new Decimal(f.salarioBase),
-        adicional13: f.adicional13 ? new Decimal(f.adicional13) : undefined,
-        adicionaisVariaveis: f.adicionaisVariaveis ? new Decimal(f.adicionaisVariaveis) : undefined,
+        ...(f.adicional13 && { adicional13: new Decimal(f.adicional13) }),
+        ...(f.adicionaisVariaveis && { adicionaisVariaveis: new Decimal(f.adicionaisVariaveis) }),
       })),
       body.grauRisco,
       new Decimal(body.fap),
@@ -688,9 +689,9 @@ export async function fiscalRoutes(app: FastifyInstance) {
         valorAquisicao: new Decimal(b.valorAquisicao),
         dataAquisicao: new Date(b.dataAquisicao),
         vidaUtilAnos: b.vidaUtilAnos ?? 10,
-        taxaAnualPersonalizada: b.taxaAnualPersonalizada
-          ? new Decimal(b.taxaAnualPersonalizada)
-          : undefined,
+        ...(b.taxaAnualPersonalizada && {
+          taxaAnualPersonalizada: new Decimal(b.taxaAnualPersonalizada),
+        }),
         turnoTrabalho: b.turnoTrabalho,
         valorResidual: new Decimal(b.valorResidual),
       }))
@@ -770,7 +771,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const apuracao = await db.apuracaoFiscal.findFirst({
       where: { tenantId, empresaId, competencia, tipo: 'IRPJ_LR' },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { criadoEm: 'desc' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'Estimativa IRPJ/CSLL LR não encontrada' })
     return apuracao
@@ -791,9 +792,52 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const apuracao = await db.apuracaoFiscal.findFirst({
       where: { tenantId, empresaId, competencia, tipo: 'DCTFWEB' },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { criadoEm: 'desc' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'Retenções na fonte não encontradas' })
+    return apuracao
+  })
+
+  app.post('/ajuste-anual-lr/:empresaId/:ano', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId } = params.parse(request.params)
+    const { ano: anoParam } = z.object({ ano: z.string().regex(/^\d{4}$/) }).parse(request.params)
+    const { lucroRealAnual, adicoesLALUR, exclusoesLALUR } = z
+      .object({
+        lucroRealAnual: z.string().default('0'),
+        adicoesLALUR: z.string().default('0'),
+        exclusoesLALUR: z.string().default('0'),
+      })
+      .parse(request.body ?? {})
+
+    const { Decimal } = await import('@saas-contabil/shared')
+    const service = new AjusteAnualLRService()
+    const resultado = await service.apurar(
+      tenantId,
+      empresaId,
+      Number(anoParam),
+      new Decimal(lucroRealAnual),
+      new Decimal(adicoesLALUR),
+      new Decimal(exclusoesLALUR)
+    )
+    return reply.code(200).send(resultado)
+  })
+
+  app.get('/ajuste-anual-lr/:empresaId/:ano', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId } = params.parse(request.params)
+    const { ano: anoParam } = z.object({ ano: z.string().regex(/^\d{4}$/) }).parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: {
+        tenantId,
+        empresaId,
+        competencia: `${anoParam}-12`,
+        tipo: 'IRPJ_LR',
+      },
+      orderBy: { criadoEm: 'desc' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'Ajuste anual LR não encontrado' })
     return apuracao
   })
 
