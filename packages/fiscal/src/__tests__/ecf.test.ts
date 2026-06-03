@@ -264,7 +264,7 @@ describe('ECFService — persistência', () => {
     expect(upsertCall[0].create.status).toBe('CALCULADO')
   })
 
-  it('busca apurações IRPJ_LP dos 4 trimestres do ano', async () => {
+  it('busca apurações IRPJ_LP dos 4 trimestres do ano (LP)', async () => {
     const service = new ECFService()
     await service.gerar(TENANT_ID, EMPRESA_ID, 2025)
 
@@ -273,6 +273,19 @@ describe('ECFService — persistência', () => {
     expect(findCall.where.competencia.in).toEqual(['2025-T1', '2025-T2', '2025-T3', '2025-T4'])
     expect(findCall.where.tenantId).toBe(TENANT_ID)
     expect(findCall.where.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('busca apurações IRPJ_LR quando empresa é Lucro Real', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      ...EMPRESA_LP,
+      regime: 'LUCRO_REAL',
+    })
+
+    const service = new ECFService()
+    await service.gerar(TENANT_ID, EMPRESA_ID, 2025)
+
+    const findCall = mockDb.apuracaoFiscal.findMany.mock.calls[0][0]
+    expect(findCall.where.tipo).toBe('IRPJ_LR')
   })
 })
 

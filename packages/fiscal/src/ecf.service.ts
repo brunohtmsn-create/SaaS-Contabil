@@ -43,13 +43,14 @@ export class ECFService {
     if (empresa.regime !== 'LUCRO_PRESUMIDO' && empresa.regime !== 'LUCRO_REAL')
       throw new Error('ECF é obrigatória apenas para Lucro Presumido ou Lucro Real')
 
-    // Busca os 4 trimestres de IRPJ já apurados no ano
+    // Busca os 4 trimestres de IRPJ já apurados no ano (tipo varia por regime)
+    const tipoIRPJ = empresa.regime === 'LUCRO_REAL' ? 'IRPJ_LR' : 'IRPJ_LP'
     const trimestresLabel = [`${ano}-T1`, `${ano}-T2`, `${ano}-T3`, `${ano}-T4`]
     const apuracoes = await this.db.apuracaoFiscal.findMany({
       where: {
         tenantId,
         empresaId,
-        tipo: 'IRPJ_LP',
+        tipo: tipoIRPJ,
         competencia: { in: trimestresLabel },
       },
     })
@@ -70,9 +71,12 @@ export class ECFService {
         }
       }
       const d = ap.dados as any
+      // LP: receita = receitaBrutaTrimestral; LR: receita = lucroRealTrimestral
+      const receitaField =
+        empresa.regime === 'LUCRO_REAL' ? d.lucroRealTrimestral : d.receitaBrutaTrimestral
       return {
         trimestre: label,
-        receita: new Decimal(d.receitaBrutaTrimestral?.toString() ?? '0'),
+        receita: new Decimal(receitaField?.toString() ?? '0'),
         baseIRPJ: new Decimal(d.baseCalculoIRPJ?.toString() ?? '0'),
         baseCSLL: new Decimal(d.baseCalculoCSLL?.toString() ?? '0'),
         irpjNormal: new Decimal(d.irpjNormal?.toString() ?? '0'),

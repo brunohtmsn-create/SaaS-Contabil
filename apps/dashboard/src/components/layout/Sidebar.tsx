@@ -13,6 +13,7 @@ const navItems = [
   { href: '/fiscal/dasn', label: 'DASN / DEFIS', icon: '📋' },
   { href: '/fiscal/lplr', label: 'LP / LR', icon: '🏛️' },
   { href: '/fiscal/ecf', label: 'ECF', icon: '📑' },
+  { href: '/fiscal/lr', label: 'IRPJ/CSLL LR', icon: '🏦' },
   { href: '/fiscal/sped-fiscal', label: 'SPED Fiscal', icon: '🗂️' },
   { href: '/fiscal/sped-contribuicoes', label: 'EFD Contrib.', icon: '📊' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
