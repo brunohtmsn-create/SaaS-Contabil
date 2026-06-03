@@ -1,6 +1,6 @@
 # Memória do Projeto — SaaS Contábil Automatizado
 
-> Atualizado em: 2026-06-02 (sessão 4)
+> Atualizado em: 2026-06-03 (sessão 5)
 
 ---
 
@@ -97,6 +97,23 @@ infra/
   - Gera blocos A100 (NFSe), C100 (NF-e/NFC-e), M001/M200/M600 (apurações), 9999
   - Prazo: dia 10 do M+2 (diferente do SPED Fiscal — dia 15)
   - tipo PIS no banco; evento PIS_COFINS_LP_APURADO no audit
+- [x] **IrpjCsllLRService** — apuração trimestral IRPJ + CSLL para Lucro Real (34 testes)
+  - Parâmetros opcionais: lucroContabilTrimestral, adicoesLALUR, exclusoesLALUR
+  - IRPJ 15% normal + 10% adicional sobre base > R$60.000/trimestre; CSLL 9%
+  - Base negativa/zero → contribuições zeradas
+  - Persiste IRPJ_LR e CSLL_LR; evento IRPJ_CSLL_LR_APURADO no audit
+- [x] **CreditosPisCofinsLRService** — créditos PIS/COFINS não-cumulativos (17 testes)
+  - Exclusivo LUCRO_REAL; PIS 1,65% / COFINS 7,6%
+  - Se doc tem valorPis/valorCofins → usa do documento; senão calcula pela alíquota padrão
+  - Filtra por lista de CFOPs creditáveis (compras p/ revenda, insumos, serviços, energia, fretes)
+  - CFOP não creditável → ignora o documento
+  - Persiste tipo COFINS; evento PIS_COFINS_LP_APURADO
+- [x] **RetencoesNaFonteService** — retenções IRRF + CSRF para tomadores LP/LR (25 testes)
+  - IRRF 1,5% (serviços profissionais) sobre todos os pagamentos, sem limite mínimo
+  - CSRF (PIS 0,65% + COFINS 3% + CSLL 1%) somente quando total ao prestador > R$5.000/mês
+  - Agrupa por CNPJ prestador; prazo recolhimento dia 20 do mês seguinte
+  - Persiste tipo DCTFWEB; evento DCTFWEB_TRANSMITIDA no audit
+- [x] **ECFService (bugfix)** — busca IRPJ_LR quando empresa é Lucro Real (antes sempre IRPJ_LP)
 
 ### Módulo Fiscal — Fase 1 (packages/fiscal)
 
@@ -158,10 +175,13 @@ infra/
   - **DCTF Mensal**: `POST/GET /fiscal/dctf-mensal/:empresaId/:competencia`
   - **SPED Fiscal**: `POST/GET /fiscal/sped-fiscal/:empresaId/:competencia`
   - **SPED Contribuições**: `POST/GET /fiscal/sped-contribuicoes/:empresaId/:competencia`
+  - **IRPJ+CSLL LR**: `POST/GET /fiscal/irpj-csll-lr/:empresaId/:competencia`
+  - **Créditos PIS/COFINS LR**: `POST/GET /fiscal/creditos-pis-cofins-lr/:empresaId/:competencia`
+  - **Retenções na Fonte**: `POST/GET /fiscal/retencoes-fonte/:empresaId/:competencia`
 
 ### Worker (apps/worker)
 
-- [x] **fiscal.job.ts** — 18 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, IRPJ_CSLL_LP, PIS_COFINS_LP, ECF, DCTF_MENSAL, SPED_FISCAL, SPED_CONTRIBUICOES, TODOS)
+- [x] **fiscal.job.ts** — 22 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, IRPJ_CSLL_LP, PIS_COFINS_LP, ECF, DCTF_MENSAL, SPED_FISCAL, SPED_CONTRIBUICOES, IRPJ_CSLL_LR, CREDITOS_PIS_COFINS_LR, RETENCOES_FONTE, TODOS)
 - [x] **fechamento.job.ts** — fechamento mensal completo (15 etapas)
 - [x] **scraper.job.ts** — captura NF-e, NFC-e, NFSe
 - [x] **bancario.job.ts** — conciliação bancária
@@ -180,6 +200,11 @@ infra/
 - [x] `/fiscal/dasn` — DASN/DEFIS: seletor empresa/ano, tabela mensal, badge status
 - [x] **`/fiscal/lplr`** — Apuração IRPJ+CSLL (trimestral) e PIS+COFINS (mensal) para LP/LR
 - [x] **`/fiscal/ecf`** — ECF anual com detalhamento por trimestre e tabela de resultados
+- [x] **`/fiscal/lr`** — IRPJ/CSLL LR com formulário LALUR (lucro contábil + adições/exclusões)
+- [x] **`/fiscal/sped-fiscal`** — EFD ICMS/IPI com download do arquivo .txt
+- [x] **`/fiscal/sped-contribuicoes`** — EFD PIS/COFINS com cards LP vs LR e download
+- [x] **`/fiscal/creditos-pis-cofins-lr`** — Créditos PIS/COFINS LR com tabela de documentos por CFOP
+- [x] **`/fiscal/retencoes-fonte`** — Retenções IRRF+CSRF com detalhamento por prestador
 - [x] `/obrigacoes` — Obrigações com filtros, calendário individual + **batch SN/MEI e batch LP/LR**
 - [x] `/fgts` — FGTS Digital com apuração mensal
 - [x] `/conciliacao` — Conciliação com aprovação/rejeição manual
@@ -195,10 +220,10 @@ infra/
 ### Banco de Dados (packages/database)
 
 - [x] **Schema Prisma** completo com RLS por tenantId
-- [x] **Enums:** TipoObrigacao (inclui DASN, FGTS_DIGITAL, DMS, ECD, ECF), TipoApuracao (inclui IRPJ_LP, CSLL_LP, PIS, COFINS, ECD, ECF), TipoEventoAudit (inclui DASN_GERADA, CALENDARIO_ANUAL_GERADO, DMS_APURADA, IRPJ_CSLL_LP_APURADO, PIS_COFINS_LP_APURADO, ECF_GERADO)
+- [x] **Enums:** TipoObrigacao (inclui DASN, FGTS_DIGITAL, DMS, ECD, ECF), TipoApuracao (inclui IRPJ_LP, CSLL_LP, PIS, COFINS, ECD, ECF, IRPJ_LR, CSLL_LR, DCTFWEB), TipoEventoAudit (inclui DASN_GERADA, CALENDARIO_ANUAL_GERADO, DMS_APURADA, IRPJ_CSLL_LP_APURADO, PIS_COFINS_LP_APURADO, ECF_GERADO, IRPJ_CSLL_LR_APURADO)
 - [x] **Prisma Client** regenerado após cada adição de enum
 
-### Testes (Total: ~1.581 testes passando)
+### Testes (Total: ~1.657 testes passando)
 
 | Pacote                 | Testes | Status |
 | ---------------------- | ------ | ------ |
@@ -209,7 +234,7 @@ infra/
 | packages/conciliation  | 42     | ✅     |
 | packages/notifications | 56     | ✅     |
 | packages/storage       | 59     | ✅     |
-| packages/fiscal        | 445    | ✅     |
+| packages/fiscal        | 521    | ✅     |
 | packages/portals       | 58     | ✅     |
 | packages/contabil      | 97     | ✅     |
 | packages/scraper       | 44     | ✅     |
@@ -245,8 +270,14 @@ infra/
 - [x] **Páginas dashboard:** `/fiscal/lplr` (IRPJ+CSLL, PIS+COFINS), `/fiscal/ecf` (ECF anual)
 - [x] **SPED Fiscal** — EFD ICMS/IPI para LP/LR (23 testes)
 - [x] **SPED Contribuições** — EFD PIS/COFINS LP/LR (23 testes)
-- [ ] **IRPJ/CSLL Lucro Real** — ajustes de lucro contábil (apuração diferente do LP)
-- [ ] **Páginas dashboard SPED** — `/fiscal/sped-fiscal` e `/fiscal/sped-contribuicoes`
+- [x] **IRPJ/CSLL Lucro Real** — IrpjCsllLRService com LALUR (34 testes)
+- [x] **Créditos PIS/COFINS LR** — CreditosPisCofinsLRService não-cumulativo (17 testes)
+- [x] **Retenções na Fonte** — IRRF + CSRF LP/LR por prestador (25 testes)
+- [x] **Páginas dashboard LP/LR** — `/fiscal/lr`, `/fiscal/sped-fiscal`, `/fiscal/sped-contribuicoes`, `/fiscal/creditos-pis-cofins-lr`, `/fiscal/retencoes-fonte`
+- [ ] **LALUR/LACS digital** — livro eletrônico para o ECF (adições/exclusões/compensações detalhadas)
+- [ ] **Depreciação acelerada LR** — tabela de bens com taxa e vida útil
+- [ ] **Compensação de prejuízos fiscais LR** — limite 30% do lucro trimestral
+- [ ] **Estimativas mensais IRPJ/CSLL LR** — para LR com tributação por estimativa (DARF mensal)
 
 ### Melhorias Técnicas Pendentes
 
