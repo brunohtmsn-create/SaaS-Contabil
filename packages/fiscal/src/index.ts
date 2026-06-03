@@ -33,6 +33,8 @@ export type {
   ResultadoCreditosPisCofinsLR,
   ItemCreditoPisCofins,
 } from './creditos-pis-cofins-lr.service.js'
+export { RetencoesNaFonteService } from './retencoes-fonte.service.js'
+export type { ResultadoRetencoesNaFonte, RetencaoPorPrestador } from './retencoes-fonte.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

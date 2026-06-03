@@ -20,6 +20,7 @@ import {
   SpedContribuicoesService,
   IrpjCsllLRService,
   CreditosPisCofinsLRService,
+  RetencoesNaFonteService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -48,6 +49,7 @@ type FiscalJobData = {
     | 'SPED_CONTRIBUICOES'
     | 'IRPJ_CSLL_LR'
     | 'CREDITOS_PIS_COFINS_LR'
+    | 'RETENCOES_FONTE'
     | 'TODOS'
 }
 
@@ -167,6 +169,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'CREDITOS_PIS_COFINS_LR': {
       const creditosLr = new CreditosPisCofinsLRService()
       await creditosLr.apurar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'RETENCOES_FONTE': {
+      const retencoes = new RetencoesNaFonteService()
+      await retencoes.apurar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {

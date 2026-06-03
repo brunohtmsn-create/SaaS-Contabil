@@ -24,6 +24,7 @@ import {
   SpedContribuicoesService,
   IrpjCsllLRService,
   CreditosPisCofinsLRService,
+  RetencoesNaFonteService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -602,6 +603,27 @@ export async function fiscalRoutes(app: FastifyInstance) {
       orderBy: { createdAt: 'desc' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'Créditos PIS/COFINS LR não encontrados' })
+    return apuracao
+  })
+
+  app.post('/retencoes-fonte/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new RetencoesNaFonteService()
+    const resultado = await service.apurar(tenantId, empresaId, competencia)
+    return reply.code(201).send(resultado)
+  })
+
+  app.get('/retencoes-fonte/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'DCTFWEB' },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'Retenções na fonte não encontradas' })
     return apuracao
   })
 

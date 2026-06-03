@@ -16,6 +16,8 @@ const navItems = [
   { href: '/fiscal/lr', label: 'IRPJ/CSLL LR', icon: '🏦' },
   { href: '/fiscal/sped-fiscal', label: 'SPED Fiscal', icon: '🗂️' },
   { href: '/fiscal/sped-contribuicoes', label: 'EFD Contrib.', icon: '📊' },
+  { href: '/fiscal/creditos-pis-cofins-lr', label: 'Créditos PIS/COFINS', icon: '💳' },
+  { href: '/fiscal/retencoes-fonte', label: 'Retenções Fonte', icon: '✂️' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },
