@@ -44,6 +44,7 @@ const mockDCTFMensal = { gerar: vi.fn() }
 const mockSpedFiscal = { gerar: vi.fn() }
 const mockSpedContrib = { gerar: vi.fn() }
 const mockIrpjCsllLR = { apurar: vi.fn() }
+const mockCreditosLR = { apurar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -66,6 +67,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   SpedFiscalService: vi.fn(() => mockSpedFiscal),
   SpedContribuicoesService: vi.fn(() => mockSpedContrib),
   IrpjCsllLRService: vi.fn(() => mockIrpjCsllLR),
+  CreditosPisCofinsLRService: vi.fn(() => mockCreditosLR),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -1893,6 +1895,35 @@ describe('POST /fiscal/irpj-csll-lr/:empresaId/:competencia', () => {
 
   it('competencia inválida → 400', async () => {
     const res = await req('POST', `/fiscal/irpj-csll-lr/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/creditos-pis-cofins-lr/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/creditos-pis-cofins-lr/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama CreditosPisCofinsLRService.apurar e retorna 201', async () => {
+    mockCreditosLR.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalDocumentosEntrada: 3,
+      totalCreditoPIS: '1650',
+      totalCreditoCOFINS: '7600',
+      totalCreditosCombinados: '9250',
+    })
+
+    const res = await req('POST', `/fiscal/creditos-pis-cofins-lr/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockCreditosLR.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/creditos-pis-cofins-lr/${EMPRESA_ID}/2025-ZZ`)
     expect(res.statusCode).toBe(400)
   })
 })

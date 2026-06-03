@@ -41,6 +41,7 @@ const mockDCTFMensal = { gerar: vi.fn() }
 const mockSpedFiscal = { gerar: vi.fn() }
 const mockSpedContrib = { gerar: vi.fn() }
 const mockIrpjCsllLR = { apurar: vi.fn() }
+const mockCreditosLR = { apurar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -62,6 +63,7 @@ vi.mock('@saas-contabil/fiscal', () => ({
   SpedFiscalService: vi.fn(() => mockSpedFiscal),
   SpedContribuicoesService: vi.fn(() => mockSpedContrib),
   IrpjCsllLRService: vi.fn(() => mockIrpjCsllLR),
+  CreditosPisCofinsLRService: vi.fn(() => mockCreditosLR),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -251,6 +253,13 @@ describe('fiscalJob — roteamento de operações', () => {
     } as any
     await fiscalJob(job)
     expect(mockIrpjCsllLR.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('CREDITOS_PIS_COFINS_LR → chama CreditosPisCofinsLRService.apurar', async () => {
+    mockCreditosLR.apurar.mockResolvedValue({ totalCreditoPIS: '1650', totalCreditoCOFINS: '7600' })
+    await fiscalJob(makeJob('CREDITOS_PIS_COFINS_LR'))
+    expect(mockCreditosLR.apurar).toHaveBeenCalledOnce()
+    expect(mockCreditosLR.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
   })
 
   it('SPED_FISCAL → chama SpedFiscalService.gerar com competencia', async () => {

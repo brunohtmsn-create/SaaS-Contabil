@@ -19,6 +19,7 @@ import {
   SpedFiscalService,
   SpedContribuicoesService,
   IrpjCsllLRService,
+  CreditosPisCofinsLRService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -46,6 +47,7 @@ type FiscalJobData = {
     | 'SPED_FISCAL'
     | 'SPED_CONTRIBUICOES'
     | 'IRPJ_CSLL_LR'
+    | 'CREDITOS_PIS_COFINS_LR'
     | 'TODOS'
 }
 
@@ -160,6 +162,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
         new Decimal(meta.adicoesLALUR ?? '0'),
         new Decimal(meta.exclusoesLALUR ?? '0')
       )
+      break
+    }
+    case 'CREDITOS_PIS_COFINS_LR': {
+      const creditosLr = new CreditosPisCofinsLRService()
+      await creditosLr.apurar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {

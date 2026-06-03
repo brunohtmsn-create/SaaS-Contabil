@@ -28,6 +28,11 @@ export { SpedContribuicoesService } from './sped-contribuicoes.service.js'
 export type { ResultadoSpedContribuicoes } from './sped-contribuicoes.service.js'
 export { IrpjCsllLRService } from './irpj-csll-lr.service.js'
 export type { ResultadoIrpjCsllLR } from './irpj-csll-lr.service.js'
+export { CreditosPisCofinsLRService } from './creditos-pis-cofins-lr.service.js'
+export type {
+  ResultadoCreditosPisCofinsLR,
+  ItemCreditoPisCofins,
+} from './creditos-pis-cofins-lr.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

@@ -23,6 +23,7 @@ import {
   SpedFiscalService,
   SpedContribuicoesService,
   IrpjCsllLRService,
+  CreditosPisCofinsLRService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -578,6 +579,29 @@ export async function fiscalRoutes(app: FastifyInstance) {
       orderBy: { createdAt: 'desc' },
     })
     if (!apuracao) return reply.code(404).send({ error: 'Apuração IRPJ LR não encontrada' })
+    return apuracao
+  })
+
+  // POST /fiscal/creditos-pis-cofins-lr/:empresaId/:competencia — apura créditos PIS/COFINS LR
+  app.post('/creditos-pis-cofins-lr/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new CreditosPisCofinsLRService()
+    const resultado = await service.apurar(tenantId, empresaId, competencia)
+    return reply.code(201).send(resultado)
+  })
+
+  // GET /fiscal/creditos-pis-cofins-lr/:empresaId/:competencia — consulta créditos
+  app.get('/creditos-pis-cofins-lr/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'COFINS' },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'Créditos PIS/COFINS LR não encontrados' })
     return apuracao
   })
 
