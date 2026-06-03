@@ -28,6 +28,7 @@ import {
   IrpjCsllLREstimativaService,
   PrejuizosFiscaisLRService,
   DepreciacaoLRService,
+  INSSPatronalService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -607,6 +608,48 @@ export async function fiscalRoutes(app: FastifyInstance) {
     })
     if (!apuracao) return reply.code(404).send({ error: 'Créditos PIS/COFINS LR não encontrados' })
     return apuracao
+  })
+
+  app.post('/inss-patronal/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const body = z
+      .object({
+        funcionarios: z
+          .array(
+            z.object({
+              id: z.string(),
+              nome: z.string(),
+              salarioBase: z.string(),
+              adicional13: z.string().optional(),
+              adicionaisVariaveis: z.string().optional(),
+            })
+          )
+          .default([]),
+        grauRisco: z.enum(['leve', 'medio', 'grave']).default('medio'),
+        fap: z.string().default('1.0'),
+        atividadeTerceiros: z.string().default('outros'),
+      })
+      .parse(request.body ?? {})
+
+    const { Decimal } = await import('@saas-contabil/shared')
+    const service = new INSSPatronalService()
+    const resultado = await service.calcular(
+      tenantId,
+      empresaId,
+      competencia,
+      body.funcionarios.map((f) => ({
+        id: f.id,
+        nome: f.nome,
+        salarioBase: new Decimal(f.salarioBase),
+        adicional13: f.adicional13 ? new Decimal(f.adicional13) : undefined,
+        adicionaisVariaveis: f.adicionaisVariaveis ? new Decimal(f.adicionaisVariaveis) : undefined,
+      })),
+      body.grauRisco,
+      new Decimal(body.fap),
+      body.atividadeTerceiros
+    )
+    return reply.code(200).send(resultado)
   })
 
   app.post('/depreciacao-lr/:empresaId/:competencia', async (request, reply) => {

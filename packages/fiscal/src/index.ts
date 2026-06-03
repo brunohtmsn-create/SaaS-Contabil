@@ -48,6 +48,12 @@ export type {
   BemDepreciavel,
   ItemDepreciacao,
 } from './depreciacao-lr.service.js'
+export { INSSPatronalService } from './inss-patronal.service.js'
+export type {
+  ResultadoINSSPatronal,
+  FuncionarioINSS,
+  ItemINSSPatronal,
+} from './inss-patronal.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,
