@@ -56,6 +56,8 @@ export type {
 } from './inss-patronal.service.js'
 export { AjusteAnualLRService } from './ajuste-anual-lr.service.js'
 export type { ResultadoAjusteAnualLR, MesEstimativaIRPJ } from './ajuste-anual-lr.service.js'
+export { LALURService } from './lalur.service.js'
+export type { ResultadoLALUR, ItemAdicao, ItemExclusao, ItemCompensacao } from './lalur.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,
