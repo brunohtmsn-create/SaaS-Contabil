@@ -27,6 +27,7 @@ import {
   RetencoesNaFonteService,
   IrpjCsllLREstimativaService,
   PrejuizosFiscaisLRService,
+  DepreciacaoLRService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -606,6 +607,62 @@ export async function fiscalRoutes(app: FastifyInstance) {
     })
     if (!apuracao) return reply.code(404).send({ error: 'Créditos PIS/COFINS LR não encontrados' })
     return apuracao
+  })
+
+  app.post('/depreciacao-lr/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const { bens } = z
+      .object({
+        bens: z
+          .array(
+            z.object({
+              id: z.string(),
+              descricao: z.string(),
+              categoria: z.string(),
+              valorAquisicao: z.string(),
+              dataAquisicao: z.string(),
+              vidaUtilAnos: z.number().int().positive().optional(),
+              taxaAnualPersonalizada: z.string().optional(),
+              turnoTrabalho: z.enum(['simples', 'duplo', 'triplo']).default('simples'),
+              valorResidual: z.string().default('0'),
+            })
+          )
+          .default([]),
+      })
+      .parse(request.body ?? {})
+
+    const { Decimal } = await import('@saas-contabil/shared')
+    const service = new DepreciacaoLRService()
+    const resultado = await service.apurar(
+      tenantId,
+      empresaId,
+      competencia,
+      bens.map((b) => ({
+        id: b.id,
+        descricao: b.descricao,
+        categoria: b.categoria,
+        valorAquisicao: new Decimal(b.valorAquisicao),
+        dataAquisicao: new Date(b.dataAquisicao),
+        vidaUtilAnos: b.vidaUtilAnos ?? 10,
+        taxaAnualPersonalizada: b.taxaAnualPersonalizada
+          ? new Decimal(b.taxaAnualPersonalizada)
+          : undefined,
+        turnoTrabalho: b.turnoTrabalho,
+        valorResidual: new Decimal(b.valorResidual),
+      }))
+    )
+    return reply.code(200).send(resultado)
+  })
+
+  app.get('/depreciacao-lr/categorias', async (_request, reply) => {
+    const service = new DepreciacaoLRService()
+    return reply.send({
+      categorias: service.getCategorias().map((cat) => ({
+        categoria: cat,
+        ...service.getTaxaDepreciacao(cat),
+      })),
+    })
   })
 
   app.post('/prejuizos-fiscais-lr/:empresaId/:competencia', async (request, reply) => {

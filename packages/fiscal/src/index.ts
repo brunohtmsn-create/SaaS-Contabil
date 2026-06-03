@@ -42,6 +42,12 @@ export type {
   ResultadoCompensacaoPrejuizo,
   PrejuizoAcumulado,
 } from './prejuizos-fiscais-lr.service.js'
+export { DepreciacaoLRService } from './depreciacao-lr.service.js'
+export type {
+  ResultadoDepreciacaoLR,
+  BemDepreciavel,
+  ItemDepreciacao,
+} from './depreciacao-lr.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,
