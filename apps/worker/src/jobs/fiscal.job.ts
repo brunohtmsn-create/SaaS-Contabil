@@ -21,6 +21,7 @@ import {
   IrpjCsllLRService,
   CreditosPisCofinsLRService,
   RetencoesNaFonteService,
+  IrpjCsllLREstimativaService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -50,6 +51,7 @@ type FiscalJobData = {
     | 'IRPJ_CSLL_LR'
     | 'CREDITOS_PIS_COFINS_LR'
     | 'RETENCOES_FONTE'
+    | 'IRPJ_CSLL_LR_ESTIMATIVA'
     | 'TODOS'
 }
 
@@ -174,6 +176,12 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'RETENCOES_FONTE': {
       const retencoes = new RetencoesNaFonteService()
       await retencoes.apurar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'IRPJ_CSLL_LR_ESTIMATIVA': {
+      const meta = (job.data as any).meta ?? {}
+      const estimativa = new IrpjCsllLREstimativaService()
+      await estimativa.apurar(tenantId, empresaId, competencia, meta.atividadePrincipal)
       break
     }
     case 'TODOS': {
