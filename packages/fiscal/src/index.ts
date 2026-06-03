@@ -37,6 +37,11 @@ export { RetencoesNaFonteService } from './retencoes-fonte.service.js'
 export type { ResultadoRetencoesNaFonte, RetencaoPorPrestador } from './retencoes-fonte.service.js'
 export { IrpjCsllLREstimativaService } from './irpj-csll-lr-estimativa.service.js'
 export type { ResultadoIrpjCsllLREstimativa } from './irpj-csll-lr-estimativa.service.js'
+export { PrejuizosFiscaisLRService } from './prejuizos-fiscais-lr.service.js'
+export type {
+  ResultadoCompensacaoPrejuizo,
+  PrejuizoAcumulado,
+} from './prejuizos-fiscais-lr.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,

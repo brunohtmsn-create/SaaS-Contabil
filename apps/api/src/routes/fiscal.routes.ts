@@ -26,6 +26,7 @@ import {
   CreditosPisCofinsLRService,
   RetencoesNaFonteService,
   IrpjCsllLREstimativaService,
+  PrejuizosFiscaisLRService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -605,6 +606,50 @@ export async function fiscalRoutes(app: FastifyInstance) {
     })
     if (!apuracao) return reply.code(404).send({ error: 'Créditos PIS/COFINS LR não encontrados' })
     return apuracao
+  })
+
+  app.post('/prejuizos-fiscais-lr/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const { prejuizoIRPJ, prejuizoCSLL } = z
+      .object({
+        prejuizoIRPJ: z.string().default('0'),
+        prejuizoCSLL: z.string().default('0'),
+      })
+      .parse(request.body ?? {})
+
+    const { Decimal } = await import('@saas-contabil/shared')
+    const service = new PrejuizosFiscaisLRService()
+    await service.registrarPrejuizo(
+      tenantId,
+      empresaId,
+      competencia,
+      new Decimal(prejuizoIRPJ),
+      new Decimal(prejuizoCSLL)
+    )
+    return reply.code(201).send({ ok: true, competencia, prejuizoIRPJ, prejuizoCSLL })
+  })
+
+  app.post('/prejuizos-fiscais-lr/:empresaId/:competencia/compensar', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const { lucroRealDoperiodo, baseCSLLdoPeriodo } = z
+      .object({
+        lucroRealDoperiodo: z.string().default('0'),
+        baseCSLLdoPeriodo: z.string().default('0'),
+      })
+      .parse(request.body ?? {})
+
+    const { Decimal } = await import('@saas-contabil/shared')
+    const service = new PrejuizosFiscaisLRService()
+    const resultado = await service.compensar(
+      tenantId,
+      empresaId,
+      competencia,
+      new Decimal(lucroRealDoperiodo),
+      new Decimal(baseCSLLdoPeriodo)
+    )
+    return reply.code(200).send(resultado)
   })
 
   app.post('/irpj-csll-lr-estimativa/:empresaId/:competencia', async (request, reply) => {
