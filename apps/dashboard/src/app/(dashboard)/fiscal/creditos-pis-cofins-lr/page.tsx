@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { useAuthStore } from '@/store/auth'
-import { apiFetch } from '@/lib/api'
+import { api } from '@/lib/api'
 
 function mesAnterior(comp: string): string {
   const [anoStr, mesStr] = comp.split('-')
@@ -39,27 +38,24 @@ function formatBRL(val: string | number | undefined): string {
 }
 
 export default function CreditosPisCofinslrPage() {
-  const { token } = useAuthStore()
   const [competencia, setCompetencia] = useState(compAtual)
   const [empresaId, setEmpresaId] = useState('')
 
   const { data: empresas } = useQuery({
     queryKey: ['empresas-lr'],
-    queryFn: () => apiFetch('/empresas?regime=LUCRO_REAL', token),
-    enabled: !!token,
+    queryFn: () => api.get('/empresas?regime=LUCRO_REAL').then((r) => r.data),
   })
 
   const { data: resultado, refetch } = useQuery({
     queryKey: ['creditos-pis-cofins-lr', empresaId, competencia],
-    queryFn: () => apiFetch(`/fiscal/creditos-pis-cofins-lr/${empresaId}/${competencia}`, token),
-    enabled: !!token && !!empresaId,
+    queryFn: () =>
+      api.get(`/fiscal/creditos-pis-cofins-lr/${empresaId}/${competencia}`).then((r) => r.data),
+    enabled: !!empresaId,
   })
 
   const apurar = useMutation({
     mutationFn: () =>
-      apiFetch(`/fiscal/creditos-pis-cofins-lr/${empresaId}/${competencia}`, token, {
-        method: 'POST',
-      }),
+      api.post(`/fiscal/creditos-pis-cofins-lr/${empresaId}/${competencia}`).then((r) => r.data),
     onSuccess: () => refetch(),
   })
 
@@ -220,7 +216,7 @@ export default function CreditosPisCofinslrPage() {
 }
 
 function CreditosResultado({ data }: { data: any }) {
-  function formatBRL(val: any): string {
+  function fmt(val: any): string {
     const n = parseFloat(val?.toString() ?? '0')
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   }
@@ -230,25 +226,23 @@ function CreditosResultado({ data }: { data: any }) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <p className="text-sm text-gray-500">Base de Crédito</p>
-          <p className="text-xl font-bold text-gray-900 mt-1">{formatBRL(data.totalBaseCredito)}</p>
+          <p className="text-xl font-bold text-gray-900 mt-1">{fmt(data.totalBaseCredito)}</p>
           <p className="text-xs text-gray-400 mt-1">{data.totalDocumentosEntrada} documentos</p>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-600">Crédito PIS</p>
-          <p className="text-xl font-bold text-blue-900 mt-1">{formatBRL(data.totalCreditoPIS)}</p>
+          <p className="text-xl font-bold text-blue-900 mt-1">{fmt(data.totalCreditoPIS)}</p>
           <p className="text-xs text-blue-400 mt-1">1,65% não-cumulativo</p>
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
           <p className="text-sm text-purple-600">Crédito COFINS</p>
-          <p className="text-xl font-bold text-purple-900 mt-1">
-            {formatBRL(data.totalCreditoCOFINS)}
-          </p>
+          <p className="text-xl font-bold text-purple-900 mt-1">{fmt(data.totalCreditoCOFINS)}</p>
           <p className="text-xs text-purple-400 mt-1">7,6% não-cumulativo</p>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <p className="text-sm text-green-600">Total Créditos</p>
           <p className="text-xl font-bold text-green-900 mt-1">
-            {formatBRL(data.totalCreditosCombinados)}
+            {fmt(data.totalCreditosCombinados)}
           </p>
           <p className="text-xs text-green-400 mt-1">PIS + COFINS</p>
         </div>
@@ -279,12 +273,10 @@ function CreditosResultado({ data }: { data: any }) {
                     <td className="px-4 py-2">{item.tipo}</td>
                     <td className="px-4 py-2 font-mono text-xs">{item.numero}</td>
                     <td className="px-4 py-2">{item.cfop ?? '—'}</td>
-                    <td className="px-4 py-2 text-right">{formatBRL(item.valorTotal)}</td>
-                    <td className="px-4 py-2 text-right text-blue-700">
-                      {formatBRL(item.creditoPIS)}
-                    </td>
+                    <td className="px-4 py-2 text-right">{fmt(item.valorTotal)}</td>
+                    <td className="px-4 py-2 text-right text-blue-700">{fmt(item.creditoPIS)}</td>
                     <td className="px-4 py-2 text-right text-purple-700">
-                      {formatBRL(item.creditoCOFINS)}
+                      {fmt(item.creditoCOFINS)}
                     </td>
                   </tr>
                 ))}

@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { useAuthStore } from '@/store/auth'
-import { apiFetch } from '@/lib/api'
+import { api } from '@/lib/api'
 
 function mesAnterior(comp: string): string {
   const [anoStr, mesStr] = comp.split('-')
@@ -46,27 +45,27 @@ function formatCNPJ(cnpj: string): string {
 }
 
 export default function RetencoesNaFontePage() {
-  const { token } = useAuthStore()
   const [competencia, setCompetencia] = useState(compAtual)
   const [empresaId, setEmpresaId] = useState('')
 
   const { data: empresas } = useQuery({
     queryKey: ['empresas-lp-lr'],
-    queryFn: () => apiFetch('/empresas?regime=LUCRO_PRESUMIDO,LUCRO_REAL', token),
-    enabled: !!token,
+    queryFn: () =>
+      api
+        .get('/empresas', { params: { regime: 'LUCRO_PRESUMIDO,LUCRO_REAL' } })
+        .then((r) => r.data),
   })
 
   const { data: resultado, refetch } = useQuery({
     queryKey: ['retencoes-fonte', empresaId, competencia],
-    queryFn: () => apiFetch(`/fiscal/retencoes-fonte/${empresaId}/${competencia}`, token),
-    enabled: !!token && !!empresaId,
+    queryFn: () =>
+      api.get(`/fiscal/retencoes-fonte/${empresaId}/${competencia}`).then((r) => r.data),
+    enabled: !!empresaId,
   })
 
   const apurar = useMutation({
     mutationFn: () =>
-      apiFetch(`/fiscal/retencoes-fonte/${empresaId}/${competencia}`, token, {
-        method: 'POST',
-      }),
+      api.post(`/fiscal/retencoes-fonte/${empresaId}/${competencia}`).then((r) => r.data),
     onSuccess: () => refetch(),
   })
 
@@ -237,37 +236,42 @@ export default function RetencoesNaFontePage() {
 }
 
 function RetencoesResultado({ data }: { data: any }) {
+  function fmt(val: any): string {
+    const n = parseFloat(val?.toString() ?? '0')
+    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
           <p className="text-xs text-gray-500">Total Pago</p>
-          <p className="text-base font-bold text-gray-900 mt-1">{formatBRL(data.totalPago)}</p>
+          <p className="text-base font-bold text-gray-900 mt-1">{fmt(data.totalPago)}</p>
           <p className="text-xs text-gray-400">{data.totalPrestadores} prestadores</p>
         </div>
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
           <p className="text-xs text-orange-600">IRRF</p>
-          <p className="text-base font-bold text-orange-900 mt-1">{formatBRL(data.totalIRRF)}</p>
+          <p className="text-base font-bold text-orange-900 mt-1">{fmt(data.totalIRRF)}</p>
           <p className="text-xs text-orange-400">1,5% padrão</p>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-xs text-blue-600">PIS Retido</p>
-          <p className="text-base font-bold text-blue-900 mt-1">{formatBRL(data.totalPIS)}</p>
+          <p className="text-base font-bold text-blue-900 mt-1">{fmt(data.totalPIS)}</p>
           <p className="text-xs text-blue-400">0,65% se &gt; R$5k</p>
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
           <p className="text-xs text-purple-600">COFINS Retido</p>
-          <p className="text-base font-bold text-purple-900 mt-1">{formatBRL(data.totalCOFINS)}</p>
+          <p className="text-base font-bold text-purple-900 mt-1">{fmt(data.totalCOFINS)}</p>
           <p className="text-xs text-purple-400">3% se &gt; R$5k</p>
         </div>
         <div className="bg-pink-50 border border-pink-200 rounded-lg p-3">
           <p className="text-xs text-pink-600">CSLL Retido</p>
-          <p className="text-base font-bold text-pink-900 mt-1">{formatBRL(data.totalCSLL)}</p>
+          <p className="text-base font-bold text-pink-900 mt-1">{fmt(data.totalCSLL)}</p>
           <p className="text-xs text-pink-400">1% se &gt; R$5k</p>
         </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
           <p className="text-xs text-red-600">Total a Recolher</p>
-          <p className="text-base font-bold text-red-900 mt-1">{formatBRL(data.totalRetencoes)}</p>
+          <p className="text-base font-bold text-red-900 mt-1">{fmt(data.totalRetencoes)}</p>
           <p className="text-xs text-red-400">IRRF + CSRF</p>
         </div>
       </div>
@@ -305,19 +309,13 @@ function RetencoesResultado({ data }: { data: any }) {
                 {data.retencoesPorPrestador.map((p: any) => (
                   <tr key={p.cnpjPrestador} className="hover:bg-gray-50">
                     <td className="px-3 py-2 font-mono text-xs">{formatCNPJ(p.cnpjPrestador)}</td>
-                    <td className="px-3 py-2 text-right">{formatBRL(p.totalPago)}</td>
-                    <td className="px-3 py-2 text-right text-orange-700">
-                      {formatBRL(p.irrfRetido)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-blue-700">{formatBRL(p.pisRetido)}</td>
-                    <td className="px-3 py-2 text-right text-purple-700">
-                      {formatBRL(p.cofinsRetido)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-pink-700">
-                      {formatBRL(p.csllRetido)}
-                    </td>
+                    <td className="px-3 py-2 text-right">{fmt(p.totalPago)}</td>
+                    <td className="px-3 py-2 text-right text-orange-700">{fmt(p.irrfRetido)}</td>
+                    <td className="px-3 py-2 text-right text-blue-700">{fmt(p.pisRetido)}</td>
+                    <td className="px-3 py-2 text-right text-purple-700">{fmt(p.cofinsRetido)}</td>
+                    <td className="px-3 py-2 text-right text-pink-700">{fmt(p.csllRetido)}</td>
                     <td className="px-3 py-2 text-right font-semibold text-red-700">
-                      {formatBRL(p.totalRetencoes)}
+                      {fmt(p.totalRetencoes)}
                     </td>
                     <td className="px-3 py-2 text-center text-gray-500 text-xs">
                       {p.documentos?.length ?? 0}

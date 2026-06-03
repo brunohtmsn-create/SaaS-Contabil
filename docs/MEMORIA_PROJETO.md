@@ -114,6 +114,25 @@ infra/
   - Agrupa por CNPJ prestador; prazo recolhimento dia 20 do mês seguinte
   - Persiste tipo DCTFWEB; evento DCTFWEB_TRANSMITIDA no audit
 - [x] **ECFService (bugfix)** — busca IRPJ_LR quando empresa é Lucro Real (antes sempre IRPJ_LP)
+- [x] **IrpjCsllLREstimativaService** — estimativa mensal IRPJ+CSLL LR (26 testes)
+  - IRPJ: comércio/indústria 8%, transporte passageiros 16%, serviços 32%
+  - CSLL: comércio/indústria 12%, serviços 32%
+  - IRPJ adicional 10% sobre base > R$20.000/mês (LIMITE_ADICIONAL_MENSAL)
+  - Prazo: dia 31 do mês seguinte; códigos DARF 2362/2484; modalidade ESTIMATIVA
+- [x] **PrejuizosFiscaisLRService** — compensação de prejuízos LR (15 testes)
+  - Limite compensação = 30% do lucro trimestral (por período, sem prazo de validade)
+  - Algoritmo FIFO: períodos mais antigos consumidos primeiro
+  - `registrarPrejuizo()` + `compensar()` separados; persiste IRPJ_LR e CSLL_LR
+- [x] **DepreciacaoLRService** — depreciação linear fiscal LR (24 testes)
+  - Tabela IN SRF 162/1998: edificações 4%, máquinas 10%, veículos 20%, computadores 20%
+  - Aceleração por turno: simples ×1.0, duplo ×1.5, triplo ×2.0 (limitado a 100% a.a.)
+  - Base = valorAquisicao − valorResidual; `depreciacaoAcumulada` considera meses efetivos
+  - Helpers: `getTaxaDepreciacao(categoria)`, `getCategorias()`
+- [x] **INSSPatronalService** — INSS Patronal CPP+GILRAT+Terceiros (21 testes)
+  - CPP 20% sobre folha + GILRAT (leve 1%, médio 2%, grave 3%) × FAP (clamp 50%–200%)
+  - Terceiros: comércio 5,8%, indústria 5,7%, serviços 5,1%
+  - Adicional13 e adicionaisVariaveis incluídos na base de cálculo
+  - Prazo: dia 20 do mês seguinte; persiste CSLL_LR; evento DCTFWEB_TRANSMITIDA
 
 ### Módulo Fiscal — Fase 1 (packages/fiscal)
 
@@ -181,7 +200,7 @@ infra/
 
 ### Worker (apps/worker)
 
-- [x] **fiscal.job.ts** — 22 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, IRPJ_CSLL_LP, PIS_COFINS_LP, ECF, DCTF_MENSAL, SPED_FISCAL, SPED_CONTRIBUICOES, IRPJ_CSLL_LR, CREDITOS_PIS_COFINS_LR, RETENCOES_FONTE, TODOS)
+- [x] **fiscal.job.ts** — 27 casos (PGDAS, DIFAL, GNRE, DESTDA, EFDREINF, ESOCIAL, DCTFWEB, FGTS, DMS, DASN, CALENDARIO_SN, CALENDARIO_LPLR, IRPJ_CSLL_LP, PIS_COFINS_LP, ECF, DCTF_MENSAL, SPED_FISCAL, SPED_CONTRIBUICOES, IRPJ_CSLL_LR, CREDITOS_PIS_COFINS_LR, RETENCOES_FONTE, IRPJ_CSLL_LR_ESTIMATIVA, PREJUIZOS_FISCAIS_LR, DEPRECIACAO_LR, INSS_PATRONAL, TODOS)
 - [x] **fechamento.job.ts** — fechamento mensal completo (15 etapas)
 - [x] **scraper.job.ts** — captura NF-e, NFC-e, NFSe
 - [x] **bancario.job.ts** — conciliação bancária
@@ -234,7 +253,7 @@ infra/
 | packages/conciliation  | 42     | ✅     |
 | packages/notifications | 56     | ✅     |
 | packages/storage       | 59     | ✅     |
-| packages/fiscal        | 521    | ✅     |
+| packages/fiscal        | 607    | ✅     |
 | packages/portals       | 58     | ✅     |
 | packages/contabil      | 97     | ✅     |
 | packages/scraper       | 44     | ✅     |
@@ -274,10 +293,12 @@ infra/
 - [x] **Créditos PIS/COFINS LR** — CreditosPisCofinsLRService não-cumulativo (17 testes)
 - [x] **Retenções na Fonte** — IRRF + CSRF LP/LR por prestador (25 testes)
 - [x] **Páginas dashboard LP/LR** — `/fiscal/lr`, `/fiscal/sped-fiscal`, `/fiscal/sped-contribuicoes`, `/fiscal/creditos-pis-cofins-lr`, `/fiscal/retencoes-fonte`
+- [x] **IrpjCsllLREstimativaService** — estimativas mensais IRPJ/CSLL LR com DARF mensal
+- [x] **PrejuizosFiscaisLRService** — compensação de prejuízos fiscais com limite 30%
+- [x] **DepreciacaoLRService** — depreciação linear com aceleração por turno
+- [x] **INSSPatronalService** — CPP+GILRAT+Terceiros com FAP
 - [ ] **LALUR/LACS digital** — livro eletrônico para o ECF (adições/exclusões/compensações detalhadas)
-- [ ] **Depreciação acelerada LR** — tabela de bens com taxa e vida útil
-- [ ] **Compensação de prejuízos fiscais LR** — limite 30% do lucro trimestral
-- [ ] **Estimativas mensais IRPJ/CSLL LR** — para LR com tributação por estimativa (DARF mensal)
+- [ ] **Ajuste anual IRPJ/CSLL LR** — comparação estimativas pagas × imposto real (31/12)
 
 ### Melhorias Técnicas Pendentes
 
