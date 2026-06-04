@@ -25,6 +25,7 @@ const navItems = [
   { href: '/fiscal/dctfweb', label: 'DCTFWeb', icon: '📤' },
   { href: '/fiscal/prejuizos-fiscais-lr', label: 'Prejuízos Fiscais LR', icon: '📉' },
   { href: '/fiscal/irpj-estimativa-lr', label: 'Estimativa LR', icon: '🔢' },
+  { href: '/fiscal/dctf-mensal', label: 'DCTF Mensal', icon: '📝' },
   { href: '/fiscal/depreciacao-lr', label: 'Depreciação LR', icon: '📦' },
   { href: '/fiscal/destda', label: 'DeSTDA', icon: '🗃️' },
   { href: '/fiscal/dms', label: 'DMS / ISS', icon: '🏙️' },
