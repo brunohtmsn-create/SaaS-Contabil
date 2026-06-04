@@ -72,6 +72,8 @@ export type {
   IndicadorCompliance,
   StatusItemDiagnostico,
 } from './diagnostico-fiscal.service.js'
+export { RelatorioFiscalService } from './relatorio-fiscal.service.js'
+export type { ResultadoRelatorioFiscal, LinhaRelatorio } from './relatorio-fiscal.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,
