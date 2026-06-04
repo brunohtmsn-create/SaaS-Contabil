@@ -162,9 +162,9 @@ export class NFeSefazAdapter extends BasePLaywrightAdapter {
 
     return {
       tipo: 'NFE',
-      chaveAcesso,
+      ...(chaveAcesso !== undefined ? { chaveAcesso } : {}),
       numero,
-      serie,
+      ...(serie !== undefined ? { serie } : {}),
       dataEmissao,
       cnpjEmitente,
       nomeEmitente,
