@@ -35,12 +35,13 @@ export class PGDASService {
 
     const receitas = this.segregarReceitas(docs, empresa.cnpj, competencia)
 
-    const [rb12, { fatorR }] = await Promise.all([
+    const [rb12, resultadoFatorR] = await Promise.all([
       this.calcularRB12Meses(tenantId, empresaId, competencia),
       this.fatorR.calcular(tenantId, empresaId, competencia),
     ])
 
-    const anexoPrincipal = this.determinarAnexoPrincipal(receitas, fatorR)
+    const fatorRDecimal = new Decimal(resultadoFatorR.fatorR)
+    const anexoPrincipal = this.determinarAnexoPrincipal(receitas, fatorRDecimal)
     const faixa = this.buscarFaixa(rb12, anexoPrincipal)
 
     const aliquotaEfetiva = faixa
@@ -62,7 +63,7 @@ export class PGDASService {
       aliquotaEfetiva: aliquotaEfetiva.times(100).toDecimalPlaces(4),
       valorDAS,
       receitas,
-      fatorR,
+      fatorR: fatorRDecimal,
     }
 
     await this.db.apuracaoFiscal.upsert({
