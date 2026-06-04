@@ -40,6 +40,7 @@ const navItems = [
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },
   { href: '/contabil', label: 'Contábil', icon: '📒' },
+  { href: '/contabil/ecd', label: 'ECD', icon: '📚' },
   { href: '/portais', label: 'Portais Gov.', icon: '🏛️' },
   { href: '/auditoria', label: 'Auditoria', icon: '🔍' },
   { href: '/relatorios', label: 'Relatórios', icon: '📊' },
