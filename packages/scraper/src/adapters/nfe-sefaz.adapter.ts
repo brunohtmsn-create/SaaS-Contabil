@@ -1,3 +1,4 @@
+import { gunzipSync } from 'zlib'
 import { BasePLaywrightAdapter } from './base-playwright.adapter.js'
 import { Session, Credential, DocumentoRaw, Periodo } from '../interfaces/base.js'
 import { Decimal } from '@saas-contabil/shared'
@@ -72,15 +73,105 @@ export class NFeSefazAdapter extends BasePLaywrightAdapter {
 </soap12:Envelope>`
   }
 
-  private parseResponse(xml: string, cnpj: string): DocumentoRaw[] {
-    return []
-  }
-
   async downloadXML(doc: DocumentoRaw): Promise<string> {
     return doc.xmlContent ?? ''
   }
 
   async downloadPDF(doc: DocumentoRaw): Promise<Buffer> {
     return Buffer.alloc(0)
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      await axios.get(this.SEFAZ_URL, { timeout: 10000 })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  // ─── Parsing SOAP / NF-e ──────────────────────────────────────────────────
+
+  private parseResponse(xml: string, cnpj: string): DocumentoRaw[] {
+    const cStatMatch = xml.match(/<cStat>(\d+)<\/cStat>/)
+    const cStat = cStatMatch ? Number(cStatMatch[1]) : 0
+
+    // 137 = "Documento(s) localizado(s)", 138 = same for different query type
+    if (![137, 138].includes(cStat)) return []
+
+    const docs: DocumentoRaw[] = []
+    const docZipRegex = /<docZip[^>]*>([^<]+)<\/docZip>/g
+    let match: RegExpExecArray | null
+
+    while ((match = docZipRegex.exec(xml)) !== null) {
+      const base64Content = match[1]!.trim().replace(/\s/g, '')
+      try {
+        const compressed = Buffer.from(base64Content, 'base64')
+        const xmlContent = gunzipSync(compressed).toString('utf8')
+        const doc = this.parseNFeXML(xmlContent, cnpj)
+        if (doc) docs.push(doc)
+      } catch (err) {
+        console.error('[NFeSefaz] Erro ao decodificar docZip:', err)
+      }
+    }
+
+    return docs
+  }
+
+  private parseNFeXML(xml: string, cnpjPrincipal: string): DocumentoRaw | null {
+    // Chave de acesso: 44 dígitos no atributo Id ou em <chNFe>
+    const chaveAttrMatch = xml.match(/Id="NFe(\d{44})"/)
+    const chaveTagMatch = xml.match(/<chNFe>(\d{44})<\/chNFe>/)
+    const chaveAcesso = chaveAttrMatch
+      ? chaveAttrMatch[1]
+      : chaveTagMatch
+        ? chaveTagMatch[1]
+        : undefined
+
+    const nNumMatch = xml.match(/<nNF>(\d+)<\/nNF>/)
+    const numero = nNumMatch ? nNumMatch[1]! : ''
+
+    const serieMatch = xml.match(/<serie>(\d+)<\/serie>/)
+    const serie = serieMatch ? serieMatch[1] : undefined
+
+    const dhEmiMatch = xml.match(/<dhEmi>([^<]+)<\/dhEmi>/)
+    const dataEmissao = dhEmiMatch ? new Date(dhEmiMatch[1]!) : new Date()
+
+    const emitBlock = xml.match(/<emit>([\s\S]*?)<\/emit>/)
+    let cnpjEmitente = ''
+    let nomeEmitente = ''
+    if (emitBlock) {
+      const cnpjEmit = emitBlock[1]!.match(/<CNPJ>(\d{14})<\/CNPJ>/)
+      const nomeEmit = emitBlock[1]!.match(/<xNome>([^<]+)<\/xNome>/)
+      cnpjEmitente = cnpjEmit ? cnpjEmit[1]! : ''
+      nomeEmitente = nomeEmit ? nomeEmit[1]! : ''
+    }
+
+    const destBlock = xml.match(/<dest>([\s\S]*?)<\/dest>/)
+    let cnpjDestinatario = ''
+    if (destBlock) {
+      const cnpjDest = destBlock[1]!.match(/<CNPJ>(\d{14})<\/CNPJ>/)
+      cnpjDestinatario = cnpjDest ? cnpjDest[1]! : ''
+    }
+    if (!cnpjDestinatario) cnpjDestinatario = cnpjPrincipal
+
+    const vNFMatch = xml.match(/<vNF>([^<]+)<\/vNF>/)
+    const valorTotal = new Decimal(vNFMatch ? vNFMatch[1]!.trim() : '0')
+
+    if (!numero && !chaveAcesso) return null
+
+    return {
+      tipo: 'NFE',
+      chaveAcesso,
+      numero,
+      serie,
+      dataEmissao,
+      cnpjEmitente,
+      nomeEmitente,
+      cnpjDestinatario,
+      valorTotal,
+      xmlContent: xml,
+      fonte: 'SEFAZ_FEDERAL',
+    }
   }
 }
