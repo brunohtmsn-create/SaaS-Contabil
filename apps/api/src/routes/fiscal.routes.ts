@@ -805,8 +805,9 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
   app.post('/ajuste-anual-lr/:empresaId/:ano', async (request, reply) => {
     const { tenantId } = request.user as any
-    const { empresaId } = params.parse(request.params)
-    const { ano: anoParam } = z.object({ ano: z.string().regex(/^\d{4}$/) }).parse(request.params)
+    const { empresaId, ano: anoParam } = z
+      .object({ empresaId: z.string().uuid(), ano: z.string().regex(/^\d{4}$/) })
+      .parse(request.params)
     const { lucroRealAnual, adicoesLALUR, exclusoesLALUR } = z
       .object({
         lucroRealAnual: z.string().default('0'),
@@ -830,8 +831,9 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
   app.get('/ajuste-anual-lr/:empresaId/:ano', async (request, reply) => {
     const { tenantId } = request.user as any
-    const { empresaId } = params.parse(request.params)
-    const { ano: anoParam } = z.object({ ano: z.string().regex(/^\d{4}$/) }).parse(request.params)
+    const { empresaId, ano: anoParam } = z
+      .object({ empresaId: z.string().uuid(), ano: z.string().regex(/^\d{4}$/) })
+      .parse(request.params)
 
     const apuracao = await db.apuracaoFiscal.findFirst({
       where: {
