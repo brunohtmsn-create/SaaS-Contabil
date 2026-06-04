@@ -425,21 +425,49 @@ describe('GET /fiscal/obrigacoes', () => {
 // ===========================================================================
 
 describe('GET /fiscal/fator-r/:empresaId/:competencia', () => {
-  it('retorna fatorR e anexo calculado', async () => {
-    const { Decimal } = await import('@saas-contabil/shared')
+  it('retorna ResultadoFatorR completo com fatorR, anexo e alíquotas', async () => {
     mockFatorR.calcular.mockResolvedValueOnce({
-      fatorR: new Decimal('0.28'),
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Teste Ltda',
+      competencia: COMPETENCIA,
+      folha12meses: '280000.00',
+      receita12meses: '1000000.00',
+      fatorR: '28.00',
       anexo: 'III',
+      aliquotaAnexoIII: '8.7200',
+      aliquotaAnexoV: '13.0000',
+      economiaAnexoIII: '3566.67',
+      recomendacao: 'Fator R de 28.00% permite enquadramento no Anexo III.',
     })
 
     const res = await req('GET', `/fiscal/fator-r/${EMPRESA_ID}/${COMPETENCIA}`)
 
     expect(res.statusCode).toBe(200)
     const body = res.json()
-    expect(body.empresaId).toBe(EMPRESA_ID)
-    expect(body.competencia).toBe(COMPETENCIA)
-    expect(body.fatorR).toBe('0.28')
+    expect(body.fatorR).toBe('28.00')
     expect(body.anexo).toBe('III')
+    expect(body.cnpj).toBe('12345678000195')
+    expect(body.aliquotaAnexoIII).toBeDefined()
+    expect(body.recomendacao).toBeDefined()
+  })
+
+  it('chama FatorRService.calcular com tenantId, empresaId e competencia', async () => {
+    mockFatorR.calcular.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Ltda',
+      competencia: COMPETENCIA,
+      folha12meses: '0.00',
+      receita12meses: '0.00',
+      fatorR: '0.00',
+      anexo: 'V',
+      aliquotaAnexoIII: '0.0000',
+      aliquotaAnexoV: '0.0000',
+      economiaAnexoIII: '0.00',
+      recomendacao: 'Sem receita no período.',
+    })
+
+    await req('GET', `/fiscal/fator-r/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(mockFatorR.calcular).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
   })
 })
 

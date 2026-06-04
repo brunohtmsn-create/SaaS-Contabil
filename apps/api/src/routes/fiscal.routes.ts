@@ -386,13 +386,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
     const { empresaId, competencia } = params.parse(request.params)
 
     const service = new FatorRService()
-    const resultado = await service.calcular(tenantId, empresaId, competencia)
-    return {
-      empresaId,
-      competencia,
-      fatorR: resultado.fatorR.toFixed(2),
-      anexo: resultado.anexo,
-    }
+    return service.calcular(tenantId, empresaId, competencia)
   })
 
   // POST /fiscal/irpj-csll-lp/:empresaId/:competencia — apura IRPJ+CSLL para LP
