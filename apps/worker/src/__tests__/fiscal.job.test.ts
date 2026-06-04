@@ -45,6 +45,13 @@ const mockCreditosLR = { apurar: vi.fn() }
 const mockLALUR = { apurar: vi.fn() }
 const mockSimulador = { simular: vi.fn() }
 const mockRelatorio = { gerar: vi.fn() }
+const mockRetencoes = { apurar: vi.fn() }
+const mockEstimativaLR = { apurar: vi.fn() }
+const mockPrejuizos = { registrarPrejuizo: vi.fn(), compensar: vi.fn() }
+const mockDepreciacaoLR = { apurar: vi.fn() }
+const mockINSSPatronal = { calcular: vi.fn() }
+const mockAjusteAnual = { apurar: vi.fn() }
+const mockPlanejamento = { analisar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -67,15 +74,15 @@ vi.mock('@saas-contabil/fiscal', () => ({
   SpedContribuicoesService: vi.fn(() => mockSpedContrib),
   IrpjCsllLRService: vi.fn(() => mockIrpjCsllLR),
   CreditosPisCofinsLRService: vi.fn(() => mockCreditosLR),
-  RetencoesNaFonteService: vi.fn(() => ({ apurar: vi.fn() })),
-  IrpjCsllLREstimativaService: vi.fn(() => ({ apurar: vi.fn() })),
-  PrejuizosFiscaisLRService: vi.fn(() => ({ registrarPrejuizo: vi.fn(), compensar: vi.fn() })),
-  DepreciacaoLRService: vi.fn(() => ({ apurar: vi.fn() })),
-  INSSPatronalService: vi.fn(() => ({ calcular: vi.fn() })),
-  AjusteAnualLRService: vi.fn(() => ({ apurar: vi.fn() })),
+  RetencoesNaFonteService: vi.fn(() => mockRetencoes),
+  IrpjCsllLREstimativaService: vi.fn(() => mockEstimativaLR),
+  PrejuizosFiscaisLRService: vi.fn(() => mockPrejuizos),
+  DepreciacaoLRService: vi.fn(() => mockDepreciacaoLR),
+  INSSPatronalService: vi.fn(() => mockINSSPatronal),
+  AjusteAnualLRService: vi.fn(() => mockAjusteAnual),
   LALURService: vi.fn(() => mockLALUR),
   SimuladorTributarioService: vi.fn(() => mockSimulador),
-  PlanejamentoTributarioService: vi.fn(() => ({ analisar: vi.fn() })),
+  PlanejamentoTributarioService: vi.fn(() => mockPlanejamento),
   DiagnosticoFiscalService: vi.fn(() => ({ diagnosticar: vi.fn() })),
   RelatorioFiscalService: vi.fn(() => mockRelatorio),
 }))
@@ -388,5 +395,150 @@ describe('fiscalJob — roteamento de operações', () => {
     await fiscalJob(makeJob('RELATORIO_FISCAL'))
     expect(mockRelatorio.gerar).toHaveBeenCalledOnce()
     expect(mockRelatorio.gerar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
+  })
+
+  it('RETENCOES_FONTE → chama RetencoesNaFonteService.apurar com params corretos', async () => {
+    mockRetencoes.apurar.mockResolvedValue({ totalRetido: '0', itens: [] })
+    await fiscalJob(makeJob('RETENCOES_FONTE'))
+    expect(mockRetencoes.apurar).toHaveBeenCalledOnce()
+    expect(mockRetencoes.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
+  })
+
+  it('IRPJ_CSLL_LR_ESTIMATIVA → chama IrpjCsllLREstimativaService.apurar com atividadePrincipal', async () => {
+    mockEstimativaLR.apurar.mockResolvedValue({ irpjEstimado: '0', csllEstimado: '0' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025-03',
+        operacao: 'IRPJ_CSLL_LR_ESTIMATIVA',
+        meta: { atividadePrincipal: 'comercio' },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockEstimativaLR.apurar).toHaveBeenCalledOnce()
+    expect(mockEstimativaLR.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-03', 'comercio')
+  })
+
+  it('PREJUIZOS_FISCAIS_LR com meta.registrar → chama registrarPrejuizo', async () => {
+    mockPrejuizos.registrarPrejuizo.mockResolvedValue({})
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025-12',
+        operacao: 'PREJUIZOS_FISCAIS_LR',
+        meta: { registrar: true, prejuizoIRPJ: '50000', prejuizoCSLL: '30000' },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockPrejuizos.registrarPrejuizo).toHaveBeenCalledOnce()
+    expect(mockPrejuizos.compensar).not.toHaveBeenCalled()
+    const [tid, eid, comp] = mockPrejuizos.registrarPrejuizo.mock.calls[0]
+    expect(tid).toBe('t-1')
+    expect(eid).toBe('emp-1')
+    expect(comp).toBe('2025-12')
+  })
+
+  it('PREJUIZOS_FISCAIS_LR sem meta.registrar → chama compensar', async () => {
+    mockPrejuizos.compensar.mockResolvedValue({})
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025-03',
+        operacao: 'PREJUIZOS_FISCAIS_LR',
+        meta: { lucroRealDoPeriodo: '120000', baseCSLLdoPeriodo: '100000' },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockPrejuizos.compensar).toHaveBeenCalledOnce()
+    expect(mockPrejuizos.registrarPrejuizo).not.toHaveBeenCalled()
+  })
+
+  it('DEPRECIACAO_LR → chama DepreciacaoLRService.apurar com lista de bens', async () => {
+    mockDepreciacaoLR.apurar.mockResolvedValue({ totalDepreciado: '0', bens: [] })
+    const bens = [
+      { descricao: 'Máquina', valorOriginal: '50000', categoria: 'maquinas_equipamentos' },
+    ]
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025-01',
+        operacao: 'DEPRECIACAO_LR',
+        meta: { bens },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockDepreciacaoLR.apurar).toHaveBeenCalledOnce()
+    expect(mockDepreciacaoLR.apurar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01', bens)
+  })
+
+  it('INSS_PATRONAL → chama INSSPatronalService.calcular com funcionários', async () => {
+    mockINSSPatronal.calcular.mockResolvedValue({ totalINSS: '0', itens: [] })
+    const funcionarios = [{ nome: 'João', salarioBruto: '5000' }]
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025-01',
+        operacao: 'INSS_PATRONAL',
+        meta: { funcionarios, grauRisco: 1 },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockINSSPatronal.calcular).toHaveBeenCalledOnce()
+    const [tid, eid, comp, funcs, grau] = mockINSSPatronal.calcular.mock.calls[0]
+    expect(tid).toBe('t-1')
+    expect(eid).toBe('emp-1')
+    expect(comp).toBe('2025-01')
+    expect(funcs).toEqual(funcionarios)
+    expect(grau).toBe(1)
+  })
+
+  it('AJUSTE_ANUAL_LR → chama AjusteAnualLRService.apurar com ano numérico e meta', async () => {
+    mockAjusteAnual.apurar.mockResolvedValue({ irpjAjuste: '0', csllAjuste: '0' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'AJUSTE_ANUAL_LR',
+        meta: { lucroRealAnual: '1000000', adicoesLALUR: '50000', exclusoesLALUR: '20000' },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockAjusteAnual.apurar).toHaveBeenCalledOnce()
+    const [tid, eid, ano] = mockAjusteAnual.apurar.mock.calls[0]
+    expect(tid).toBe('t-1')
+    expect(eid).toBe('emp-1')
+    expect(ano).toBe(2025)
+  })
+
+  it('PLANEJAMENTO_TRIBUTARIO → chama PlanejamentoTributarioService.analisar com exercício numérico', async () => {
+    mockPlanejamento.analisar.mockResolvedValue({ melhorRegime: 'LUCRO_PRESUMIDO' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'PLANEJAMENTO_TRIBUTARIO',
+        meta: { receitaProjetadaAnual: '2000000', folhaProjetadaAnual: '400000' },
+      },
+    } as any
+    await fiscalJob(job)
+    expect(mockPlanejamento.analisar).toHaveBeenCalledOnce()
+    const [tid, eid, exercicio] = mockPlanejamento.analisar.mock.calls[0]
+    expect(tid).toBe('t-1')
+    expect(eid).toBe('emp-1')
+    expect(exercicio).toBe(2025)
   })
 })
