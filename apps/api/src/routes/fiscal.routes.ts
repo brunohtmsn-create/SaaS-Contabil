@@ -34,6 +34,7 @@ import {
   SimuladorTributarioService,
   PlanejamentoTributarioService,
   DiagnosticoFiscalService,
+  RelatorioFiscalService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -1268,5 +1269,17 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const service = new DiagnosticoFiscalService()
     return service.diagnosticar(tenantId, empresaId, competencia)
+  })
+
+  // -------------------------------------------------------------------------
+  // Relatório Fiscal Consolidado
+  // -------------------------------------------------------------------------
+
+  app.get('/relatorio/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new RelatorioFiscalService()
+    return service.gerar(tenantId, empresaId, competencia)
   })
 }
