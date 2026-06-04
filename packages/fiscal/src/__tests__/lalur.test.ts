@@ -321,3 +321,85 @@ describe('LALURService — persistência e auditoria', () => {
     expect(auditCall.tenantId).toBe(TENANT_ID)
   })
 })
+
+// ===========================================================================
+// Campos alternativos de prejuízo e adições com lucro negativo
+// ===========================================================================
+
+describe('LALURService — prejuízos com saldoRemanescente diferente de valorPrejuizo', () => {
+  it('usa saldoRemanescente quando presente (prejuízo parcialmente consumido)', async () => {
+    // valorPrejuizo = 300.000, mas saldoRemanescente = 100.000 (já usou 200.000)
+    const prejuizoParcial = {
+      competencia: '2024-01',
+      tipo: 'IRPJ_LR',
+      dados: {
+        tipo: 'PREJUIZO',
+        valorPrejuizo: '300000',
+        saldoRemanescente: '100000',
+      },
+    }
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([prejuizoParcial])
+
+    const service = new LALURService()
+    // lucro 500.000 → limite 30% = 150.000, mas saldo disponível = 100.000
+    const resultado = await service.apurar(TENANT_ID, EMPRESA_ID, '2025-12', new Decimal('500000'))
+
+    // Deve compensar apenas 100.000 (saldo remanescente), não 150.000
+    const compensacaoTotal = resultado.compensacoes.reduce(
+      (s, c) => s.plus(c.valorUtilizado),
+      new Decimal(0)
+    )
+    expect(compensacaoTotal.toNumber()).toBe(100000)
+  })
+
+  it('usa valorPrejuizo quando saldoRemanescente ausente', async () => {
+    const prejuizoSemSaldo = {
+      competencia: '2024-01',
+      tipo: 'IRPJ_LR',
+      dados: {
+        tipo: 'PREJUIZO',
+        valorPrejuizo: '60000',
+        // sem saldoRemanescente
+      },
+    }
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([prejuizoSemSaldo])
+
+    const service = new LALURService()
+    // lucro 300.000 → limite 30% = 90.000 > 60.000 disponível → usa tudo
+    const resultado = await service.apurar(TENANT_ID, EMPRESA_ID, '2025-12', new Decimal('300000'))
+
+    const compensacaoTotal = resultado.compensacoes.reduce(
+      (s, c) => s.plus(c.valorUtilizado),
+      new Decimal(0)
+    )
+    expect(compensacaoTotal.toNumber()).toBe(60000)
+  })
+})
+
+describe('LALURService — lucro negativo com adições', () => {
+  it('lucro líquido negativo + adições → base pode ser positiva', async () => {
+    const service = new LALURService()
+    // lucroLiquido = -50.000, adição = 80.000 → lucroAjustado = 30.000
+    const resultado = await service.apurar(
+      TENANT_ID,
+      EMPRESA_ID,
+      '2025-12',
+      new Decimal('-50000'),
+      [addItem('Multa dedutível', 80000)]
+    )
+    expect(resultado.lucroReal.toNumber()).toBe(30000)
+  })
+
+  it('lucro líquido negativo + adições insuficientes → lucroReal zerado', async () => {
+    const service = new LALURService()
+    // lucroLiquido = -100.000, adição = 40.000 → lucroAjustado = -60.000 → lucroReal ≥ 0
+    const resultado = await service.apurar(
+      TENANT_ID,
+      EMPRESA_ID,
+      '2025-12',
+      new Decimal('-100000'),
+      [addItem('Adição', 40000)]
+    )
+    expect(resultado.lucroReal.toNumber()).toBe(0)
+  })
+})
