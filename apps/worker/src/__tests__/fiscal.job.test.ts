@@ -44,6 +44,7 @@ const mockIrpjCsllLR = { apurar: vi.fn() }
 const mockCreditosLR = { apurar: vi.fn() }
 const mockLALUR = { apurar: vi.fn() }
 const mockSimulador = { simular: vi.fn() }
+const mockRelatorio = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -74,6 +75,9 @@ vi.mock('@saas-contabil/fiscal', () => ({
   AjusteAnualLRService: vi.fn(() => ({ apurar: vi.fn() })),
   LALURService: vi.fn(() => mockLALUR),
   SimuladorTributarioService: vi.fn(() => mockSimulador),
+  PlanejamentoTributarioService: vi.fn(() => ({ analisar: vi.fn() })),
+  DiagnosticoFiscalService: vi.fn(() => ({ diagnosticar: vi.fn() })),
+  RelatorioFiscalService: vi.fn(() => mockRelatorio),
 }))
 
 import { fiscalJob } from '../jobs/fiscal.job.js'
@@ -377,5 +381,12 @@ describe('fiscalJob — roteamento de operações', () => {
     const [tid, , atividade] = mockSimulador.simular.mock.calls[0]
     expect(tid).toBe('t-1')
     expect(atividade).toBe('comercio')
+  })
+
+  it('RELATORIO_FISCAL → chama RelatorioFiscalService.gerar com parâmetros corretos', async () => {
+    mockRelatorio.gerar.mockResolvedValue({ tributos: [], totalApurado: '0' })
+    await fiscalJob(makeJob('RELATORIO_FISCAL'))
+    expect(mockRelatorio.gerar).toHaveBeenCalledOnce()
+    expect(mockRelatorio.gerar).toHaveBeenCalledWith('t-1', 'emp-1', '2025-01')
   })
 })

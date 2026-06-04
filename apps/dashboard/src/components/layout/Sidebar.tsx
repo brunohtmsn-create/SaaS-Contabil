@@ -23,6 +23,7 @@ const navItems = [
   { href: '/fiscal/simulador-tributario', label: 'Simulador Tributário', icon: '🧮' },
   { href: '/fiscal/planejamento-tributario', label: 'Planejamento Tributário', icon: '📈' },
   { href: '/fiscal/diagnostico', label: 'Diagnóstico Fiscal', icon: '🩺' },
+  { href: '/fiscal/relatorio', label: 'Relatório Fiscal', icon: '📋' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },

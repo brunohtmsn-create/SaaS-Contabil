@@ -47,6 +47,7 @@ const mockIrpjCsllLR = { apurar: vi.fn() }
 const mockCreditosLR = { apurar: vi.fn() }
 const mockLALUR = { apurar: vi.fn() }
 const mockSimulador = { simular: vi.fn() }
+const mockRelatorio = { gerar: vi.fn() }
 
 vi.mock('@saas-contabil/fiscal', () => ({
   PGDASService: vi.fn(() => mockPGDAS),
@@ -78,6 +79,9 @@ vi.mock('@saas-contabil/fiscal', () => ({
   AjusteAnualLRService: vi.fn(() => ({ apurar: vi.fn() })),
   LALURService: vi.fn(() => mockLALUR),
   SimuladorTributarioService: vi.fn(() => mockSimulador),
+  PlanejamentoTributarioService: vi.fn(() => ({ analisar: vi.fn() })),
+  DiagnosticoFiscalService: vi.fn(() => ({ diagnosticar: vi.fn() })),
+  RelatorioFiscalService: vi.fn(() => mockRelatorio),
 }))
 
 const { mockDb, mockQueue } = vi.hoisted(() => ({
@@ -2062,5 +2066,78 @@ describe('POST /fiscal/simulador-tributario', () => {
   it('body sem receitaBrutaAnual → 400', async () => {
     const res = await req('POST', '/fiscal/simulador-tributario', {})
     expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/diagnostico/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/diagnostico/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna diagnóstico fiscal', async () => {
+    const mockDiagnostico = {
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Ltda',
+      regime: 'SIMPLES_NACIONAL',
+      competencia: COMPETENCIA,
+      itens: [],
+      indicador: { total: 0, ok: 0, pendentes: 0, atrasados: 0, percentualCompliance: 100 },
+      alertasAtivos: 0,
+      documentosPendenteConciliacao: 0,
+      recomendacoes: [],
+    }
+
+    const diagService = (await import('@saas-contabil/fiscal')).DiagnosticoFiscalService as any
+    diagService.mockImplementation(() => ({
+      diagnosticar: vi.fn().mockResolvedValue(mockDiagnostico),
+    }))
+
+    const res = await req('GET', `/fiscal/diagnostico/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(200)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/relatorio/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/relatorio/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna relatório fiscal consolidado', async () => {
+    mockRelatorio.gerar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Ltda',
+      competencia: COMPETENCIA,
+      geradoEm: new Date(),
+      regime: 'SIMPLES_NACIONAL',
+      tributos: [
+        {
+          tributo: 'DAS (Simples Nacional)',
+          regime: 'SIMPLES_NACIONAL',
+          baseCalculo: '300000',
+          aliquota: '0.073',
+          valorApurado: '21900',
+          valorPago: '21900',
+          status: 'PAGO',
+        },
+      ],
+      totalApurado: '21900',
+      totalPago: '21900',
+      totalPendente: '0',
+      percentualPago: 100,
+    })
+
+    const res = await req('GET', `/fiscal/relatorio/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body)
+    expect(body.percentualPago).toBe(100)
+    expect(mockRelatorio.gerar).toHaveBeenCalledOnce()
+    const [tid, eid, comp] = mockRelatorio.gerar.mock.calls[0]
+    expect(tid).toBe(TENANT_ID)
+    expect(eid).toBe(EMPRESA_ID)
+    expect(comp).toBe(COMPETENCIA)
   })
 })

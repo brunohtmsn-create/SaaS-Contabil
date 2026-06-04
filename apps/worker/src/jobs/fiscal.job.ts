@@ -29,6 +29,7 @@ import {
   LALURService,
   SimuladorTributarioService,
   PlanejamentoTributarioService,
+  RelatorioFiscalService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -66,6 +67,7 @@ type FiscalJobData = {
     | 'LALUR'
     | 'SIMULADOR_TRIBUTARIO'
     | 'PLANEJAMENTO_TRIBUTARIO'
+    | 'RELATORIO_FISCAL'
     | 'TODOS'
 }
 
@@ -295,6 +297,11 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
         meta.folhaProjetadaAnual ? new Decimal(meta.folhaProjetadaAnual) : undefined,
         meta.lucroProjetadoAnual ? new Decimal(meta.lucroProjetadoAnual) : undefined
       )
+      break
+    }
+    case 'RELATORIO_FISCAL': {
+      const relatorio = new RelatorioFiscalService()
+      await relatorio.gerar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {
