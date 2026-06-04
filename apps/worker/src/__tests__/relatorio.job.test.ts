@@ -250,3 +250,160 @@ describe('gerarRelatorioMensal — sem empresas', () => {
     expect(mockDb.alerta.create).not.toHaveBeenCalled()
   })
 })
+
+describe('gerarRelatorioMensal — extração de valores (campos alternativos)', () => {
+  function captureCSV(): { csv: string } {
+    const state = { csv: '' }
+    mockStorage.upload.mockImplementation((_key: string, buf: Buffer) => {
+      state.csv = buf.toString('utf-8')
+      return { s3Key: 'mock' }
+    })
+    return state
+  }
+
+  it('dados com chave "valorTotal" → usado como valorDas', async () => {
+    const empresa = {
+      id: 'emp-x',
+      cnpj: '44444444000144',
+      razaoSocial: 'Empresa VT',
+      apuracoesFiscais: [
+        {
+          tipo: 'PGDAS',
+          status: 'CALCULADO',
+          dados: { valorTotal: '750.00', receitaBruta: '10000.00' },
+        },
+      ],
+    }
+    mockDb.empresaCliente.findMany.mockResolvedValue([empresa])
+    const state = captureCSV()
+    await gerarRelatorioMensal(makeJob())
+    expect(state.csv).toContain('750.00')
+  })
+
+  it('dados com chave "valor" → usado como valorDas', async () => {
+    const empresa = {
+      id: 'emp-y',
+      cnpj: '55555555000155',
+      razaoSocial: 'Empresa V',
+      apuracoesFiscais: [
+        { tipo: 'PGDAS', status: 'CALCULADO', dados: { valor: '300.00', receitaBruta: '5000.00' } },
+      ],
+    }
+    mockDb.empresaCliente.findMany.mockResolvedValue([empresa])
+    const state = captureCSV()
+    await gerarRelatorioMensal(makeJob())
+    expect(state.csv).toContain('300.00')
+  })
+
+  it('dados com chave "rbTotal" → usado como receitaBruta', async () => {
+    const empresa = {
+      id: 'emp-rb',
+      cnpj: '66666666000166',
+      razaoSocial: 'Empresa RB',
+      apuracoesFiscais: [
+        { tipo: 'PGDAS', status: 'CALCULADO', dados: { valorDas: '100.00', rbTotal: '2000.00' } },
+      ],
+    }
+    mockDb.empresaCliente.findMany.mockResolvedValue([empresa])
+    const state = captureCSV()
+    await gerarRelatorioMensal(makeJob())
+    expect(state.csv).toContain('2000.00')
+  })
+
+  it('dados com chave "receitaBrutaTotal" → usado como receitaBruta', async () => {
+    const empresa = {
+      id: 'emp-rbt',
+      cnpj: '77777777000177',
+      razaoSocial: 'Empresa RBT',
+      apuracoesFiscais: [
+        {
+          tipo: 'PGDAS',
+          status: 'CALCULADO',
+          dados: { valorDas: '200.00', receitaBrutaTotal: '4000.00' },
+        },
+      ],
+    }
+    mockDb.empresaCliente.findMany.mockResolvedValue([empresa])
+    const state = captureCSV()
+    await gerarRelatorioMensal(makeJob())
+    expect(state.csv).toContain('4000.00')
+  })
+
+  it('dados null → valorDas e rbTotal ficam 0.00', async () => {
+    const empresa = {
+      id: 'emp-null',
+      cnpj: '88888888000188',
+      razaoSocial: 'Empresa Null',
+      apuracoesFiscais: [{ tipo: 'PGDAS', status: 'CALCULADO', dados: null }],
+    }
+    mockDb.empresaCliente.findMany.mockResolvedValue([empresa])
+    const state = captureCSV()
+    await gerarRelatorioMensal(makeJob())
+    // Linha de dados com 0.00 e alíquota 0.00
+    const linhas = state.csv.split('\n').filter(Boolean)
+    const dataLine = linhas[1] ?? ''
+    expect(dataLine).toContain('0.00')
+  })
+})
+
+describe('gerarRelatorioMensal — CSV escaping e múltiplas apurações', () => {
+  it('razão social com aspas duplas → escapa corretamente', async () => {
+    const empresa = {
+      ...empresa1,
+      cnpj: '99999999000199',
+      razaoSocial: 'Empresa "Top" LTDA',
+    }
+    mockDb.empresaCliente.findMany.mockResolvedValue([empresa])
+    let csv = ''
+    mockStorage.upload.mockImplementation((_key: string, buf: Buffer) => {
+      csv = buf.toString('utf-8')
+      return { s3Key: 'mock' }
+    })
+    await gerarRelatorioMensal(makeJob())
+    // aspas duplas escapadas como ""
+    expect(csv).toContain('"Empresa ""Top"" LTDA"')
+  })
+
+  it('empresa com múltiplas apurações → gera uma linha por apuração', async () => {
+    const empresa = {
+      id: 'emp-multi',
+      cnpj: '10101010000110',
+      razaoSocial: 'Multi Apurações LTDA',
+      apuracoesFiscais: [
+        {
+          tipo: 'PGDAS',
+          status: 'CALCULADO',
+          dados: { valorDas: '100.00', receitaBruta: '5000.00' },
+        },
+        {
+          tipo: 'DIFAL',
+          status: 'CALCULADO',
+          dados: { valorDas: '50.00', receitaBruta: '5000.00' },
+        },
+      ],
+    }
+    mockDb.empresaCliente.findMany.mockResolvedValue([empresa])
+    let csv = ''
+    mockStorage.upload.mockImplementation((_key: string, buf: Buffer) => {
+      csv = buf.toString('utf-8')
+      return { s3Key: 'mock' }
+    })
+    await gerarRelatorioMensal(makeJob())
+    const linhas = csv.split('\n').filter(Boolean)
+    // cabeçalho + 2 linhas de apurações
+    expect(linhas.length).toBe(3)
+    expect(csv).toContain('PGDAS')
+    expect(csv).toContain('DIFAL')
+  })
+
+  it('upload recebe metadata com tenantId, competencia e empresasCount', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValue([empresa1])
+    await gerarRelatorioMensal(makeJob('2025-03'))
+    const [, , , metadata] = mockStorage.upload.mock.calls[0]!
+    expect(metadata).toMatchObject({
+      tenantId: 't-1',
+      competencia: '2025-03',
+      empresasCount: '1',
+    })
+  })
+})
