@@ -386,3 +386,56 @@ describe('RetencoesNaFonteService — persistência e auditoria', () => {
     expect(auditCall.tenantId).toBe(TENANT_ID)
   })
 })
+
+// ===========================================================================
+// Fallback de CNPJ do prestador
+// ===========================================================================
+
+describe('RetencoesNaFonteService — fallback de cnpjPrestador', () => {
+  it('sem cnpjEmitente mas com cnpjDestinatario → usa cnpjDestinatario', async () => {
+    const docSemEmitente = {
+      id: 'doc-fallback-1',
+      numero: '001',
+      serie: '001',
+      dataEmissao: new Date('2025-05-10'),
+      dataCompetencia: new Date('2025-05-10'),
+      tipo: 'NFSE_TOMADA',
+      direcao: 'TOMADO',
+      status: 'CONCILIADO',
+      valorTotal: { toString: () => '10000' },
+      cnpjEmitente: undefined,
+      cnpjDestinatario: '77777777000177',
+    }
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([docSemEmitente])
+
+    const service = new RetencoesNaFonteService()
+    const resultado = await service.apurar(TENANT_ID, EMPRESA_ID, '2025-05')
+
+    // Deve agregar e reter IRRF (10.000 > 3.000 limite)
+    expect(resultado.retencoesPorPrestador.length).toBe(1)
+    expect(resultado.retencoesPorPrestador[0]!.cnpjPrestador).toBe('77777777000177')
+  })
+
+  it('sem cnpjEmitente nem cnpjDestinatario → usa "SEM_CNPJ"', async () => {
+    const docSemCnpj = {
+      id: 'doc-fallback-2',
+      numero: '001',
+      serie: '001',
+      dataEmissao: new Date('2025-05-10'),
+      dataCompetencia: new Date('2025-05-10'),
+      tipo: 'NFSE_TOMADA',
+      direcao: 'TOMADO',
+      status: 'CONCILIADO',
+      valorTotal: { toString: () => '10000' },
+      cnpjEmitente: undefined,
+      cnpjDestinatario: undefined,
+    }
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([docSemCnpj])
+
+    const service = new RetencoesNaFonteService()
+    const resultado = await service.apurar(TENANT_ID, EMPRESA_ID, '2025-05')
+
+    expect(resultado.retencoesPorPrestador.length).toBe(1)
+    expect(resultado.retencoesPorPrestador[0]!.cnpjPrestador).toBe('SEM_CNPJ')
+  })
+})
