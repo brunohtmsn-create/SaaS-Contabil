@@ -321,6 +321,14 @@ describe('fechamentoCompleto — scraper e normalizer', () => {
     expect(mockNormalizer.normalizar).not.toHaveBeenCalled()
   })
 
+  it('sem credencialId → loga "Sem credencial configurada — usando documentos já importados"', async () => {
+    const job = makeJob()
+    await fechamentoCompleto(job)
+    const logCalls = job.log.mock.calls.flat() as string[]
+    expect(logCalls.some((m) => m.includes('Sem credencial configurada'))).toBe(true)
+    expect(logCalls.some((m) => m.includes('documentos já importados'))).toBe(true)
+  })
+
   it('com credencialId → recupera credencial e chama scraper', async () => {
     mockCredential.retrieve.mockResolvedValueOnce({ data: { cert: 'mock' } })
     mockScraper.capturarTodos.mockResolvedValueOnce({
