@@ -244,4 +244,35 @@ describe('ConciliacaoBancariaService — matching', () => {
 
     expect(mockDb.transacaoBancaria.update).not.toHaveBeenCalled()
   })
+
+  it('múltiplos docs com mesmo valor → primeiro match vence (short-circuit)', async () => {
+    mockDb.transacaoBancaria.findMany.mockResolvedValueOnce([
+      makeTransacao('tx-sc', '700.00', '2025-05-10'),
+    ])
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([
+      makeDoc('doc-first', '700.00', '2025-05-10'),
+      makeDoc('doc-second', '700.00', '2025-05-10'),
+    ])
+
+    const service = new ConciliacaoBancariaService()
+    await service.conciliar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(mockDb.transacaoBancaria.update).toHaveBeenCalledOnce()
+    const { data } = mockDb.transacaoBancaria.update.mock.calls[0][0]
+    expect(data.documentoId).toBe('doc-first')
+  })
+
+  it('data da transação anterior à do doc (diff negativa) → abs() torna positivo e faz match', async () => {
+    mockDb.transacaoBancaria.findMany.mockResolvedValueOnce([
+      makeTransacao('tx-before', '600.00', '2025-05-08'), // 2 dias ANTES do doc
+    ])
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([
+      makeDoc('doc-after', '600.00', '2025-05-10'),
+    ])
+
+    const service = new ConciliacaoBancariaService()
+    await service.conciliar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(mockDb.transacaoBancaria.update).toHaveBeenCalledOnce()
+  })
 })

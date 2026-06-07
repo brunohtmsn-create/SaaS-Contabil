@@ -228,6 +228,42 @@ describe('GET /relatorios/historico', () => {
     const { take } = mockDb.alerta.findMany.mock.calls[0][0]
     expect(take).toBe(100)
   })
+
+  it('?limit=0 cai no fallback 12 (0 é falsy)', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/relatorios/historico?limit=0')
+
+    const { take } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(take).toBe(12)
+  })
+
+  it('?limit=abc (NaN) cai no fallback 12', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/relatorios/historico?limit=abc')
+
+    const { take } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(take).toBe(12)
+  })
+
+  it('?limit=-5 (negativo) é clamped para 1 pelo Math.max', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/relatorios/historico?limit=-5')
+
+    const { take } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(take).toBe(1)
+  })
+
+  it('ordenado por criadoEm descendente', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/relatorios/historico')
+
+    const { orderBy } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(orderBy).toEqual({ criadoEm: 'desc' })
+  })
 })
 
 // ===========================================================================
@@ -262,5 +298,17 @@ describe('PATCH /relatorios/historico/:id/lido', () => {
     const where = mockDb.alerta.findFirst.mock.calls[0][0].where
     expect(where.tenantId).toBe(TENANT_ID)
     expect(where.id).toBe('some-id')
+  })
+
+  it('update seta lido=true no alerta', async () => {
+    mockDb.alerta.findFirst.mockResolvedValueOnce({ id: 'rel-lido-upd', tenantId: TENANT_ID })
+    mockDb.alerta.update.mockResolvedValueOnce({})
+
+    await req('PATCH', '/relatorios/historico/rel-lido-upd/lido')
+
+    const updateCall = mockDb.alerta.update.mock.calls[0][0]
+    expect(updateCall.data.lido).toBe(true)
+    expect(updateCall.where.id).toBe('rel-lido-upd')
+    expect(updateCall.where.tenantId).toBe(TENANT_ID)
   })
 })
