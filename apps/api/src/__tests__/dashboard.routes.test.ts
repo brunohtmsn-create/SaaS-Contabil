@@ -2,10 +2,11 @@
  * Testes de integração — dashboard.routes.ts
  *
  * Cobre:
- *  GET  /dashboard/resumo       — métricas agregadas do tenant
- *  GET  /dashboard/alertas      — alertas não lidos
- *  PATCH /dashboard/alertas/:id/ler — marca alerta lido
- *  GET  /dashboard/volume       — volume documental 6 meses
+ *  GET  /dashboard/resumo            — métricas agregadas do tenant
+ *  GET  /dashboard/alertas           — alertas não lidos
+ *  PATCH /dashboard/alertas/:id/ler  — marca alerta lido
+ *  GET  /dashboard/volume            — volume documental 6 meses
+ *  GET  /dashboard/timeline/:empresaId — agrupamento por competência e tipo
  */
 
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
@@ -252,5 +253,78 @@ describe('GET /dashboard/volume', () => {
 
     const firstWhere = mockDb.documentoFiscal.count.mock.calls[0][0].where
     expect(firstWhere.tenantId).toBe(TENANT_ID)
+  })
+})
+
+// ===========================================================================
+// GET /dashboard/timeline/:empresaId
+// ===========================================================================
+
+describe('GET /dashboard/timeline/:empresaId', () => {
+  const EMPRESA_ID = 'emp-timeline-1'
+
+  it('retorna agrupamento de documentos → 200', async () => {
+    const groupResult = [
+      {
+        dataCompetencia: new Date('2025-04-01'),
+        tipo: 'NFE',
+        _count: 12,
+        _sum: { valorTotal: 50000 },
+      },
+      {
+        dataCompetencia: new Date('2025-05-01'),
+        tipo: 'NFSE_EMITIDA',
+        _count: 5,
+        _sum: { valorTotal: 15000 },
+      },
+    ]
+    mockDb.documentoFiscal.groupBy.mockResolvedValueOnce(groupResult)
+
+    const res = await req('GET', `/dashboard/timeline/${EMPRESA_ID}`)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body).toHaveLength(2)
+    expect(body[0]._count).toBe(12)
+    expect(body[1].tipo).toBe('NFSE_EMITIDA')
+  })
+
+  it('filtra por tenantId e empresaId (isolamento)', async () => {
+    mockDb.documentoFiscal.groupBy.mockResolvedValueOnce([])
+
+    await req('GET', `/dashboard/timeline/${EMPRESA_ID}`)
+
+    const { where } = mockDb.documentoFiscal.groupBy.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('aplica filtro gte para 6 meses atrás', async () => {
+    mockDb.documentoFiscal.groupBy.mockResolvedValueOnce([])
+
+    await req('GET', `/dashboard/timeline/${EMPRESA_ID}`)
+
+    const { where } = mockDb.documentoFiscal.groupBy.mock.calls[0][0]
+    expect(where.dataCompetencia).toBeDefined()
+    expect(where.dataCompetencia.gte).toBeInstanceOf(Date)
+  })
+
+  it('agrupa por dataCompetencia e tipo', async () => {
+    mockDb.documentoFiscal.groupBy.mockResolvedValueOnce([])
+
+    await req('GET', `/dashboard/timeline/${EMPRESA_ID}`)
+
+    const { by } = mockDb.documentoFiscal.groupBy.mock.calls[0][0]
+    expect(by).toContain('dataCompetencia')
+    expect(by).toContain('tipo')
+  })
+
+  it('nenhum documento no período → retorna array vazio → 200', async () => {
+    mockDb.documentoFiscal.groupBy.mockResolvedValueOnce([])
+
+    const res = await req('GET', `/dashboard/timeline/${EMPRESA_ID}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([])
   })
 })
