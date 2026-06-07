@@ -249,6 +249,22 @@ describe('ESocialService — gerarS1200() / XML S-1200', () => {
     expect(xml).toContain(`<perApur>${COMPETENCIA}</perApur>`)
   })
 
+  it('XML contém FGTS mensal correto em <vrFGTSMensal> (8% do salário)', async () => {
+    // Salário 2000 → FGTS = 2000 × 8% = 160.00
+    mockDb.transacaoBancaria.findMany.mockResolvedValue([
+      {
+        id: 'trx-fgts',
+        descricao: 'FOLHA Teste',
+        valor: new Decimal('2000.00'),
+        data: new Date('2025-01-31'),
+      },
+    ])
+
+    const xml = await service.gerarS1200(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(xml).toContain('<vrFGTSMensal>160.00</vrFGTSMensal>')
+  })
+
   it('Lança erro se empresa não encontrada', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValue(null)
 
@@ -434,6 +450,28 @@ describe('ESocialService — gerarS1299() / fechamento + banco', () => {
     const xml = await service.gerarS1299(TENANT_ID, EMPRESA_ID, COMPETENCIA)
 
     expect(xml).toContain('<vrTotalINSS>264.72</vrTotalINSS>')
+  })
+
+  it('XML contém vrTotalFGTS = soma de 8% de todos os salários', async () => {
+    // Emp A: 2000 → FGTS 160.00; Emp B: 1412 → FGTS 112.96; Total = 272.96
+    mockDb.transacaoBancaria.findMany.mockResolvedValue([
+      {
+        id: 'trx-fgts-a',
+        descricao: 'FOLHA A',
+        valor: new Decimal('2000.00'),
+        data: new Date('2025-01-31'),
+      },
+      {
+        id: 'trx-fgts-b',
+        descricao: 'FOLHA B',
+        valor: new Decimal('1412.00'),
+        data: new Date('2025-01-31'),
+      },
+    ])
+
+    const xml = await service.gerarS1299(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(xml).toContain('<vrTotalFGTS>272.96</vrTotalFGTS>')
   })
 
   it('gerarS1299 persiste ApuracaoFiscal tipo EFD_REINF com status CALCULADO', async () => {

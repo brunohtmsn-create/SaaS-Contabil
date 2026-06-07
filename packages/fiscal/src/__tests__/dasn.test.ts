@@ -182,6 +182,38 @@ describe('DasnService.gerar()', () => {
     expect(aggCall.where.empresaId).toBe(EMPRESA_ID)
   })
 
+  it('aggregate retorna valorTotal null → receita tratada como zero (sem crash)', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValue(empresa)
+    mockDb.apuracaoFiscal.findMany.mockResolvedValue([])
+    // Prisma retorna null quando não há documentos
+    mockDb.documentoFiscal.aggregate.mockResolvedValue({ _sum: { valorTotal: null } })
+    mockDb.obrigacao.findFirst.mockResolvedValue(null)
+    mockDb.obrigacao.create.mockResolvedValue({ id: 'obrig-null' })
+
+    const resultado = await service.gerar(TENANT, EMPRESA_ID, ANO)
+
+    expect(resultado.receitaAnualTotal).toBe('0.00')
+    expect(resultado.receitaMensal.every((m) => m.receita === '0.00')).toBe(true)
+  })
+
+  it('aggregate filtra por status CONCILIADO e tipos de documento corretos', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValue(empresa)
+    mockDb.apuracaoFiscal.findMany.mockResolvedValue([])
+    mockAggregate('0')
+    mockDb.obrigacao.findFirst.mockResolvedValue(null)
+    mockDb.obrigacao.create.mockResolvedValue({ id: 'obrig-f' })
+
+    await service.gerar(TENANT, EMPRESA_ID, ANO)
+
+    const aggCall = mockDb.documentoFiscal.aggregate.mock.calls[0][0]
+    expect(aggCall.where.status).toBe('CONCILIADO')
+    expect(aggCall.where.tipo.in).toContain('NFE')
+    expect(aggCall.where.tipo.in).toContain('NFCE')
+    expect(aggCall.where.tipo.in).toContain('NFSE_EMITIDA')
+    expect(aggCall.where.direcao.in).toContain('SAIDA')
+    expect(aggCall.where.direcao.in).toContain('PRESTACAO')
+  })
+
   it('inclui flag pgdasCalculado correto por mês', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValue(empresa)
     // Apenas janeiro e fevereiro calculados
