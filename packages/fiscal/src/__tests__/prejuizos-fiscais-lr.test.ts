@@ -433,9 +433,99 @@ describe('PrejuizosFiscaisLRService — registrarPrejuizo', () => {
     )
     expect(chamadaCSLL).toBeUndefined()
   })
+
+  it('não persiste IRPJ_LR quando prejuizoIRPJ é zero', async () => {
+    const service = new PrejuizosFiscaisLRService()
+    await service.registrarPrejuizo(
+      TENANT_ID,
+      EMPRESA_ID,
+      '2024-12',
+      new Decimal(0),
+      new Decimal('20000')
+    )
+
+    const chamadas = mockDb.apuracaoFiscal.upsert.mock.calls
+    const chamadaIRPJ = chamadas.find(
+      (c: any) => c[0].where.tenantId_empresaId_competencia_tipo.tipo === 'IRPJ_LR'
+    )
+    expect(chamadaIRPJ).toBeUndefined()
+  })
+
+  it('ambos zero → nenhum upsert chamado, apenas audit', async () => {
+    const service = new PrejuizosFiscaisLRService()
+    await service.registrarPrejuizo(
+      TENANT_ID,
+      EMPRESA_ID,
+      '2024-12',
+      new Decimal(0),
+      new Decimal(0)
+    )
+
+    expect(mockDb.apuracaoFiscal.upsert).not.toHaveBeenCalled()
+    expect(mockAudit.registrar).toHaveBeenCalledOnce()
+  })
 })
 
 // ===========================================================================
+
+describe('PrejuizosFiscaisLRService — compensar: casos especiais', () => {
+  it('lucro negativo → compensação zero, saldo preservado intacto', async () => {
+    mockDb.apuracaoFiscal.findMany
+      .mockResolvedValueOnce([
+        makePrejuizoApuracao({
+          competencia: '2024-06',
+          tipo: 'IRPJ_LR',
+          prejuizoOriginal: 50000,
+          saldoDisponivel: 50000,
+        }),
+      ])
+      .mockResolvedValueOnce([])
+
+    const service = new PrejuizosFiscaisLRService()
+    const result = await service.compensar(
+      TENANT_ID,
+      EMPRESA_ID,
+      '2025-01',
+      new Decimal('-10000'), // lucro negativo
+      new Decimal('0')
+    )
+
+    expect(result.compensacaoIRPJUtilizada.toFixed(2)).toBe('0.00')
+    // Saldo não é reduzido quando lucro < 0
+    expect(result.saldoPrejuizoIRPJDepois.toFixed(2)).toBe('50000.00')
+  })
+
+  it('apuracao com saldoDisponivel=0 é ignorada (filtered out)', async () => {
+    mockDb.apuracaoFiscal.findMany
+      .mockResolvedValueOnce([
+        makePrejuizoApuracao({
+          competencia: '2024-03',
+          tipo: 'IRPJ_LR',
+          prejuizoOriginal: 30000,
+          saldoDisponivel: 0, // saldo zerado → deve ser ignorada
+        }),
+        makePrejuizoApuracao({
+          competencia: '2024-06',
+          tipo: 'IRPJ_LR',
+          prejuizoOriginal: 20000,
+          saldoDisponivel: 20000,
+        }),
+      ])
+      .mockResolvedValueOnce([])
+
+    const service = new PrejuizosFiscaisLRService()
+    const result = await service.compensar(
+      TENANT_ID,
+      EMPRESA_ID,
+      '2025-01',
+      new Decimal('100000'), // limite = 30.000
+      new Decimal('0')
+    )
+
+    // Apenas a segunda apuracao (20k) participa (primeira tem saldo=0)
+    expect(result.compensacaoIRPJUtilizada.toFixed(2)).toBe('20000.00')
+  })
+})
 
 describe('PrejuizosFiscaisLRService — auditoria', () => {
   it('registra IRPJ_CSLL_LR_APURADO no audit ao compensar', async () => {
