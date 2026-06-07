@@ -2564,3 +2564,53 @@ describe('GET /fiscal/planejamento-tributario/:empresaId/:exercicio', () => {
     expect(res.statusCode).toBe(400)
   })
 })
+
+// ===========================================================================
+// POST /fiscal/esocial/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/esocial/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('processa eSocial e retorna resultado → 200', async () => {
+    const resultado = {
+      empresaId: EMPRESA_ID,
+      competencia: COMPETENCIA,
+      eventos: ['S-1200', 'S-1210'],
+      status: 'TRANSMITIDO',
+    }
+    mockESocial.processar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/esocial/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual(resultado)
+  })
+
+  it('chama ESocialService.processar com tenantId, empresaId e competencia corretos', async () => {
+    mockESocial.processar.mockResolvedValueOnce({ status: 'TRANSMITIDO' })
+
+    await req('POST', `/fiscal/esocial/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(mockESocial.processar).toHaveBeenCalledOnce()
+    expect(mockESocial.processar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('empresaId inválido (não UUID) → 400', async () => {
+    const res = await req('POST', `/fiscal/esocial/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia com formato inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/esocial/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('erro no serviço → 500', async () => {
+    mockESocial.processar.mockRejectedValueOnce(new Error('Falha eSocial'))
+
+    const res = await req('POST', `/fiscal/esocial/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(500)
+  })
+})
