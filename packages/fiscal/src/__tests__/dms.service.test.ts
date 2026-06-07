@@ -350,3 +350,45 @@ describe('DMSService.apurar() — audit trail', () => {
     expect(estadoNovo.totalISS).toBe('60.00') // (1000+2000) * 0.02
   })
 })
+
+// ===========================================================================
+// Casos de borda
+// ===========================================================================
+
+describe('DMSService.apurar() — casos de borda', () => {
+  it('municipioIBGE e ibgeEmitente nulos → chave DESCONHECIDO', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce(EMPRESA)
+    // NFSe sem nenhuma referência de município
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([
+      {
+        id: 'nf-desconhecido',
+        tipo: 'NFSE_EMITIDA',
+        status: 'CONCILIADO',
+        valorTotal: new Decimal('500.00'),
+        municipioIBGE: null,
+        ibgeEmitente: null,
+      },
+    ])
+
+    const svc = new DMSService()
+    const r = await svc.apurar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(r.porMunicipio).toHaveLength(1)
+    expect(r.porMunicipio[0]!.municipioIBGE).toBe('DESCONHECIDO')
+  })
+
+  it('competencia dezembro → vencimento dia 10 de janeiro do ano seguinte', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce(EMPRESA)
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([makeNFSe('nf-dez', '1000.00')])
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce(null)
+
+    const svc = new DMSService()
+    await svc.apurar(TENANT_ID, EMPRESA_ID, '2025-12')
+
+    const { data } = mockDb.obrigacao.create.mock.calls[0][0]
+    // new Date(2025, 12, 10) → JavaScript avança para janeiro de 2026
+    expect(data.vencimento.getFullYear()).toBe(2026)
+    expect(data.vencimento.getMonth()).toBe(0) // janeiro (0-indexed)
+    expect(data.vencimento.getDate()).toBe(10)
+  })
+})

@@ -218,6 +218,19 @@ describe('INSSPatronalService — GILRAT', () => {
     // mínimo = 2% × 0,5 = 1%; não pode ir abaixo disso
     expect(Number(r.totalGILRAT)).toBeGreaterThanOrEqual(100)
   })
+
+  it('grauRisco desconhecido → usa padrão medio (2%)', async () => {
+    const service = new INSSPatronalService()
+    const r = await service.calcular(
+      TENANT_ID,
+      EMPRESA_ID,
+      '2025-05',
+      [makeFuncionario({ salarioBase: 10000 })],
+      'altissimo' as any // valor não mapeado → cai em 'medio'
+    )
+
+    expect(Number(r.totalGILRAT)).toBe(200) // 10.000 × 2% (default medio)
+  })
 })
 
 // ===========================================================================
@@ -266,6 +279,21 @@ describe('INSSPatronalService — terceiros', () => {
     )
 
     expect(Number(r.totalTerceiros)).toBe(510) // 10.000 × 5,1%
+  })
+
+  it('atividadeTerceiros desconhecido → usa padrão outros (5,8%)', async () => {
+    const service = new INSSPatronalService()
+    const r = await service.calcular(
+      TENANT_ID,
+      EMPRESA_ID,
+      '2025-05',
+      [makeFuncionario({ salarioBase: 10000 })],
+      'medio',
+      new Decimal('1.0'),
+      'agricultura' as any // valor não mapeado → cai em 'outros'
+    )
+
+    expect(Number(r.totalTerceiros)).toBe(580) // mesmo que 'outros' = 5,8%
   })
 })
 
