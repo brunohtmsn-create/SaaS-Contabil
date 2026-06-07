@@ -228,6 +228,45 @@ describe('CreditosPisCofinsLRService — CFOP', () => {
     expect(r.totalDocumentosEntrada).toBe(1)
     expect(Number(r.totalCreditoPIS)).toBeGreaterThan(0)
   })
+
+  it('CFOP 5101 (saída) → documento pulado, não gera crédito', async () => {
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([
+      makeDocEntrada({ valorTotal: 10000, cfop: '5101' }),
+    ])
+
+    const service = new CreditosPisCofinsLRService()
+    const r = await service.apurar(TENANT_ID, EMPRESA_ID, '2025-05')
+
+    expect(r.totalDocumentosEntrada).toBe(0)
+    expect(r.totalCreditoPIS.toFixed(2)).toBe('0.00')
+    expect(r.itens).toHaveLength(0)
+  })
+
+  it('mix: CFOP válido + CFOP inválido → somente o válido conta', async () => {
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([
+      makeDocEntrada({ valorTotal: 5000, cfop: '1101' }), // gera crédito
+      makeDocEntrada({ valorTotal: 9999, cfop: '5101' }), // ignorado
+    ])
+
+    const service = new CreditosPisCofinsLRService()
+    const r = await service.apurar(TENANT_ID, EMPRESA_ID, '2025-05')
+
+    expect(r.totalDocumentosEntrada).toBe(1)
+    // 5000 * 1.65% = 82.5
+    expect(r.totalCreditoPIS.toFixed(2)).toBe('82.50')
+  })
+
+  it('query filtra por status CONCILIADO e direcao ENTRADA', async () => {
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([])
+
+    const service = new CreditosPisCofinsLRService()
+    await service.apurar(TENANT_ID, EMPRESA_ID, '2025-05')
+
+    const { where } = mockDb.documentoFiscal.findMany.mock.calls[0][0]
+    expect(where.status).toBe('CONCILIADO')
+    expect(where.direcao.in).toContain('ENTRADA')
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
 })
 
 // ===========================================================================
