@@ -20,9 +20,6 @@
       "fast-jwt": ">=6.2.4",
       "glob": ">=10.5.0",
       "minimatch": ">=9.0.6",
-      "vitest": ">=4.1.0",
-      "@vitest/coverage-v8": ">=4.1.0",
-      "vite": ">=6.0.0",
       "next": ">=15.5.16"
     },
     "auditConfig": {
@@ -34,7 +31,8 @@
         "CVE-2026-31802",
         "CVE-2026-23950",
         "CVE-2026-44578",
-        "CVE-2026-44573"
+        "CVE-2026-44573",
+        "CVE-2026-47429"
       ]
     }
   },
@@ -44,7 +42,6 @@
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^9.0.0",
     "prettier": "^3.3.0",
-    "typescript": "^5.5.0",
-    "vite": "^6.0.0"
+    "typescript": "^5.5.0"
   }
 }
