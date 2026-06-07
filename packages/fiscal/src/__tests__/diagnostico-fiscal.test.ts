@@ -302,4 +302,59 @@ describe('DiagnosticoFiscalService — metadados', () => {
 
     expect(r.geradoEm).toBeInstanceOf(Date)
   })
+
+  it('regime undefined na empresa → defaults para SIMPLES_NACIONAL', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Regime Indefinido',
+      regime: undefined,
+    })
+    const service = new DiagnosticoFiscalService()
+    const r = await service.diagnosticar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(r.regime).toBe('SIMPLES_NACIONAL')
+    expect(r.itens.find((i) => i.item === 'DAS')).toBeDefined()
+  })
+})
+
+// ===========================================================================
+
+describe('DiagnosticoFiscalService — casos de borda', () => {
+  it('obrigação com tipo parcial encontrada via includes (partial match)', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce(makeEmpresa('LUCRO_PRESUMIDO'))
+    // 'IRPJ_LP_TRIMESTRAL'.includes('IRPJ_LP') → true
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([
+      { tipo: 'IRPJ_LP_TRIMESTRAL', status: 'TRANSMITIDA', vencimento: new Date('2025-05-31') },
+    ])
+
+    const service = new DiagnosticoFiscalService()
+    const r = await service.diagnosticar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    const irpj = r.itens.find((i) => i.item === 'IRPJ/CSLL')
+    expect(irpj?.status).toBe('OK')
+  })
+
+  it('obrigação vencida e não transmitida → item ATRASADO e recomendação de atraso', async () => {
+    // nowBR() = 2025-06-01; vencimento = 2025-05-20 → atrasado
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([
+      { tipo: 'PGDAS', status: 'PENDENTE', vencimento: new Date('2025-05-20') },
+    ])
+
+    const service = new DiagnosticoFiscalService()
+    const r = await service.diagnosticar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    const das = r.itens.find((i) => i.item === 'DAS')
+    expect(das?.status).toBe('ATRASADO')
+    expect(r.recomendacoes.some((rec) => rec.includes('atraso'))).toBe(true)
+  })
+
+  it('compliance < 80% → recomendação de priorização gerada', async () => {
+    // Com SN e zero apurações, compliance ≈ 17% (1/6 itens OK)
+    const service = new DiagnosticoFiscalService()
+    const r = await service.diagnosticar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(r.indicador.percentualCompliance).toBeLessThan(80)
+    expect(r.recomendacoes.some((rec) => rec.includes('80%'))).toBe(true)
+  })
 })
