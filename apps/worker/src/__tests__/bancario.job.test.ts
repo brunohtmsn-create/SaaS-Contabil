@@ -212,6 +212,28 @@ describe('bancarioJob — modo BATCH_TENANT', () => {
     expect(finalLog).toMatch(/ok=1/)
     expect(finalLog).toMatch(/erros=0/)
   })
+
+  it('erro em empresa → contagem ok=1 erros=1 no log final', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-ok', cnpj: '11111111000111' },
+      { id: 'emp-fail', cnpj: '99999999000199' },
+    ])
+    mockDb.empresaCliente.findUnique
+      .mockResolvedValueOnce({ cnpj: '11111111000111' })
+      .mockResolvedValueOnce({ cnpj: '99999999000199' })
+
+    mockOpenFinance.sincronizarContas
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('timeout'))
+
+    const job = makeJob({ modo: 'BATCH_TENANT', tenantId: TENANT_ID, competencia: COMP })
+    await bancarioJob(job)
+
+    const logCalls = job.log.mock.calls.map((c: string[]) => c[0])
+    const finalLog = logCalls.find((l: string) => l.includes('concluído'))
+    expect(finalLog).toMatch(/ok=1/)
+    expect(finalLog).toMatch(/erros=1/)
+  })
 })
 
 // ===========================================================================

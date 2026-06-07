@@ -78,11 +78,23 @@ describe('portalJob', () => {
     expect(jobArg.competencia).toBe('2025-01')
   })
 
+  it('sem competencia no job → executar chamado sem a chave competencia', async () => {
+    await portalJob(makeJob())
+    const [jobArg] = mockOrchestrator.executar.mock.calls[0]
+    expect(jobArg).not.toHaveProperty('competencia')
+  })
+
   it('propaga dados para o orchestrator', async () => {
     const dados = { receita: '50000' }
     await portalJob(makeJob({ dados }))
     const [jobArg] = mockOrchestrator.executar.mock.calls[0]
     expect(jobArg.dados).toEqual(dados)
+  })
+
+  it('sem dados no job → executar chamado sem a chave dados', async () => {
+    await portalJob(makeJob())
+    const [jobArg] = mockOrchestrator.executar.mock.calls[0]
+    expect(jobArg).not.toHaveProperty('dados')
   })
 
   it('propaga prioridade corretamente', async () => {
