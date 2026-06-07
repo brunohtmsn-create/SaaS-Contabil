@@ -120,6 +120,22 @@ describe('PGDASService — segregarReceitas()', () => {
     expect(receitas.anexoI.toFixed(2)).toBe('0.00')
     expect(receitas.anexoIII.toFixed(2)).toBe('0.00')
   })
+
+  it('NF-e com cfop null → não vai para nenhum anexo e não lança erro (optional chaining)', () => {
+    // doc.cfop?.startsWith('5') → undefined quando cfop é null → não entra no Anexo I
+    const docs = [makeDoc('NFE', '1000.00', undefined)]
+    // makeDoc sem cfop → cfop = undefined → equivale ao null path
+    const docComCfopNull = { tipo: 'NFE', valorTotal: new Decimal('1000.00'), cfop: null }
+    const receitas = (service as any).segregarReceitas(
+      [docComCfopNull],
+      '00.000.000/0001-00',
+      '2025-01'
+    )
+
+    expect(receitas.anexoI.toFixed(2)).toBe('0.00')
+    expect(receitas.anexoIII.toFixed(2)).toBe('0.00')
+    expect(receitas.total.toFixed(2)).toBe('0.00')
+  })
 })
 
 // ---------------------------------------------------------------------------
