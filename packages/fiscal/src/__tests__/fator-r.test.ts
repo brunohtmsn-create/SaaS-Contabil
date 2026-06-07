@@ -353,4 +353,18 @@ describe('FatorR — casos de negócio', () => {
       expect(parseFloat(r.aliquotaAnexoIII)).toBeLessThanOrEqual(parseFloat(r.aliquotaAnexoV))
     }
   })
+
+  it('razaoSocial ausente na empresa → resultado.razaoSocial = "" (operador ??)', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '12345678000195',
+      // razaoSocial propositalmente ausente
+    })
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({ _sum: { valorTotal: '500000' } })
+
+    const service = new FatorRService()
+    const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
+
+    expect(resultado.razaoSocial).toBe('')
+  })
 })

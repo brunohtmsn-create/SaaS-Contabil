@@ -384,4 +384,57 @@ describe('LancamentoService — lancarImpostos()', () => {
     expect(historico).toContain('Simples Nacional')
     expect(historico).toContain('2025-01')
   })
+
+  it('dados.valorDAS ausente (undefined) → operador ?? usa 0 → sem lançamento', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '11.111.111/0001-11',
+    })
+    // dados sem a chave valorDAS — aciona o fallback ?? 0
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ dados: {} })
+    const service = new LancamentoService()
+    await service.lancarImpostos('t-1', 'emp-1', '2025-01')
+    expect(mockDb.lancamentoContabil.create).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Testes — casos de borda no docToLancamento()
+// ---------------------------------------------------------------------------
+
+describe('LancamentoService — borda: CFOP nulo em NF-e ENTRADA', () => {
+  const service = new LancamentoService()
+  const call = (doc: unknown) => (service as any).docToLancamento(doc)
+
+  it('NF-e ENTRADA sem cfop → conta de estoque cai para fallback 1.1.3.01', () => {
+    const lanc = call(
+      makeDoc({
+        direcao: 'ENTRADA',
+        cfop: null,
+        valorProdutos: '500.00',
+        valorIcms: '50.00',
+        valorTotal: '500.00',
+      })
+    )
+    const debitEstoque = lanc?.partidas.find(
+      (p: any) => p.tipo === 'DEBITO' && p.conta !== '1.1.5.01'
+    )
+    expect(debitEstoque?.conta).toBe('1.1.3.01')
+  })
+
+  it('NF-e ENTRADA com cfop inexistente no mapa → conta de estoque cai para fallback 1.1.3.01', () => {
+    const lanc = call(
+      makeDoc({
+        direcao: 'ENTRADA',
+        cfop: '9.999', // cfop válido porém ausente no MAPA_CFOP_CONTA
+        valorProdutos: '800.00',
+        valorIcms: '80.00',
+        valorTotal: '800.00',
+      })
+    )
+    const debitEstoque = lanc?.partidas.find(
+      (p: any) => p.tipo === 'DEBITO' && p.conta !== '1.1.5.01'
+    )
+    expect(debitEstoque?.conta).toBe('1.1.3.01')
+  })
 })
