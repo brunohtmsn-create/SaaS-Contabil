@@ -14,32 +14,42 @@
  *  - importarExtrato(): retorna count de transações efetivamente importadas
  *  - sincronizarContas(): chama importarExtrato com conta mock quando sem OPEN_FINANCE_API_URL
  *  - sincronizarContas(): suporta erro parcial (Promise.allSettled) sem lançar
+ *  - Modo API (OPEN_FINANCE_API_URL configurada):
+ *    - listarContas() chama GET /contas com tenantId, empresaId e Authorization header
+ *    - buscarTransacoes() chama GET /contas/:id/transacoes com datas formatadas e timeout 30s
+ *    - transações da API são importadas corretamente
+ *    - sincronizarContas() usa contas da API
  *
  * PrismaClient, AuditService e axios são mockados.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Mocks
+// Mocks (vi.hoisted garante que as referências estejam disponíveis nas factories)
 // ---------------------------------------------------------------------------
 
-const mockDb = {
-  empresaCliente: { findUnique: vi.fn() },
-  transacaoBancaria: { findFirst: vi.fn(), create: vi.fn() },
-  usuario: { findMany: vi.fn() },
-}
+const { mockDb, mockAudit, mockAxiosGet } = vi.hoisted(() => ({
+  mockDb: {
+    empresaCliente: { findUnique: vi.fn() },
+    transacaoBancaria: { findFirst: vi.fn(), create: vi.fn() },
+    usuario: { findMany: vi.fn() },
+  },
+  mockAudit: { registrar: vi.fn() },
+  mockAxiosGet: vi.fn(),
+}))
 
 vi.mock('@saas-contabil/database', () => ({
   getPrismaClient: vi.fn(() => mockDb),
 }))
 
-const mockAudit = { registrar: vi.fn() }
 vi.mock('@saas-contabil/audit', () => ({
   AuditService: vi.fn(() => mockAudit),
 }))
 
-vi.mock('axios')
+vi.mock('axios', () => ({
+  default: { get: mockAxiosGet },
+}))
 
 import { OpenFinanceService } from '../open-finance.service.js'
 
@@ -287,5 +297,115 @@ describe('OpenFinanceService.sincronizarContas()', () => {
     const service = new OpenFinanceService()
     // sincronizarContas chama importarExtrato que chama findUnique — deve absorver via allSettled
     await expect(service.sincronizarContas(TENANT_ID, EMPRESA_ID)).resolves.toBeUndefined()
+  })
+})
+
+// ===========================================================================
+// Modo API (OPEN_FINANCE_API_URL configurada)
+// ===========================================================================
+
+describe('OpenFinanceService — modo API (OPEN_FINANCE_API_URL configurada)', () => {
+  const API_URL = 'https://openfinance.example.com/v1'
+
+  beforeEach(() => {
+    process.env['OPEN_FINANCE_API_URL'] = API_URL
+    process.env['OPEN_FINANCE_TOKEN'] = 'bearer-token-xyz'
+  })
+
+  afterEach(() => {
+    delete process.env['OPEN_FINANCE_API_URL']
+    delete process.env['OPEN_FINANCE_TOKEN']
+  })
+
+  it('buscarTransacoes() — chama GET /contas/:id/transacoes com datas formatadas em SP', async () => {
+    mockAxiosGet.mockResolvedValueOnce({ data: { transacoes: [] } })
+
+    const service = new OpenFinanceService()
+    await service.importarExtrato(TENANT_ID, EMPRESA_ID, CONTA, PERIODO)
+
+    const [url, config] = mockAxiosGet.mock.calls[0]!
+    expect(url).toBe(`${API_URL}/contas/${CONTA.id}/transacoes`)
+    // formatDate converte para America/Sao_Paulo: 2025-05-01T00:00:00Z → 2025-04-30 em SP
+    expect(config.params?.dataInicio).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(config.params?.dataFim).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('buscarTransacoes() — envia header Authorization com token Bearer', async () => {
+    mockAxiosGet.mockResolvedValueOnce({ data: { transacoes: [] } })
+
+    const service = new OpenFinanceService()
+    await service.importarExtrato(TENANT_ID, EMPRESA_ID, CONTA, PERIODO)
+
+    const [, config] = mockAxiosGet.mock.calls[0]!
+    expect(config.headers?.Authorization).toBe('Bearer bearer-token-xyz')
+  })
+
+  it('buscarTransacoes() — timeout de 30s configurado', async () => {
+    mockAxiosGet.mockResolvedValueOnce({ data: { transacoes: [] } })
+
+    const service = new OpenFinanceService()
+    await service.importarExtrato(TENANT_ID, EMPRESA_ID, CONTA, PERIODO)
+
+    const [, config] = mockAxiosGet.mock.calls[0]!
+    expect(config.timeout).toBe(30_000)
+  })
+
+  it('transações da API são importadas corretamente (CREDIT → CREDITO)', async () => {
+    const txApi = makeTransacao({ id: 'api-tx-1', valor: '500.00', tipo: 'CREDIT' })
+    mockAxiosGet.mockResolvedValueOnce({ data: { transacoes: [txApi] } })
+
+    const service = new OpenFinanceService()
+    const count = await service.importarExtrato(TENANT_ID, EMPRESA_ID, CONTA, PERIODO)
+
+    expect(count).toBe(1)
+    expect(mockDb.transacaoBancaria.create).toHaveBeenCalledOnce()
+    const criada = mockDb.transacaoBancaria.create.mock.calls[0]![0].data
+    expect(criada.tipo).toBe('CREDITO')
+    expect(criada.valor).toBeGreaterThan(0)
+  })
+
+  it('transação DEBIT da API → salva como DEBITO', async () => {
+    const txApi = makeTransacao({ id: 'api-tx-2', valor: '-750.00', tipo: 'DEBIT' })
+    mockAxiosGet.mockResolvedValueOnce({ data: { transacoes: [txApi] } })
+
+    const service = new OpenFinanceService()
+    const count = await service.importarExtrato(TENANT_ID, EMPRESA_ID, CONTA, PERIODO)
+
+    expect(count).toBe(1)
+    const criada = mockDb.transacaoBancaria.create.mock.calls[0]![0].data
+    expect(criada.tipo).toBe('DEBITO')
+    expect(criada.valor).toBeGreaterThan(0)
+  })
+
+  it('listarContas() — sincronizarContas chama GET /contas com params corretos', async () => {
+    const contaApi = {
+      id: 'api-conta-1',
+      banco: 'Banco API',
+      agencia: '9999',
+      numero: '00000-1',
+      tipo: 'CORRENTE' as const,
+    }
+    // listarContas chama GET /contas
+    mockAxiosGet.mockResolvedValueOnce({ data: { contas: [contaApi] } })
+    // buscarTransacoes para a conta retornada chama GET /contas/:id/transacoes
+    mockAxiosGet.mockResolvedValueOnce({ data: { transacoes: [] } })
+
+    const service = new OpenFinanceService()
+    await service.sincronizarContas(TENANT_ID, EMPRESA_ID)
+
+    const [url, config] = mockAxiosGet.mock.calls[0]!
+    expect(url).toBe(`${API_URL}/contas`)
+    expect(config.params).toMatchObject({ tenantId: TENANT_ID, empresaId: EMPRESA_ID })
+  })
+
+  it('listarContas() — envia header Authorization com token Bearer', async () => {
+    mockAxiosGet.mockResolvedValueOnce({ data: { contas: [CONTA] } })
+    mockAxiosGet.mockResolvedValueOnce({ data: { transacoes: [] } })
+
+    const service = new OpenFinanceService()
+    await service.sincronizarContas(TENANT_ID, EMPRESA_ID)
+
+    const [, config] = mockAxiosGet.mock.calls[0]!
+    expect(config.headers?.Authorization).toBe('Bearer bearer-token-xyz')
   })
 })
