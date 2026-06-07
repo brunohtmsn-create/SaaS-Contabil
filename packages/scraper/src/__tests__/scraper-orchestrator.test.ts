@@ -358,3 +358,58 @@ describe('ScraperOrchestrator — capturarNFe() e capturarNFCe()', () => {
     expect(mockNFe.authenticate).not.toHaveBeenCalled()
   })
 })
+
+// ===========================================================================
+// capturarNFSe() — Portal Nacional
+// ===========================================================================
+
+describe('ScraperOrchestrator — capturarNFSe()', () => {
+  it('autentica no Portal Nacional e retorna emitidas e tomadas', async () => {
+    mockNFSe.fetchEmitidas.mockResolvedValueOnce([makeDoc('NFSE_EMITIDA', 'SN-001')])
+    mockNFSe.fetchTomadas.mockResolvedValueOnce([makeDoc('NFSE_TOMADA', 'SN-T-001')])
+
+    const orch = new ScraperOrchestrator()
+    const result = await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(result.emitidas).toHaveLength(1)
+    expect(result.tomadas).toHaveLength(1)
+    expect(mockNFSe.authenticate).toHaveBeenCalledOnce()
+  })
+
+  it('passa credencial correta para authenticate', async () => {
+    const orch = new ScraperOrchestrator()
+    await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(mockNFSe.authenticate).toHaveBeenCalledWith(CREDENCIAL)
+  })
+
+  it('busca emitidas e tomadas independentemente', async () => {
+    mockNFSe.fetchEmitidas.mockResolvedValueOnce([
+      makeDoc('NFSE_EMITIDA', 'E-001'),
+      makeDoc('NFSE_EMITIDA', 'E-002'),
+    ])
+    mockNFSe.fetchTomadas.mockResolvedValueOnce([makeDoc('NFSE_TOMADA', 'T-001')])
+
+    const orch = new ScraperOrchestrator()
+    const result = await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(result.emitidas).toHaveLength(2)
+    expect(result.tomadas).toHaveLength(1)
+  })
+
+  it('não autentica adapters NF-e ou NFC-e', async () => {
+    const orch = new ScraperOrchestrator()
+    await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(mockNFe.authenticate).not.toHaveBeenCalled()
+    expect(mockNFCe.authenticate).not.toHaveBeenCalled()
+  })
+
+  it('sem NFS-e emitidas ou tomadas → retorna arrays vazios', async () => {
+    const orch = new ScraperOrchestrator()
+    const result = await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(result.emitidas).toHaveLength(0)
+    expect(result.tomadas).toHaveLength(0)
+  })
+})

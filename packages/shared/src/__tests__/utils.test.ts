@@ -15,19 +15,30 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { Decimal } from '../utils/decimal.js'
+import {
+  Decimal,
+  toDecimal,
+  decimalSum,
+  decimalMin,
+  decimalMax,
+  isZero,
+  formatBRL,
+} from '../utils/decimal.js'
 import {
   parsePeriodo,
   formatCompetencia,
   nowBR,
   addDays,
   addMeses,
+  subMeses,
   competencias12Meses,
   differenceInCalendarDays,
+  formatDate,
+  competenciaToDate,
 } from '../utils/date.js'
 import { sha256 } from '../utils/crypto.js'
 import { MAPA_CFOP_CONTA } from '../constants/cfop.js'
-import { validarCNPJ, formatarCNPJ, limparCNPJ } from '../utils/cnpj.js'
+import { validarCNPJ, formatarCNPJ, limparCNPJ, limparCPF } from '../utils/cnpj.js'
 
 // ---------------------------------------------------------------------------
 // parsePeriodo
@@ -440,5 +451,196 @@ describe('limparCNPJ()', () => {
 
   it('CNPJ sem pontuação permanece igual', () => {
     expect(limparCNPJ('11222333000181')).toBe('11222333000181')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// limparCPF
+// ---------------------------------------------------------------------------
+
+describe('limparCPF()', () => {
+  it('remove pontuação e retorna apenas dígitos', () => {
+    expect(limparCPF('123.456.789-09')).toBe('12345678909')
+  })
+
+  it('CPF sem pontuação permanece igual', () => {
+    expect(limparCPF('12345678909')).toBe('12345678909')
+  })
+
+  it('remove todos os caracteres não numéricos', () => {
+    expect(limparCPF('xxx123yyy456zzz789ab09')).toBe('12345678909')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatDate
+// ---------------------------------------------------------------------------
+
+describe('formatDate()', () => {
+  it('formato padrão yyyy-MM-dd', () => {
+    const date = new Date('2025-05-15T12:00:00.000Z')
+    expect(formatDate(date)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('formato personalizado dd/MM/yyyy', () => {
+    const date = new Date('2025-01-20T12:00:00.000Z')
+    expect(formatDate(date, 'dd/MM/yyyy')).toMatch(/^\d{2}\/\d{2}\/\d{4}$/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// competenciaToDate
+// ---------------------------------------------------------------------------
+
+describe('competenciaToDate()', () => {
+  it("'2025-05' retorna Date com ano 2025 e mês 5 (maio)", () => {
+    const d = competenciaToDate('2025-05')
+    expect(d.getUTCFullYear()).toBe(2025)
+    expect(d.getUTCMonth() + 1).toBe(5)
+    expect(d.getUTCDate()).toBe(1)
+  })
+
+  it("'2024-12' retorna o primeiro dia de dezembro de 2024", () => {
+    const d = competenciaToDate('2024-12')
+    expect(d.getUTCMonth() + 1).toBe(12)
+    expect(d.getUTCDate()).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// subMeses
+// ---------------------------------------------------------------------------
+
+describe('subMeses()', () => {
+  it('subtrai 1 mês corretamente', () => {
+    const result = subMeses(new Date('2025-05-01'), 1)
+    expect(result.getUTCMonth() + 1).toBe(4) // abril
+    expect(result.getUTCFullYear()).toBe(2025)
+  })
+
+  it('subtrai meses cruzando ano', () => {
+    const result = subMeses(new Date('2025-01-01'), 1)
+    expect(result.getUTCMonth() + 1).toBe(12) // dezembro
+    expect(result.getUTCFullYear()).toBe(2024)
+  })
+
+  it('subtrai 12 meses = mesmo mês do ano anterior', () => {
+    const result = subMeses(new Date('2025-05-01'), 12)
+    expect(result.getUTCMonth() + 1).toBe(5)
+    expect(result.getUTCFullYear()).toBe(2024)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// toDecimal
+// ---------------------------------------------------------------------------
+
+describe('toDecimal()', () => {
+  it('null → retorna 0', () => {
+    expect(toDecimal(null).toFixed(2)).toBe('0.00')
+  })
+
+  it('undefined → retorna 0', () => {
+    expect(toDecimal(undefined).toFixed(2)).toBe('0.00')
+  })
+
+  it('string numérica → converte corretamente', () => {
+    expect(toDecimal('1234.56').toFixed(2)).toBe('1234.56')
+  })
+
+  it('number → converte corretamente', () => {
+    expect(toDecimal(42.5).toFixed(2)).toBe('42.50')
+  })
+
+  it('Decimal existente → passa sem transformação', () => {
+    const d = new Decimal('999.99')
+    expect(toDecimal(d).toFixed(2)).toBe('999.99')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// decimalSum
+// ---------------------------------------------------------------------------
+
+describe('decimalSum()', () => {
+  it('soma valores positivos', () => {
+    expect(decimalSum(new Decimal('100'), new Decimal('200')).toFixed(2)).toBe('300.00')
+  })
+
+  it('null e undefined são tratados como 0', () => {
+    expect(decimalSum(new Decimal('100'), null, undefined).toFixed(2)).toBe('100.00')
+  })
+
+  it('sem argumentos → retorna 0', () => {
+    expect(decimalSum().toFixed(2)).toBe('0.00')
+  })
+
+  it('soma frações sem erro de ponto flutuante', () => {
+    const result = decimalSum(new Decimal('0.1'), new Decimal('0.2'))
+    expect(result.toFixed(1)).toBe('0.3')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// decimalMin / decimalMax
+// ---------------------------------------------------------------------------
+
+describe('decimalMin()', () => {
+  it('retorna o menor dos dois valores', () => {
+    expect(decimalMin(new Decimal('100'), new Decimal('200')).toFixed(2)).toBe('100.00')
+  })
+
+  it('retorna o primeiro quando iguais', () => {
+    expect(decimalMin(new Decimal('50'), new Decimal('50')).toFixed(2)).toBe('50.00')
+  })
+})
+
+describe('decimalMax()', () => {
+  it('retorna o maior dos dois valores', () => {
+    expect(decimalMax(new Decimal('100'), new Decimal('200')).toFixed(2)).toBe('200.00')
+  })
+
+  it('retorna o primeiro quando iguais', () => {
+    expect(decimalMax(new Decimal('75'), new Decimal('75')).toFixed(2)).toBe('75.00')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isZero
+// ---------------------------------------------------------------------------
+
+describe('isZero()', () => {
+  it('retorna true para valor zero', () => {
+    expect(isZero(new Decimal('0'))).toBe(true)
+  })
+
+  it('retorna false para valor positivo', () => {
+    expect(isZero(new Decimal('0.01'))).toBe(false)
+  })
+
+  it('retorna false para valor negativo', () => {
+    expect(isZero(new Decimal('-0.01'))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatBRL
+// ---------------------------------------------------------------------------
+
+describe('formatBRL()', () => {
+  it('formata valor inteiro com dois decimais', () => {
+    expect(formatBRL(new Decimal('1000'))).toBe('1.000,00')
+  })
+
+  it('formata valor com centavos', () => {
+    expect(formatBRL(new Decimal('1234.56'))).toBe('1.234,56')
+  })
+
+  it('formata valor abaixo de 1000 sem separador de milhar', () => {
+    expect(formatBRL(new Decimal('999.99'))).toBe('999,99')
+  })
+
+  it('formata valor acima de 1 milhão com dois separadores', () => {
+    expect(formatBRL(new Decimal('1234567.89'))).toBe('1.234.567,89')
   })
 })
