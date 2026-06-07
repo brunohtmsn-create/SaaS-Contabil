@@ -204,6 +204,60 @@ describe('FGTSDigitalService.apurar() — com lançamentos de folha', () => {
   })
 })
 
+describe('FGTSDigitalService.apurar() — partidas não-array', () => {
+  it('lançamento com partidas null → ignorado (baseCalculo permanece 0)', async () => {
+    mockDb.lancamentoContabil.findMany.mockResolvedValueOnce([
+      { partidas: null },
+      { partidas: { conta: '6.1.01', tipo: 'DEBITO', valor: '5000.00' } }, // objeto, não array
+    ])
+
+    const service = new FGTSDigitalService()
+    const result = await service.apurar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(result.baseCalculo.toFixed(2)).toBe('0.00')
+    expect(result.valorFGTS.toFixed(2)).toBe('0.00')
+  })
+
+  it('lançamentos sem CPF nas partidas → totalEmpregados = número de lançamentos', async () => {
+    mockDb.lancamentoContabil.findMany.mockResolvedValueOnce([
+      makeLancamento([{ conta: '6.1.01', tipo: 'DEBITO', valor: '2000.00' }]), // sem cpf
+      makeLancamento([{ conta: '6.1.01', tipo: 'DEBITO', valor: '3000.00' }]), // sem cpf
+    ])
+
+    const service = new FGTSDigitalService()
+    const result = await service.apurar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    // Nenhum CPF informado → totalEmpregados = número de lançamentos (2)
+    expect(result.totalEmpregados).toBe(2)
+  })
+})
+
+describe('FGTSDigitalService.apurar() — buscarOuGerarIdObrigacao', () => {
+  it('obrigação existente → upsert usa ID existente (update path)', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({ id: 'obrigacao-existente-123' })
+    mockDb.obrigacao.upsert.mockResolvedValue({ id: 'obrigacao-existente-123' })
+
+    const service = new FGTSDigitalService()
+    await service.apurar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    const upsertCall = mockDb.obrigacao.upsert.mock.calls[0][0]
+    expect(upsertCall.where.id).toBe('obrigacao-existente-123')
+    // update deve conter valor e status
+    expect(upsertCall.update).toMatchObject({ status: 'PENDENTE' })
+  })
+
+  it('sem obrigação existente → upsert usa ID inválido (força create)', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce(null)
+
+    const service = new FGTSDigitalService()
+    await service.apurar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    const upsertCall = mockDb.obrigacao.upsert.mock.calls[0][0]
+    // UUID sentinela que garante que o where nunca bate e força o create
+    expect(upsertCall.where.id).toBe('00000000-0000-0000-0000-000000000000')
+  })
+})
+
 describe('FGTSDigitalService.gerarGRRF() — multa rescisória', () => {
   it('empresa não encontrada → lança erro', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
@@ -252,5 +306,33 @@ describe('FGTSDigitalService.gerarGRRF() — multa rescisória', () => {
     const createCall = mockDb.obrigacao.create.mock.calls[0][0]
     expect(createCall.data.tipo).toBe('FGTS_DIGITAL')
     expect(createCall.data.tenantId).toBe(TENANT_ID)
+  })
+
+  it('apurações com status RASCUNHO são excluídas do saldo', async () => {
+    // findMany filtra por status CALCULADO/TRANSMITIDO/PAGO, não RASCUNHO
+    // O mock retorna apenas os dados filtrados pelo Prisma — testamos o where
+    const service = new FGTSDigitalService()
+    await service.gerarGRRF(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    const findManyWhere = mockDb.apuracaoFiscal.findMany.mock.calls[0][0].where
+    expect(findManyWhere.status.in).toContain('CALCULADO')
+    expect(findManyWhere.status.in).toContain('TRANSMITIDO')
+    expect(findManyWhere.status.in).toContain('PAGO')
+    expect(findManyWhere.status.in).not.toContain('RASCUNHO')
+  })
+
+  it('vencimento GRRF = fim do período + 10 dias', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([])
+
+    const service = new FGTSDigitalService()
+    await service.gerarGRRF(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    const createCall = mockDb.obrigacao.create.mock.calls[0][0]
+    const vencimento = createCall.data.vencimento as Date
+    // parsePeriodo mockado retorna fim = 2025-05-31
+    const fimEsperado = new Date('2025-05-31')
+    fimEsperado.setDate(fimEsperado.getDate() + 10)
+    expect(vencimento.getDate()).toBe(fimEsperado.getDate())
+    expect(vencimento.getMonth()).toBe(fimEsperado.getMonth())
   })
 })
