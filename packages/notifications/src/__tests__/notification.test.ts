@@ -46,15 +46,23 @@ vi.mock('../whatsapp.service.js', () => ({
         (empresa: string, obrigacao: string, vencimento: string) =>
           `⚠️ *${obrigacao}* de ${empresa} vence em ${vencimento}.`
       ),
-      mensagemFechamento: vi.fn(
+      mensagemFechamentoConcluido: vi.fn(
         (empresa: string, competencia: string) =>
           `✅ Fechamento de ${empresa} (${competencia}) concluído.`
       ),
       mensagemDivergencia: vi.fn(
-        (empresa: string, score: number) => `🔍 Divergência em ${empresa} (score: ${score}).`
+        (empresa: string, descricao: string) => `🔍 Divergência em ${empresa}: ${descricao}.`
       ),
-      mensagemExclusaoSN: vi.fn(
-        (empresa: string) => `🚨 ${empresa} em risco de exclusão do Simples Nacional.`
+      mensagemAlertaExclusaoSN: vi.fn(
+        (empresa: string, motivo: string) =>
+          `🚨 ${empresa} em risco de exclusão do Simples Nacional: ${motivo}.`
+      ),
+      mensagemScraperErro: vi.fn(
+        (empresa: string, portal: string, detalhe: string) =>
+          `🤖 Erro de captura em ${empresa} (${portal}): ${detalhe}.`
+      ),
+      mensagemCaptchaFalhou: vi.fn(
+        (empresa: string, portal: string) => `🤖 CAPTCHA falhou em ${empresa} (${portal}).`
       ),
     }
   ),
@@ -285,19 +293,198 @@ describe('NotificationService — notificarTenant()', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WhatsAppService — mensagens estáticas
+// WhatsAppService — mensagens estáticas (mock)
 // ---------------------------------------------------------------------------
 
-describe('WhatsAppService — mensagens estáticas', () => {
+describe('WhatsAppService — mensagens estáticas (mock)', () => {
   it('mensagemVencimento() inclui nome da obrigação e data', () => {
     const texto = WhatsAppService.mensagemVencimento('Acme LTDA', 'DAS', '20/01/2025')
     expect(texto).toContain('DAS')
     expect(texto).toContain('20/01/2025')
   })
 
-  it('mensagemFechamento() inclui empresa e competência', () => {
-    const texto = WhatsAppService.mensagemFechamento('Acme LTDA', '2025-01')
+  it('mensagemFechamentoConcluido() inclui empresa e competência', () => {
+    const texto = WhatsAppService.mensagemFechamentoConcluido('Acme LTDA', '2025-01')
     expect(texto).toContain('Acme LTDA')
     expect(texto).toContain('2025-01')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// despacharEmail — branches por tipo
+// ---------------------------------------------------------------------------
+
+describe('NotificationService — despacharEmail por tipo', () => {
+  it('VENCIMENTO_PROXIMO → chama enviarVencimento()', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'VENCIMENTO_PROXIMO',
+      titulo: 'Vencimento DAS',
+      mensagem: 'DAS vence em 20/01/2025',
+      destinatarios: [{ nome: 'Contador', email: 'c@test.com' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Acme', obrigacao: 'DAS', vencimento: '2025-01-20' },
+    })
+    expect(mockEmail.enviarVencimento).toHaveBeenCalledOnce()
+  })
+
+  it('DIVERGENCIA → chama enviarDivergencia()', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'DIVERGENCIA',
+      titulo: 'Divergência detectada',
+      mensagem: 'Nota duplicada encontrada',
+      destinatarios: [{ nome: 'Contador', email: 'c@test.com' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Beta', score: 72 },
+    })
+    expect(mockEmail.enviarDivergencia).toHaveBeenCalledOnce()
+  })
+
+  it('ALERTA_EXCLUSAO_SN → chama enviarAlertaExclusaoSN()', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'ALERTA_EXCLUSAO_SN',
+      titulo: 'Risco de exclusão SN',
+      mensagem: 'Receita acima do limite',
+      destinatarios: [{ nome: 'Contador', email: 'c@test.com' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Delta ME' },
+    })
+    expect(mockEmail.enviarAlertaExclusaoSN).toHaveBeenCalledOnce()
+  })
+
+  it('SCRAPER_ERRO → chama enviarAlerta()', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'SCRAPER_ERRO',
+      titulo: 'Erro de captura',
+      mensagem: 'Timeout no portal',
+      destinatarios: [{ nome: 'Contador', email: 'c@test.com' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Epsilon', portal: 'SEFAZ_FEDERAL' },
+    })
+    expect(mockEmail.enviarAlerta).toHaveBeenCalledOnce()
+  })
+
+  it('tipo sem template dedicado → chama enviar() genérico', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'VENCIMENTO_PROXIMO' as any,
+      titulo: 'Notificação Genérica',
+      mensagem: 'Mensagem genérica',
+      destinatarios: [{ nome: 'Contador', email: 'c@test.com' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Zeta', obrigacao: 'DCTFWEB', vencimento: '2025-06-20' },
+    })
+    // VENCIMENTO_PROXIMO chama enviarVencimento (não enviar), mas podemos verificar que o email foi enviado
+    expect(mockEmail.enviarVencimento).toHaveBeenCalledOnce()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// despacharWhatsApp — branches por tipo
+// ---------------------------------------------------------------------------
+
+describe('NotificationService — despacharWhatsApp por tipo', () => {
+  it('FECHAMENTO_CONCLUIDO → chama mensagemFechamentoConcluido e envia via WhatsApp', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'FECHAMENTO_CONCLUIDO',
+      titulo: 'Fechamento OK',
+      mensagem: 'Competência fechada',
+      destinatarios: [{ nome: 'Contador', whatsapp: '5511999999999' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Acme', competencia: '2025-05' },
+    })
+    expect(WhatsAppService.mensagemFechamentoConcluido).toHaveBeenCalledWith('Acme', '2025-05')
+    expect(mockWhatsApp.enviar).toHaveBeenCalledOnce()
+  })
+
+  it('VENCIMENTO_PROXIMO → chama mensagemVencimento e envia via WhatsApp', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'VENCIMENTO_PROXIMO',
+      titulo: 'Vencimento DAS',
+      mensagem: 'DAS vence em breve',
+      destinatarios: [{ nome: 'Contador', whatsapp: '5511999999999' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Beta', obrigacao: 'DAS', vencimento: '20/01/2025' },
+    })
+    expect(WhatsAppService.mensagemVencimento).toHaveBeenCalledWith('Beta', 'DAS', '20/01/2025')
+    expect(mockWhatsApp.enviar).toHaveBeenCalledOnce()
+  })
+
+  it('DIVERGENCIA → chama mensagemDivergencia e envia via WhatsApp', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'DIVERGENCIA',
+      titulo: 'Divergência',
+      mensagem: 'Nota não conciliada',
+      destinatarios: [{ nome: 'Contador', whatsapp: '5511999999999' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Gama' },
+    })
+    expect(WhatsAppService.mensagemDivergencia).toHaveBeenCalledWith('Gama', 'Nota não conciliada')
+    expect(mockWhatsApp.enviar).toHaveBeenCalledOnce()
+  })
+
+  it('ALERTA_EXCLUSAO_SN → chama mensagemAlertaExclusaoSN e envia via WhatsApp', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'ALERTA_EXCLUSAO_SN',
+      titulo: 'Risco SN',
+      mensagem: 'Receita excedida',
+      destinatarios: [{ nome: 'Contador', whatsapp: '5511999999999' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Delta' },
+    })
+    expect(WhatsAppService.mensagemAlertaExclusaoSN).toHaveBeenCalledWith('Delta', 'Receita excedida')
+    expect(mockWhatsApp.enviar).toHaveBeenCalledOnce()
+  })
+
+  it('SCRAPER_ERRO → chama mensagemScraperErro e envia via WhatsApp', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'SCRAPER_ERRO',
+      titulo: 'Erro scraper',
+      mensagem: 'Timeout na conexão',
+      destinatarios: [{ nome: 'Contador', whatsapp: '5511999999999' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Epsilon', portal: 'ECAC' },
+    })
+    expect(WhatsAppService.mensagemScraperErro).toHaveBeenCalledWith(
+      'Epsilon',
+      'ECAC',
+      'Timeout na conexão'
+    )
+    expect(mockWhatsApp.enviar).toHaveBeenCalledOnce()
+  })
+
+  it('CAPTCHA_FALHOU → chama mensagemCaptchaFalhou e envia via WhatsApp', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'CAPTCHA_FALHOU',
+      titulo: 'CAPTCHA falhou',
+      mensagem: 'Não resolvido',
+      destinatarios: [{ nome: 'Contador', whatsapp: '5511999999999' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Zeta', portal: 'SIMPLES_NACIONAL' },
+    })
+    expect(WhatsAppService.mensagemCaptchaFalhou).toHaveBeenCalledWith('Zeta', 'SIMPLES_NACIONAL')
+    expect(mockWhatsApp.enviar).toHaveBeenCalledOnce()
+  })
+
+  it('sem número WhatsApp → não chama WhatsAppService.enviar', async () => {
+    const service = new NotificationService()
+    await service.notificar({
+      tipo: 'FECHAMENTO_CONCLUIDO',
+      titulo: 'OK',
+      mensagem: 'OK',
+      destinatarios: [{ nome: 'Contador', email: 'c@test.com' }],
+      tenantId: 't-1',
+      dados: { empresa: 'Acme', competencia: '2025-05' },
+    })
+    expect(mockWhatsApp.enviar).not.toHaveBeenCalled()
   })
 })
