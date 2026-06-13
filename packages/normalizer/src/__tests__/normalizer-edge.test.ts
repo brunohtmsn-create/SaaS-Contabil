@@ -422,3 +422,72 @@ describe('NormalizerService — dataCompetencia calculada de dataEmissao', () =>
     expect(dc.getDate()).toBe(1)
   })
 })
+
+// ===========================================================================
+// chaveUnica — fallbacks para campos nulos (operador ??)
+// ===========================================================================
+
+describe('NormalizerService — chaveUnica NFSe com campos nulos', () => {
+  const baseNFSe = {
+    tipo: 'NFSE_EMITIDA',
+    chaveAcesso: undefined,
+    numero: '001',
+    dataEmissao: new Date('2025-03-10'),
+    cnpjEmitente: '11111111000191',
+    nomeEmitente: 'Prestadora',
+    cnpjDestinatario: '22222222000100',
+    valorTotal: new Decimal('800.00'),
+    fonte: 'NFSE_PORTAL',
+  } as DocumentoRaw
+
+  it('municipioIBGE nulo → chaveUnica usa string vazia como fallback (operador ??)', async () => {
+    const rawSemIbge = { ...baseNFSe, municipioIBGE: null, valorServicos: new Decimal('800.00') }
+    const rawComIbge = {
+      ...baseNFSe,
+      municipioIBGE: '3550308',
+      valorServicos: new Decimal('800.00'),
+    }
+
+    const svc = new NormalizerService()
+
+    // doc sem IBGE
+    await svc.normalizar(rawSemIbge as any, 'tenant-test', 'empresa-test')
+    const chaveSemIbge = mockDocumentoFiscal.findFirst.mock.calls[0]![0].where.chaveUnica
+
+    vi.clearAllMocks()
+    mockDocumentoFiscal.findFirst.mockResolvedValue(null)
+
+    // doc com IBGE diferente → chave diferente (prova que '' e '3550308' geram hashes distintos)
+    await svc.normalizar(rawComIbge, 'tenant-test', 'empresa-test')
+    const chaveComIbge = mockDocumentoFiscal.findFirst.mock.calls[0]![0].where.chaveUnica
+
+    expect(typeof chaveSemIbge).toBe('string')
+    expect(chaveSemIbge).toHaveLength(64) // SHA-256 hex
+    expect(chaveSemIbge).not.toBe(chaveComIbge)
+  })
+
+  it('valorServicos nulo → chaveUnica usa valorTotal como fallback (operador ??)', async () => {
+    const rawSemServicos = { ...baseNFSe, municipioIBGE: '3550308', valorServicos: null }
+    const rawComServicos = {
+      ...baseNFSe,
+      municipioIBGE: '3550308',
+      valorServicos: new Decimal('400.00'), // valor diferente
+    }
+
+    const svc = new NormalizerService()
+
+    // doc sem valorServicos → usa valorTotal = 800.00
+    await svc.normalizar(rawSemServicos as any, 'tenant-test', 'empresa-test')
+    const chaveSemServicos = mockDocumentoFiscal.findFirst.mock.calls[0]![0].where.chaveUnica
+
+    vi.clearAllMocks()
+    mockDocumentoFiscal.findFirst.mockResolvedValue(null)
+
+    // doc com valorServicos = 400.00 → chave diferente (400 != 800)
+    await svc.normalizar(rawComServicos, 'tenant-test', 'empresa-test')
+    const chaveComServicos = mockDocumentoFiscal.findFirst.mock.calls[0]![0].where.chaveUnica
+
+    expect(typeof chaveSemServicos).toBe('string')
+    expect(chaveSemServicos).not.toBe(chaveComServicos)
+  })
+})

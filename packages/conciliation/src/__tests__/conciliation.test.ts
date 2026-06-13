@@ -420,6 +420,22 @@ describe('ConciliationService — conciliarNFSeTomadas()', () => {
     expect(alertArgs[0].data[0].tipo).toBe('DIVERGENCIA_CONCILIACAO')
   })
 
+  it('Documento CONCILIADO → alerta.createMany NÃO chamado (branch Promise.resolve())', async () => {
+    // cnpjEmitente válido e valor > 0 → deve gerar status CONCILIADA → sem alertas
+    const doc = makeDoc({
+      id: 'doc-ok',
+      cnpjEmitente: '11111111000191',
+      valorTotal: new Decimal('1500'),
+    })
+    mockDocumentoFiscal.findMany.mockResolvedValue([doc])
+    mockDocumentoFiscal.update.mockResolvedValue({})
+
+    const service = new ConciliationService()
+    await service.conciliarNFSeTomadas(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(mockAlerta.createMany).not.toHaveBeenCalled()
+  })
+
   it('Múltiplos documentos → retorna resultado para cada um', async () => {
     const docs = [
       makeDoc({ id: 'doc-1', cnpjEmitente: '11111111000191', valorTotal: new Decimal('1000') }),
