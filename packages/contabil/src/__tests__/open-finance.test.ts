@@ -408,4 +408,18 @@ describe('OpenFinanceService — modo API (OPEN_FINANCE_API_URL configurada)', (
     const [, config] = mockAxiosGet.mock.calls[0]!
     expect(config.headers?.Authorization).toBe('Bearer bearer-token-xyz')
   })
+
+  it('formatarDescricao — transação sem categoria não inclui [] na descrição', async () => {
+    const txSemCategoria = makeTransacao({ id: 'tx-sem-cat', descricao: 'PIX SEM CATEGORIA' })
+    // categoria não definida → branch false → '' (não inclui colchetes com categoria)
+    mockAxiosGet.mockResolvedValueOnce({ data: { transacoes: [txSemCategoria] } })
+
+    const service = new OpenFinanceService()
+    await service.importarExtrato(TENANT_ID, EMPRESA_ID, CONTA, PERIODO)
+
+    const criada = mockDb.transacaoBancaria.create.mock.calls[0]![0].data
+    expect(criada.descricao).toBe('PIX SEM CATEGORIA [OF:tx-sem-cat]')
+    expect(criada.descricao).not.toMatch(/\[undefined\]/)
+    expect(criada.descricao).not.toMatch(/\[null\]/)
+  })
 })

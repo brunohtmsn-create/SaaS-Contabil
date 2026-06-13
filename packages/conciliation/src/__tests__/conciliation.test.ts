@@ -436,6 +436,18 @@ describe('ConciliationService — conciliarNFSeTomadas()', () => {
     expect(mockAlerta.createMany).not.toHaveBeenCalled()
   })
 
+  it('empresa não encontrada → usa cnpj="" via nullish coalescing (não lança erro)', async () => {
+    mockEmpresaCliente.findUnique.mockResolvedValueOnce(null)
+    const doc = makeDoc({ id: 'doc-sem-emp', cnpjEmitente: '11111111000191', valorTotal: new Decimal('500') })
+    mockDocumentoFiscal.findMany.mockResolvedValue([doc])
+
+    const service = new ConciliationService()
+    // empresa null → cnpj = empresa?.cnpj ?? '' = '' — serviço não deve lançar erro
+    await expect(
+      service.conciliarNFSeTomadas(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    ).resolves.toHaveLength(1)
+  })
+
   it('Múltiplos documentos → retorna resultado para cada um', async () => {
     const docs = [
       makeDoc({ id: 'doc-1', cnpjEmitente: '11111111000191', valorTotal: new Decimal('1000') }),

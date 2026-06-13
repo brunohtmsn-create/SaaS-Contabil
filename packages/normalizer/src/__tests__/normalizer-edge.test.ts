@@ -169,6 +169,16 @@ describe('NormalizerService — operacaoInterestadual', () => {
     const [createArgs] = mockDocumentoFiscal.create.mock.calls
     expect(createArgs[0].data.operacaoInterestadual).toBe(true)
   })
+
+  it('ufEmitente e ufDestinatario ambos nulos → ambos viram "" → operacaoInterestadual = false', async () => {
+    const raw = makeRaw({ ufEmitente: undefined, ufDestinatario: undefined })
+
+    const svc = new NormalizerService()
+    await svc.normalizar(raw as any, 'tenant-test', 'empresa-test')
+
+    const [createArgs] = mockDocumentoFiscal.create.mock.calls
+    expect(createArgs[0].data.operacaoInterestadual).toBe(false)
+  })
 })
 
 // ===========================================================================
@@ -464,6 +474,17 @@ describe('NormalizerService — chaveUnica NFSe com campos nulos', () => {
     expect(typeof chaveSemIbge).toBe('string')
     expect(chaveSemIbge).toHaveLength(64) // SHA-256 hex
     expect(chaveSemIbge).not.toBe(chaveComIbge)
+  })
+
+  it('NFE sem chaveAcesso → chaveUnica gerada via fallback cnpj-numero-serie', async () => {
+    const rawSemChave = makeRaw({ tipo: 'NFE', chaveAcesso: undefined, numero: '0000777', serie: '002' })
+
+    const svc = new NormalizerService()
+    await svc.normalizar(rawSemChave as any, 'tenant-test', 'empresa-test')
+
+    const chaveUsada = mockDocumentoFiscal.findFirst.mock.calls[0]![0].where.chaveUnica
+    expect(typeof chaveUsada).toBe('string')
+    expect(chaveUsada).toHaveLength(64) // SHA-256 hex
   })
 
   it('valorServicos nulo → chaveUnica usa valorTotal como fallback (operador ??)', async () => {

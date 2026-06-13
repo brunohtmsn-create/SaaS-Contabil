@@ -354,3 +354,40 @@ describe('StorageService.verificarIntegridade()', () => {
     expect(result).toBe(false)
   })
 })
+
+// ===========================================================================
+// Configuração S3Client com endpoint (MinIO / S3-compatible)
+// ===========================================================================
+
+describe('StorageService — construtor com AWS_S3_ENDPOINT (MinIO)', () => {
+  it('passa endpoint e forcePathStyle ao S3Client quando AWS_S3_ENDPOINT definido', async () => {
+    const { S3Client } = await import('@aws-sdk/client-s3')
+    const mockConstructor = S3Client as unknown as ReturnType<typeof vi.fn>
+    mockConstructor.mockClear()
+
+    process.env['AWS_S3_ENDPOINT'] = 'http://localhost:9000'
+    process.env['AWS_REGION'] = 'sa-east-1'
+
+    new StorageService()
+
+    const constructorArgs = mockConstructor.mock.calls[0][0]
+    expect(constructorArgs.endpoint).toBe('http://localhost:9000')
+    expect(constructorArgs.forcePathStyle).toBe(true)
+
+    delete process.env['AWS_S3_ENDPOINT']
+  })
+
+  it('S3Client sem endpoint quando AWS_S3_ENDPOINT não definido', async () => {
+    const { S3Client } = await import('@aws-sdk/client-s3')
+    const mockConstructor = S3Client as unknown as ReturnType<typeof vi.fn>
+    mockConstructor.mockClear()
+
+    delete process.env['AWS_S3_ENDPOINT']
+
+    new StorageService()
+
+    const constructorArgs = mockConstructor.mock.calls[0][0]
+    expect(constructorArgs.endpoint).toBeUndefined()
+    expect(constructorArgs.forcePathStyle).toBeUndefined()
+  })
+})
