@@ -541,4 +541,62 @@ describe('fiscalJob — roteamento de operações', () => {
     expect(eid).toBe('emp-1')
     expect(exercicio).toBe(2025)
   })
+
+  it('SIMULADOR_TRIBUTARIO sem atividade → usa default "servicos"', async () => {
+    mockSimulador.simular.mockResolvedValue({ melhorRegime: 'SIMPLES_NACIONAL' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'SIMULADOR_TRIBUTARIO',
+        meta: { receitaBrutaAnual: '300000' },
+        // atividade ausente → deve usar 'servicos'
+      },
+    } as any
+    await fiscalJob(job)
+    const [, , atividade] = mockSimulador.simular.mock.calls[0]
+    expect(atividade).toBe('servicos')
+  })
+
+  it('SIMULADOR_TRIBUTARIO com lucroEstimadoAnual → passa Decimal (não undefined)', async () => {
+    mockSimulador.simular.mockResolvedValue({ melhorRegime: 'LUCRO_PRESUMIDO' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'SIMULADOR_TRIBUTARIO',
+        meta: { receitaBrutaAnual: '500000', atividade: 'servicos', lucroEstimadoAnual: '150000' },
+      },
+    } as any
+    await fiscalJob(job)
+    const args = mockSimulador.simular.mock.calls[0]
+    // índice [4] é lucroEstimadoAnual (Decimal, não undefined)
+    expect(args[4]).toBeDefined()
+    expect(typeof args[4].toNumber).toBe('function')
+  })
+
+  it('PLANEJAMENTO_TRIBUTARIO sem projections → passa undefined para todos os opcionais', async () => {
+    mockPlanejamento.analisar.mockResolvedValue({ melhorRegime: 'SIMPLES_NACIONAL' })
+    const job = {
+      data: {
+        tenantId: 't-1',
+        empresaId: 'emp-1',
+        cnpj: '11111111000111',
+        competencia: '2025',
+        operacao: 'PLANEJAMENTO_TRIBUTARIO',
+        meta: {},
+        // sem receitaProjetadaAnual, folhaProjetadaAnual, lucroProjetadoAnual
+      },
+    } as any
+    await fiscalJob(job)
+    const args = mockPlanejamento.analisar.mock.calls[0]
+    // índices [3], [4], [5] são os opcionais — todos undefined
+    expect(args[3]).toBeUndefined()
+    expect(args[4]).toBeUndefined()
+    expect(args[5]).toBeUndefined()
+  })
 })

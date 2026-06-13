@@ -308,6 +308,140 @@ describe('POST /credenciais (JSON)', () => {
 })
 
 // ===========================================================================
+// POST /credenciais (multipart — certificado .pfx)
+// ===========================================================================
+
+describe('POST /credenciais (multipart — certificado .pfx)', () => {
+  function buildMultipart(
+    boundary: string,
+    fields: Record<string, string>,
+    fileField?: { name: string; filename: string; data: Buffer }
+  ): Buffer {
+    const parts: string[] = []
+
+    if (fileField) {
+      parts.push(
+        `--${boundary}\r\n` +
+          `Content-Disposition: form-data; name="${fileField.name}"; filename="${fileField.filename}"\r\n` +
+          `Content-Type: application/octet-stream\r\n\r\n`
+      )
+    }
+
+    const bufs: Buffer[] = []
+    for (const part of parts) bufs.push(Buffer.from(part))
+    if (fileField) bufs.push(fileField.data)
+    bufs.push(Buffer.from('\r\n'))
+
+    for (const [k, v] of Object.entries(fields)) {
+      bufs.push(
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`
+        )
+      )
+    }
+
+    bufs.push(Buffer.from(`--${boundary}--\r\n`))
+    return Buffer.concat(bufs)
+  }
+
+  it('sem arquivo enviado → 400 com "Arquivo não enviado"', async () => {
+    const boundary = 'TestBnd123'
+    // Envia apenas campos de texto, sem file part
+    const body = buildMultipart(boundary, {
+      empresaId: EMPRESA_ID,
+      cnpj: '12345678000195',
+      tipo: 'CERTIFICADO_A1',
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/credenciais',
+      headers: {
+        'x-test-skip-auth': '1',
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toMatch(/Arquivo não enviado/)
+    expect(mockCredService.store).not.toHaveBeenCalled()
+  })
+
+  it('com arquivo e campos válidos → 201 sem campos sensíveis', async () => {
+    const boundary = 'TestBnd456'
+    const pfxData = Buffer.from([0x30, 0x82, 0x00, 0x01])
+    const body = buildMultipart(
+      boundary,
+      {
+        empresaId: EMPRESA_ID,
+        cnpj: '12345678000195',
+        tipo: 'CERTIFICADO_A1',
+      },
+      { name: 'file', filename: 'cert.pfx', data: pfxData }
+    )
+
+    mockCredService.store.mockResolvedValueOnce({
+      id: 'cred-pfx-1',
+      tipo: 'CERTIFICADO_A1',
+      status: 'ATIVO',
+      encryptedData: 'ENC',
+      iv: 'IV',
+      authTag: 'TAG',
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/credenciais',
+      headers: {
+        'x-test-skip-auth': '1',
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(201)
+    const result = res.json()
+    expect(result.tipo).toBe('CERTIFICADO_A1')
+    expect(result).not.toHaveProperty('encryptedData')
+    expect(result).not.toHaveProperty('iv')
+    expect(result).not.toHaveProperty('authTag')
+    expect(mockCredService.store).toHaveBeenCalledOnce()
+    // rawData deve ser o buffer do arquivo
+    const storeArgs = mockCredService.store.mock.calls[0][0]
+    expect(Buffer.isBuffer(storeArgs.rawData)).toBe(true)
+    expect(storeArgs.tenantId).toBe(TENANT_ID)
+  })
+
+  it('com arquivo mas campos inválidos (tipo errado) → 400', async () => {
+    const boundary = 'TestBnd789'
+    const pfxData = Buffer.from([0x30, 0x82])
+    const body = buildMultipart(
+      boundary,
+      {
+        empresaId: EMPRESA_ID,
+        cnpj: '12345678000195',
+        tipo: 'TIPO_INVALIDO',
+      },
+      { name: 'file', filename: 'cert.pfx', data: pfxData }
+    )
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/credenciais',
+      headers: {
+        'x-test-skip-auth': '1',
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(mockCredService.store).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
 // DELETE /credenciais/:id
 // ===========================================================================
 
