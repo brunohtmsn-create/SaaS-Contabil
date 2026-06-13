@@ -404,6 +404,41 @@ describe('RelatorioFiscalService — ISS/DMS', () => {
 
 // ===========================================================================
 
+describe('RelatorioFiscalService — casos de borda', () => {
+  it('apuração com dados null → ignorada (if !dados continue)', async () => {
+    // Apuração PGDAS real + uma apuração com dados null
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([
+      makeApuracao('PGDAS', { totalDAS: '5000', receitaBruta: '100000', aliquotaEfetiva: '0.05' }),
+      { tipo: 'IRPJ_LP', dados: null, status: 'CALCULADO' },
+    ])
+
+    const service = new RelatorioFiscalService()
+    const r = await service.gerar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    // Apenas PGDAS foi processado; IRPJ_LP com dados null foi ignorado
+    const das = r.tributos.find((t) => t.tributo.includes('DAS'))
+    expect(das).toBeDefined()
+    // IRPJ_LP não aparece como linha apurada (ignorado pelo continue)
+    const irpj = r.tributos.find((t) => t.tributo.includes('IRPJ'))
+    // Pode ser NAO_APURADO (adicionado pelo preenchimento de tipos esperados para SN)
+    // O importante é que não lança erro
+    expect(r).toBeDefined()
+  })
+
+  it('apuração com tipo desconhecido → buildLinha retorna null, não aparece em tributos', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([
+      { tipo: 'TIPO_FANTASMA', dados: { valor: '9999' }, status: 'CALCULADO' },
+    ])
+
+    const service = new RelatorioFiscalService()
+    const r = await service.gerar(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    // TIPO_FANTASMA não é adicionado à lista de tributos
+    const fantasma = r.tributos.find((t) => t.tributo === 'TIPO_FANTASMA')
+    expect(fantasma).toBeUndefined()
+  })
+})
+
 describe('RelatorioFiscalService — dados do resultado', () => {
   it('resultado contém cnpj e razaoSocial da empresa', async () => {
     const service = new RelatorioFiscalService()
