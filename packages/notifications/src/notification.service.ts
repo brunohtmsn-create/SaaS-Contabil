@@ -76,7 +76,7 @@ export class NotificationService {
       (u: { nome: string; email: string; telefone: string | null }) => ({
         nome: u.nome,
         email: u.email,
-        whatsapp: u.telefone ?? undefined,
+        ...(u.telefone ? { whatsapp: u.telefone } : {}),
       })
     )
 
