@@ -25,7 +25,7 @@ export async function configuracoesRoutes(app: FastifyInstance) {
       }),
       db.usuario.findUnique({
         where: { id: userId },
-        select: { id: true, nome: true, email: true, perfil: true, criadoEm: true },
+        select: { id: true, nome: true, email: true, perfil: true, telefone: true, criadoEm: true },
       }),
     ])
 
@@ -39,15 +39,20 @@ export async function configuracoesRoutes(app: FastifyInstance) {
     return { tenant, usuario, stats: { totalEmpresas, totalUsuarios } }
   })
 
-  // PUT /configuracoes/perfil — atualiza nome do usuário logado
+  // PUT /configuracoes/perfil — atualiza nome e telefone do usuário logado
   app.put('/perfil', async (request, reply) => {
     const { sub: userId } = request.user as any
-    const { nome } = z.object({ nome: z.string().min(2).max(100) }).parse(request.body)
+    const { nome, telefone } = z
+      .object({
+        nome: z.string().min(2).max(100),
+        telefone: z.string().max(20).optional().nullable(),
+      })
+      .parse(request.body)
 
     const updated = await db.usuario.update({
       where: { id: userId },
-      data: { nome },
-      select: { id: true, nome: true, email: true, perfil: true },
+      data: { nome, ...(telefone !== undefined ? { telefone: telefone ?? null } : {}) },
+      select: { id: true, nome: true, email: true, perfil: true, telefone: true },
     })
 
     return updated

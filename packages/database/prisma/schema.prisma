@@ -36,14 +36,15 @@ enum PlanoTenant {
 // ─── USUÁRIO ───────────────────────────────────────────────────────────────
 
 model Usuario {
-  id       String   @id @default(uuid())
-  tenantId String
-  nome     String
-  email    String
+  id        String        @id @default(uuid())
+  tenantId  String
+  nome      String
+  email     String
   senhaHash String
-  perfil   PerfilUsuario @default(CONTADOR)
-  ativo    Boolean  @default(true)
-  criadoEm DateTime @default(now())
+  perfil    PerfilUsuario @default(CONTADOR)
+  ativo     Boolean       @default(true)
+  telefone  String?
+  criadoEm  DateTime      @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 

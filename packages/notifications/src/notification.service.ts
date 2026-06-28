@@ -64,7 +64,7 @@ export class NotificationService {
   ): Promise<void> {
     const usuarios = await this.db.usuario.findMany({
       where: { tenantId, ativo: true },
-      select: { nome: true, email: true },
+      select: { nome: true, email: true, telefone: true },
     })
 
     if (usuarios.length === 0) {
@@ -73,7 +73,11 @@ export class NotificationService {
     }
 
     const destinatarios: DestinatarioNotificacao[] = usuarios.map(
-      (u: { nome: string; email: string }) => ({ nome: u.nome, email: u.email })
+      (u: { nome: string; email: string; telefone: string | null }) => ({
+        nome: u.nome,
+        email: u.email,
+        whatsapp: u.telefone ?? undefined,
+      })
     )
 
     const { titulo, mensagem } = this.montarMensagem(tipo, dados)

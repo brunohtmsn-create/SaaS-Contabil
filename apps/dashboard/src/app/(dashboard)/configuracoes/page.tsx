@@ -36,6 +36,8 @@ export default function ConfiguracoesPage() {
   const [senhaMsg, setSenhaMsg] = useState<{ ok: boolean; texto: string } | null>(null)
   const [nomeEdit, setNomeEdit] = useState('')
   const [editandoNome, setEditandoNome] = useState(false)
+  const [telefoneEdit, setTelefoneEdit] = useState('')
+  const [editandoTelefone, setEditandoTelefone] = useState(false)
   const [novoUser, setNovoUser] = useState({ nome: '', email: '', senha: '', perfil: 'AUXILIAR' })
   const [criarUserOpen, setCriarUserOpen] = useState(false)
   const [criarUserErr, setCriarUserErr] = useState('')
@@ -53,6 +55,15 @@ export default function ConfiguracoesPage() {
     onSuccess: () => {
       refetch()
       setEditandoNome(false)
+    },
+  })
+
+  const atualizarTelefone = useMutation({
+    mutationFn: (telefone: string | null) =>
+      api.put('/configuracoes/perfil', { nome: (data as any)?.usuario?.nome ?? '', telefone }),
+    onSuccess: () => {
+      refetch()
+      setEditandoTelefone(false)
     },
   })
 
@@ -185,6 +196,52 @@ export default function ConfiguracoesPage() {
           >
             {usuario?.perfil}
           </span>
+        </div>
+
+        {/* WhatsApp */}
+        <div className="border-t border-slate-100 pt-4">
+          <p className="text-xs font-medium text-slate-500 mb-2">WhatsApp (notificações)</p>
+          {editandoTelefone ? (
+            <div className="flex items-center gap-2">
+              <input
+                value={telefoneEdit}
+                onChange={(e) => setTelefoneEdit(e.target.value)}
+                placeholder="+55 11 99999-9999"
+                className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1"
+                autoFocus
+              />
+              <button
+                onClick={() => atualizarTelefone.mutate(telefoneEdit.trim() || null)}
+                disabled={atualizarTelefone.isPending}
+                className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-50"
+              >
+                Salvar
+              </button>
+              <button
+                onClick={() => setEditandoTelefone(false)}
+                className="text-slate-400 text-xs px-2 py-1.5"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-slate-700">
+                {usuario?.telefone ?? (
+                  <span className="text-slate-400 italic">Não configurado</span>
+                )}
+              </p>
+              <button
+                onClick={() => {
+                  setEditandoTelefone(true)
+                  setTelefoneEdit(usuario?.telefone ?? '')
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800"
+              >
+                {usuario?.telefone ? 'editar' : 'adicionar'}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="text-xs text-slate-400">
