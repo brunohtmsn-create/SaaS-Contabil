@@ -36,7 +36,19 @@ export async function alertasRoutes(app: FastifyInstance) {
     const body = z
       .object({
         empresaId: z.string().uuid(),
-        tipo: z.string(),
+        tipo: z.enum([
+          'CREDENCIAL_VENCENDO',
+          'CREDENCIAL_VENCIDA',
+          'SUBLIMITE_ESTADUAL',
+          'RISCO_EXCLUSAO_SN',
+          'VENCIMENTO_OBRIGACAO',
+          'DIVERGENCIA_CONCILIACAO',
+          'DISTRIBUICAO_LUCROS',
+          'FATOR_R_MUDOU',
+          'PGDAS_PENDENTE',
+          'CERTIFICADO_VENCENDO',
+          'CONFIGURACAO_ISS',
+        ]),
         mensagem: z.string().min(1),
         dados: z.record(z.unknown()).optional(),
       })
