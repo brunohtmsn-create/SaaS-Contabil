@@ -332,8 +332,8 @@ describe('GET /alertas/resumo', () => {
       .mockResolvedValueOnce(15) // total
       .mockResolvedValueOnce(7) // naoLidos
     mockDb.alerta.groupBy.mockResolvedValueOnce([
-      { tipo: 'VENCIMENTO_OBRIGACAO', _count: { _all: 4 } },
-      { tipo: 'PGDAS_PENDENTE', _count: { _all: 3 } },
+      { tipo: 'VENCIMENTO_OBRIGACAO', _count: 4 },
+      { tipo: 'PGDAS_PENDENTE', _count: 3 },
     ])
 
     const res = await req('GET', '/alertas/resumo')

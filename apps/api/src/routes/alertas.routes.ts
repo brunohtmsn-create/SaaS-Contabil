@@ -55,7 +55,7 @@ export async function alertasRoutes(app: FastifyInstance) {
       .parse(request.body)
 
     const alerta = await db.alerta.create({
-      data: { tenantId, ...body },
+      data: { tenantId, ...body } as any,
     })
 
     return reply.code(201).send(alerta)
@@ -109,7 +109,7 @@ export async function alertasRoutes(app: FastifyInstance) {
       db.alerta.groupBy({
         by: ['tipo'],
         where: { tenantId, lido: false },
-        _count: { _all: true },
+        _count: true,
         orderBy: { tipo: 'asc' },
       }),
     ])
@@ -117,7 +117,7 @@ export async function alertasRoutes(app: FastifyInstance) {
     return {
       total,
       naoLidos,
-      porTipo: porTipo.map((r: any) => ({ tipo: r.tipo, count: r._count._all })),
+      porTipo: porTipo.map((r: any) => ({ tipo: r.tipo, count: r._count })),
     }
   })
 }
