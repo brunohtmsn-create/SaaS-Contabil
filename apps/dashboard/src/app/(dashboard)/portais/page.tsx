@@ -65,6 +65,16 @@ export default function PortaisPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['portais-status', empresaId] }),
   })
 
+  const transmitirDCTFWeb = useMutation({
+    mutationFn: () => api.post(`/portais/dctfweb/transmitir/${empresaId}/${competencia}`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portais-status', empresaId] }),
+  })
+
+  const consultarDCTFWeb = useMutation({
+    mutationFn: () => api.get(`/portais/dctfweb/consultar/${empresaId}/${competencia}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portais-status', empresaId] }),
+  })
+
   const empresa = empresas.find((e) => e.id === empresaId)
 
   return (
@@ -72,7 +82,9 @@ export default function PortaisPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Portais Governamentais</h1>
-          <p className="text-slate-500 text-sm mt-1">SEFAZ, Simples Nacional, e-CAC, Prefeitura</p>
+          <p className="text-slate-500 text-sm mt-1">
+            SEFAZ, Simples Nacional, e-CAC, DCTFWeb, Prefeitura
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <select
@@ -130,6 +142,20 @@ export default function PortaisPage() {
                     className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   >
                     {transmitirPGDAS.isPending ? 'Transmitindo...' : '💰 Transmitir PGDAS'}
+                  </button>
+                  <button
+                    onClick={() => transmitirDCTFWeb.mutate()}
+                    disabled={transmitirDCTFWeb.isPending}
+                    className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {transmitirDCTFWeb.isPending ? 'Transmitindo...' : '📄 Transmitir DCTFWeb'}
+                  </button>
+                  <button
+                    onClick={() => consultarDCTFWeb.mutate()}
+                    disabled={consultarDCTFWeb.isPending}
+                    className="text-sm border border-slate-300 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {consultarDCTFWeb.isPending ? 'Consultando...' : '🔍 Consultar DCTFWeb'}
                   </button>
                 </div>
               </div>
