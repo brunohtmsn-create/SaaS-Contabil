@@ -625,6 +625,7 @@ enum TipoEventoAudit {
   PIS_COFINS_LP_APURADO
   ECF_GERADO
   PLANEJAMENTO_TRIBUTARIO_GERADO
+  ICMS_ST_CALCULADO
 }
 
 enum TipoResponsavel {
