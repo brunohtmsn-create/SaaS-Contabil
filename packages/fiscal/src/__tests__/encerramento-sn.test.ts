@@ -134,9 +134,7 @@ const EMPRESA_INDUSTRIA = {
 const PGDAS_RESULTADO = { valorDAS: new Decimal('1500.00') }
 
 // Resultado padrão do DIFAL (array de resultados por UF)
-const DIFAL_RESULTADO = [
-  { ufDestino: 'SP', valorTotal: new Decimal('200.00') },
-]
+const DIFAL_RESULTADO = [{ ufDestino: 'SP', valorTotal: new Decimal('200.00') }]
 
 // Resultado padrão do ICMS-ST
 const ICMS_ST_RESULTADO = {
@@ -183,9 +181,9 @@ describe('EncerramentoSNService', () => {
       mockDb.empresaCliente.findUnique.mockResolvedValue(null)
 
       const service = new EncerramentoSNService()
-      await expect(
-        service.encerrar(TENANT_ID, EMPRESA_COMERCIO.id, COMPETENCIA)
-      ).rejects.toThrow('Empresa não encontrada')
+      await expect(service.encerrar(TENANT_ID, EMPRESA_COMERCIO.id, COMPETENCIA)).rejects.toThrow(
+        'Empresa não encontrada'
+      )
     })
 
     it('lança erro quando empresa não é do Simples Nacional', async () => {
@@ -195,9 +193,9 @@ describe('EncerramentoSNService', () => {
       })
 
       const service = new EncerramentoSNService()
-      await expect(
-        service.encerrar(TENANT_ID, EMPRESA_COMERCIO.id, COMPETENCIA)
-      ).rejects.toThrow('não é do Simples Nacional')
+      await expect(service.encerrar(TENANT_ID, EMPRESA_COMERCIO.id, COMPETENCIA)).rejects.toThrow(
+        'não é do Simples Nacional'
+      )
     })
   })
 
@@ -526,7 +524,11 @@ describe('EncerramentoSNService', () => {
       const service = new EncerramentoSNService()
       const resultado = await service.encerrar(TENANT_ID, EMPRESA_COMERCIO.id, COMPETENCIA)
 
-      expect(mockEFDReinfProcessar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_COMERCIO.id, COMPETENCIA)
+      expect(mockEFDReinfProcessar).toHaveBeenCalledWith(
+        TENANT_ID,
+        EMPRESA_COMERCIO.id,
+        COMPETENCIA
+      )
       expect(resultado.passos.efdReinf).toBe('OK')
     })
 

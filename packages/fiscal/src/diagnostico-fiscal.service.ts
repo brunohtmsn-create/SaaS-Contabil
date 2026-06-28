@@ -55,7 +55,7 @@ export class DiagnosticoFiscalService {
       where: { tenantId, empresaId, competencia },
     })
 
-    const tiposApurados = new Set(apuracoes.map((a) => a.tipo))
+    const tiposApurados = new Set<string>(apuracoes.map((a) => a.tipo as string))
 
     // Busca obrigações do período
     const obrigacoes = await this.db.obrigacao.findMany({

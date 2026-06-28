@@ -249,7 +249,11 @@ describe('IcmsStService', () => {
       // base=1000 → valorIcmsProprioRemetente=70, baseCalcST=1350, ST=1350×17/100−70=229.5−70=159.5 (positivo)
       // Não é possível gerar negativo com a fórmula e MVA positivo.
       // O branch lt(0)→Decimal(0) pode ser testado via monkey-patch da Decimal:
-      const docNegativo = makeDocST({ valorTotal: new Decimal('0.01'), ufOrigem: 'SP', ufDestino: 'RJ' })
+      const docNegativo = makeDocST({
+        valorTotal: new Decimal('0.01'),
+        ufOrigem: 'SP',
+        ufDestino: 'RJ',
+      })
       mockDb.documentoFiscal.findMany.mockResolvedValue([docNegativo])
       mockDb.apuracaoFiscal.upsert.mockClear()
 
@@ -268,7 +272,12 @@ describe('IcmsStService', () => {
       await service.calcular(TENANT_ID, EMPRESA_ID, COMPETENCIA)
 
       expect(mockDb.obrigacao.findFirst).toHaveBeenCalledWith({
-        where: { tenantId: TENANT_ID, empresaId: EMPRESA_ID, tipo: 'GNRE_ST', competencia: COMPETENCIA },
+        where: {
+          tenantId: TENANT_ID,
+          empresaId: EMPRESA_ID,
+          tipo: 'GNRE_ST',
+          competencia: COMPETENCIA,
+        },
       })
       expect(mockDb.obrigacao.create).toHaveBeenCalledOnce()
       expect(mockDb.obrigacao.create).toHaveBeenCalledWith(
@@ -358,9 +367,9 @@ describe('IcmsStService', () => {
       mockDb.empresaCliente.findUnique.mockResolvedValue(null)
 
       const service = new IcmsStService()
-      await expect(
-        service.calcular(TENANT_ID, EMPRESA_ID, COMPETENCIA)
-      ).rejects.toThrow('Empresa não encontrada')
+      await expect(service.calcular(TENANT_ID, EMPRESA_ID, COMPETENCIA)).rejects.toThrow(
+        'Empresa não encontrada'
+      )
     })
 
     it('query ao banco inclui tenantId em todas as chamadas', async () => {
@@ -399,8 +408,18 @@ describe('IcmsStService', () => {
 
     it('soma corretamente múltiplos documentos ST', async () => {
       mockDb.documentoFiscal.findMany.mockResolvedValue([
-        makeDocST({ id: 'doc-1', valorTotal: new Decimal('1000.00'), ufOrigem: 'SP', ufDestino: 'RJ' }),
-        makeDocST({ id: 'doc-2', valorTotal: new Decimal('2000.00'), ufOrigem: 'SP', ufDestino: 'RJ' }),
+        makeDocST({
+          id: 'doc-1',
+          valorTotal: new Decimal('1000.00'),
+          ufOrigem: 'SP',
+          ufDestino: 'RJ',
+        }),
+        makeDocST({
+          id: 'doc-2',
+          valorTotal: new Decimal('2000.00'),
+          ufOrigem: 'SP',
+          ufDestino: 'RJ',
+        }),
       ])
 
       const service = new IcmsStService()
