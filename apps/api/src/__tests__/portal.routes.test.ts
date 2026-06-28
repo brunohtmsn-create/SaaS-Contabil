@@ -197,18 +197,19 @@ describe('GET /portais/jobs/:empresaId', () => {
 // ===========================================================================
 
 describe('GET /portais/status/:empresaId', () => {
-  it('retorna status dos 5 portais → 200', async () => {
+  it('retorna status dos 6 portais → 200', async () => {
     mockDb.portalJob.findMany.mockResolvedValueOnce([])
 
     const res = await req('GET', `/portais/status/${EMPRESA_ID}`)
 
     expect(res.statusCode).toBe(200)
     const body = res.json()
-    expect(body).toHaveLength(5)
+    expect(body).toHaveLength(6)
     const portais = body.map((p: any) => p.portal)
     expect(portais).toContain('SEFAZ_FEDERAL')
     expect(portais).toContain('SIMPLES_NACIONAL')
     expect(portais).toContain('ECAC')
+    expect(portais).toContain('DCTFWEB')
   })
 
   it('portal sem job → status PENDENTE', async () => {

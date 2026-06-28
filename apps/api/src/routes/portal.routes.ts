@@ -63,6 +63,7 @@ export async function portalRoutes(app: FastifyInstance) {
       { portal: 'SEFAZ_FEDERAL', label: 'SEFAZ Federal (NF-e/NFC-e)' },
       { portal: 'SIMPLES_NACIONAL', label: 'Portal Simples Nacional (PGDAS)' },
       { portal: 'ECAC', label: 'e-CAC (Receita Federal)' },
+      { portal: 'DCTFWEB', label: 'DCTFWeb — SPED Receita Federal' },
       { portal: 'SEFAZ_ESTADUAL', label: 'SEFAZ Estadual (DIFAL/GNRE)' },
       { portal: 'PREFEITURA', label: 'Prefeitura (NFS-e)' },
     ]
@@ -112,5 +113,89 @@ export async function portalRoutes(app: FastifyInstance) {
     )
 
     return { jobId: job.id, status: 'AGUARDANDO' }
+  })
+
+  // POST /portais/dctfweb/transmitir/:empresaId/:competencia
+  app.post('/dctfweb/transmitir/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = z
+      .object({
+        empresaId: z.string().uuid(),
+        competencia: z.string().regex(/^\d{4}-\d{2}$/),
+      })
+      .parse(request.params)
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    const credencial = await db.credencial.findFirst({
+      where: { tenantId, empresaId, tipo: 'CERTIFICADO_A1', status: 'ATIVO' },
+    })
+    if (!credencial) return reply.code(422).send({ error: 'Certificado A1 ativo não encontrado' })
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'DCTFWEB', status: 'CALCULADO' },
+    })
+    if (!apuracao)
+      return reply
+        .code(422)
+        .send({ error: 'DCTFWeb não calculada para esta competência — gere antes de transmitir' })
+
+    const body = (request.body ?? {}) as { certSenha?: string }
+
+    const job = await portalQueue.add(
+      'portal-job',
+      {
+        tenantId,
+        empresaId,
+        cnpj: empresa.cnpj,
+        portal: 'DCTFWEB',
+        operacao: 'TRANSMITIR',
+        credencialId: credencial.id,
+        competencia,
+        dados: { certSenha: body.certSenha },
+      },
+      { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
+    )
+
+    return reply.code(202).send({ jobId: job.id, status: 'AGUARDANDO', competencia })
+  })
+
+  // GET /portais/dctfweb/consultar/:empresaId/:competencia
+  app.get('/dctfweb/consultar/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = z
+      .object({
+        empresaId: z.string().uuid(),
+        competencia: z.string().regex(/^\d{4}-\d{2}$/),
+      })
+      .parse(request.params)
+
+    const empresa = await db.empresaCliente.findFirst({ where: { id: empresaId, tenantId } })
+    if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
+
+    const credencial = await db.credencial.findFirst({
+      where: { tenantId, empresaId, tipo: 'CERTIFICADO_A1', status: 'ATIVO' },
+    })
+    if (!credencial) return reply.code(422).send({ error: 'Certificado A1 ativo não encontrado' })
+
+    const body = (request.body ?? {}) as { certSenha?: string }
+
+    const job = await portalQueue.add(
+      'portal-job',
+      {
+        tenantId,
+        empresaId,
+        cnpj: empresa.cnpj,
+        portal: 'DCTFWEB',
+        operacao: 'CONSULTAR',
+        credencialId: credencial.id,
+        competencia,
+        dados: { certSenha: body.certSenha },
+      },
+      { attempts: 2, backoff: { type: 'exponential', delay: 3000 } }
+    )
+
+    return reply.code(202).send({ jobId: job.id, status: 'AGUARDANDO', competencia })
   })
 }
