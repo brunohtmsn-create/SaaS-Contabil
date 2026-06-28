@@ -1389,7 +1389,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
       orderBy: { razaoSocial: 'asc' },
     })
 
-    const now = new Date()
+    const now = nowBR()
     const { inicio, fim } = parsePeriodo(competencia)
 
     const resultados = await Promise.all(
@@ -1408,7 +1408,7 @@ export async function fiscalRoutes(app: FastifyInstance) {
             where: {
               tenantId,
               empresaId: emp.id,
-              status: { in: ['PENDENTE_REVISAO', 'DIVERGENCIA'] },
+              status: { in: ['PENDENTE_REVISAO', 'DIVERGENTE'] },
               dataCompetencia: { gte: inicio, lte: fim },
             },
           }),

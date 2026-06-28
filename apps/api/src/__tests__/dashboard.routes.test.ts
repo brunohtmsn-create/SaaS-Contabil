@@ -328,3 +328,83 @@ describe('GET /dashboard/timeline/:empresaId', () => {
     expect(res.json()).toEqual([])
   })
 })
+
+// ===========================================================================
+// GET /dashboard/alertas — filtros avançados (lido, tipo, empresaId, limite)
+// ===========================================================================
+
+describe('GET /dashboard/alertas com filtros', () => {
+  it('lido=todos retorna todos os alertas sem filtro de lido', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/dashboard/alertas?lido=todos')
+
+    const { where } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(where).not.toHaveProperty('lido')
+  })
+
+  it('lido=true filtra somente alertas lidos', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/dashboard/alertas?lido=true')
+
+    const { where } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(where.lido).toBe(true)
+  })
+
+  it('tipo filtra por tipo de alerta', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/dashboard/alertas?tipo=VENCIMENTO_OBRIGACAO')
+
+    const { where } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(where.tipo).toBe('VENCIMENTO_OBRIGACAO')
+  })
+
+  it('limite respeita máximo de 200', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/dashboard/alertas?limite=500')
+
+    const { take } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(take).toBe(200)
+  })
+})
+
+// ===========================================================================
+// PATCH /dashboard/alertas/ler-todos
+// ===========================================================================
+
+describe('PATCH /dashboard/alertas/ler-todos', () => {
+  it('marca todos os alertas não lidos como lidos → 200', async () => {
+    mockDb.alerta.updateMany.mockResolvedValueOnce({ count: 5 })
+
+    const res = await req('PATCH', '/dashboard/alertas/ler-todos')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.success).toBe(true)
+    expect(body.count).toBe(5)
+  })
+
+  it('filtra por tipo quando fornecido', async () => {
+    mockDb.alerta.updateMany.mockResolvedValueOnce({ count: 2 })
+
+    await req('PATCH', '/dashboard/alertas/ler-todos?tipo=PGDAS_PENDENTE')
+
+    const { where } = mockDb.alerta.updateMany.mock.calls[0][0]
+    expect(where.tipo).toBe('PGDAS_PENDENTE')
+    expect(where.lido).toBe(false)
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
+
+  it('sem tipo marca todos os tipos como lidos', async () => {
+    mockDb.alerta.updateMany.mockResolvedValueOnce({ count: 10 })
+
+    await req('PATCH', '/dashboard/alertas/ler-todos')
+
+    const { where } = mockDb.alerta.updateMany.mock.calls[0][0]
+    expect(where).not.toHaveProperty('tipo')
+    expect(where.lido).toBe(false)
+  })
+})
