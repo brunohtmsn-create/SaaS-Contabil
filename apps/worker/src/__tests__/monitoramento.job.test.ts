@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const { mockDb, mockAlertasService, mockNotificacao, mockCredService } = vi.hoisted(() => ({
   mockDb: {
     tenant: { findMany: vi.fn() },
+    empresaCliente: { findFirst: vi.fn() },
     alerta: { findFirst: vi.fn(), create: vi.fn() },
     documentoFiscal: { count: vi.fn() },
     apuracaoFiscal: { count: vi.fn() },
@@ -95,6 +96,7 @@ beforeEach(() => {
   mockNotificacao.notificarTenant.mockResolvedValue(undefined)
   mockCredService.updateExpiredStatuses.mockResolvedValue(0)
   mockCredService.checkExpiring.mockResolvedValue([])
+  mockDb.empresaCliente.findFirst.mockResolvedValue({ id: 'emp-default' })
   mockDb.alerta.findFirst.mockResolvedValue(null)
   mockDb.alerta.create.mockResolvedValue({ id: 'new-alerta' })
   mockDb.documentoFiscal.count.mockResolvedValue(0)

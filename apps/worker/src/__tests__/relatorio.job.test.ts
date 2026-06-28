@@ -66,7 +66,10 @@ vi.mock('@saas-contabil/shared', () => {
       return this.v
     }
   }
-  return { Decimal: MockDecimal }
+  return {
+    Decimal: MockDecimal,
+    nowBR: vi.fn(() => new Date('2025-01-15T12:00:00Z')),
+  }
 })
 
 import { gerarRelatorioMensal } from '../jobs/relatorio.job.js'
