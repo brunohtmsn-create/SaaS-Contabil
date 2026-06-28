@@ -32,6 +32,7 @@ const { mockDb } = vi.hoisted(() => ({
     portalJob: { findMany: vi.fn() },
     empresaCliente: { findFirst: vi.fn() },
     credencial: { findFirst: vi.fn() },
+    apuracaoFiscal: { findFirst: vi.fn() },
   },
 }))
 
@@ -306,5 +307,158 @@ describe('POST /portais/ecac/sincronizar/:empresaId', () => {
     const where = mockDb.empresaCliente.findFirst.mock.calls[0][0].where
     expect(where.tenantId).toBe(TENANT_ID)
     expect(where.id).toBe(EMPRESA_ID)
+  })
+})
+
+// ===========================================================================
+// POST /portais/dctfweb/transmitir/:empresaId/:competencia
+// ===========================================================================
+
+const COMPETENCIA = '2025-01'
+
+describe('POST /portais/dctfweb/transmitir/:empresaId/:competencia', () => {
+  it('empresa + credencial + apuração OK → enfileira job → 202', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '12345678000195',
+    })
+    mockDb.credencial.findFirst.mockResolvedValueOnce({ id: 'cred-a1-1' })
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'apur-dctf-1' })
+    mockPortalQueue.add.mockResolvedValueOnce({ id: 'dctf-job-1' })
+
+    const res = await req('POST', `/portais/dctfweb/transmitir/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(202)
+    const body = res.json()
+    expect(body.status).toBe('AGUARDANDO')
+    expect(body.jobId).toBe('dctf-job-1')
+    expect(body.competencia).toBe(COMPETENCIA)
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', `/portais/dctfweb/transmitir/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+    expect(mockPortalQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('credencial A1 não encontrada → 422', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '12345678000195',
+    })
+    mockDb.credencial.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', `/portais/dctfweb/transmitir/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error).toMatch(/certificado/i)
+    expect(mockPortalQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('apuração DCTFWeb não calculada → 422', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '12345678000195',
+    })
+    mockDb.credencial.findFirst.mockResolvedValueOnce({ id: 'cred-a1-1' })
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', `/portais/dctfweb/transmitir/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error).toMatch(/dctfweb/i)
+    expect(mockPortalQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('competência inválida → 400', async () => {
+    const res = await req('POST', `/portais/dctfweb/transmitir/${EMPRESA_ID}/202501`)
+
+    expect(res.statusCode).toBe(400)
+    expect(mockPortalQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('job carrega tenantId, portal DCTFWEB e operação TRANSMITIR', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '12345678000195',
+    })
+    mockDb.credencial.findFirst.mockResolvedValueOnce({ id: 'cred-a1-2' })
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'apur-dctf-2' })
+    mockPortalQueue.add.mockResolvedValueOnce({ id: 'dctf-job-2' })
+
+    await req('POST', `/portais/dctfweb/transmitir/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    const jobData = mockPortalQueue.add.mock.calls[0][1]
+    expect(jobData.tenantId).toBe(TENANT_ID)
+    expect(jobData.portal).toBe('DCTFWEB')
+    expect(jobData.operacao).toBe('TRANSMITIR')
+    expect(jobData.competencia).toBe(COMPETENCIA)
+    expect(jobData.credencialId).toBe('cred-a1-2')
+  })
+})
+
+// ===========================================================================
+// GET /portais/dctfweb/consultar/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /portais/dctfweb/consultar/:empresaId/:competencia', () => {
+  it('empresa + credencial OK → enfileira job de consulta → 202', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '12345678000195',
+    })
+    mockDb.credencial.findFirst.mockResolvedValueOnce({ id: 'cred-a1-3' })
+    mockPortalQueue.add.mockResolvedValueOnce({ id: 'dctf-consulta-1' })
+
+    const res = await req('GET', `/portais/dctfweb/consultar/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(202)
+    const body = res.json()
+    expect(body.status).toBe('AGUARDANDO')
+    expect(body.jobId).toBe('dctf-consulta-1')
+    expect(body.competencia).toBe(COMPETENCIA)
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/portais/dctfweb/consultar/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+    expect(mockPortalQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('credencial A1 não encontrada → 422', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '12345678000195',
+    })
+    mockDb.credencial.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/portais/dctfweb/consultar/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error).toMatch(/certificado/i)
+    expect(mockPortalQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('job carrega portal DCTFWEB e operação CONSULTAR', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '12345678000195',
+    })
+    mockDb.credencial.findFirst.mockResolvedValueOnce({ id: 'cred-a1-4' })
+    mockPortalQueue.add.mockResolvedValueOnce({ id: 'dctf-consulta-2' })
+
+    await req('GET', `/portais/dctfweb/consultar/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    const jobData = mockPortalQueue.add.mock.calls[0][1]
+    expect(jobData.tenantId).toBe(TENANT_ID)
+    expect(jobData.portal).toBe('DCTFWEB')
+    expect(jobData.operacao).toBe('CONSULTAR')
+    expect(jobData.competencia).toBe(COMPETENCIA)
   })
 })
