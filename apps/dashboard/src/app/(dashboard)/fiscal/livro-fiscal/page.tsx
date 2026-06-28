@@ -109,9 +109,7 @@ function TabelaLivro({ linhas, label }: { linhas: LinhaLivro[]; label: string })
                     <p className="font-mono text-xs text-gray-400">{linha.cnpjContraparte}</p>
                   </div>
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-gray-500">
-                  {linha.cfop || '—'}
-                </td>
+                <td className="px-3 py-2 font-mono text-xs text-gray-500">{linha.cfop || '—'}</td>
                 <td className="px-3 py-2 text-right font-medium text-gray-800">
                   {fmt(linha.valorTotal)}
                 </td>
@@ -164,13 +162,12 @@ export default function LivroFiscalPage() {
 
   const exibir = livro ?? livroSalvo
 
-  const totalGeral =
-    exibir
-      ? Number(exibir.totaisEntradas.valorTotal) +
-        Number(exibir.totaisSaidas.valorTotal) +
-        Number(exibir.totalServicosEmitidos) +
-        Number(exibir.totalServicosTomados)
-      : 0
+  const totalGeral = exibir
+    ? Number(exibir.totaisEntradas.valorTotal) +
+      Number(exibir.totaisSaidas.valorTotal) +
+      Number(exibir.totalServicosEmitidos) +
+      Number(exibir.totalServicosTomados)
+    : 0
 
   const linhasPorAba: Record<Aba, LinhaLivro[]> = exibir
     ? {

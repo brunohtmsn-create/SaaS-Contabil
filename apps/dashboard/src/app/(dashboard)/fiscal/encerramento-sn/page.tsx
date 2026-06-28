@@ -195,9 +195,7 @@ export default function EncerramentoSNPage() {
                 disabled={encerrarBatch.isPending}
                 className="w-full rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
               >
-                {encerrarBatch.isPending
-                  ? 'Processando…'
-                  : `Encerrar Lote — ${competencia}`}
+                {encerrarBatch.isPending ? 'Processando…' : `Encerrar Lote — ${competencia}`}
               </button>
             )}
           </div>
@@ -212,10 +210,10 @@ export default function EncerramentoSNPage() {
         <p className="font-semibold">Fluxo de Encerramento SN</p>
         <p className="mt-1">
           O encerramento executa todas as obrigações do Simples Nacional em sequência: apura o PGDAS
-          com segregação de receitas por anexo, calcula DIFAL e ICMS-ST para operações interestaduais,
-          gera GNREs por UF, apura DeSTDA estadual, processa DMS municipal e encerra o EFD-Reinf. Cada
-          etapa é executada somente se aplicável ao tipo de empresa (Comércio, Indústria, Serviços ou
-          Misto).
+          com segregação de receitas por anexo, calcula DIFAL e ICMS-ST para operações
+          interestaduais, gera GNREs por UF, apura DeSTDA estadual, processa DMS municipal e encerra
+          o EFD-Reinf. Cada etapa é executada somente se aplicável ao tipo de empresa (Comércio,
+          Indústria, Serviços ou Misto).
         </p>
       </div>
 
@@ -270,7 +268,10 @@ export default function EncerramentoSNPage() {
             <h3 className="mb-3 text-sm font-semibold text-gray-800">Etapas do Encerramento</h3>
             <div className="grid gap-2 sm:grid-cols-4">
               {(Object.keys(resultado.passos) as (keyof PassosEncerramento)[]).map((k) => (
-                <div key={k} className="flex items-center justify-between rounded bg-gray-50 px-3 py-2">
+                <div
+                  key={k}
+                  className="flex items-center justify-between rounded bg-gray-50 px-3 py-2"
+                >
                   <span className="text-xs font-medium text-gray-600">{PASSOS_LABELS[k]}</span>
                   {passoBadge(resultado.passos[k])}
                 </div>
