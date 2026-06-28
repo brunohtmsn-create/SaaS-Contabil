@@ -1373,4 +1373,84 @@ export async function fiscalRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Livro fiscal não encontrado para o período' })
     return apuracao
   })
+
+  // -------------------------------------------------------------------------
+  // Painel de Saúde Fiscal — score agregado por empresa
+  // -------------------------------------------------------------------------
+
+  app.get('/saude/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { competencia } = request.params as { competencia: string }
+    const db = getPrismaClient()
+
+    const empresas = await db.empresaCliente.findMany({
+      where: { tenantId, ativa: true },
+      select: { id: true, cnpj: true, razaoSocial: true, regime: true },
+      orderBy: { razaoSocial: 'asc' },
+    })
+
+    const now = new Date()
+    const { inicio, fim } = parsePeriodo(competencia)
+
+    const resultados = await Promise.all(
+      empresas.map(async (emp) => {
+        const [alertas, obrigacoesAtrasadas, docsPendentes, apuracoes] = await Promise.all([
+          db.alerta.count({ where: { tenantId, empresaId: emp.id, lido: false } }),
+          db.obrigacao.count({
+            where: {
+              tenantId,
+              empresaId: emp.id,
+              status: 'PENDENTE',
+              vencimento: { lt: now },
+            },
+          }),
+          db.documentoFiscal.count({
+            where: {
+              tenantId,
+              empresaId: emp.id,
+              status: { in: ['PENDENTE_REVISAO', 'DIVERGENCIA'] },
+              dataCompetencia: { gte: inicio, lte: fim },
+            },
+          }),
+          db.apuracaoFiscal.count({
+            where: { tenantId, empresaId: emp.id, competencia, status: 'CALCULADO' },
+          }),
+        ])
+
+        let score = 100
+        score -= Math.min(alertas * 5, 30)
+        score -= Math.min(obrigacoesAtrasadas * 10, 40)
+        score -= Math.min(docsPendentes * 5, 20)
+        score = Math.max(0, score)
+
+        const nivel =
+          score >= 80 ? 'SAUDAVEL' : score >= 60 ? 'ATENCAO' : score >= 40 ? 'CRITICO' : 'GRAVE'
+
+        return {
+          empresaId: emp.id,
+          cnpj: emp.cnpj,
+          razaoSocial: emp.razaoSocial,
+          regime: emp.regime,
+          score,
+          nivel,
+          alertas,
+          obrigacoesAtrasadas,
+          docsPendentes,
+          apuracoesCalculadas: apuracoes,
+        }
+      })
+    )
+
+    resultados.sort((a, b) => a.score - b.score)
+
+    return {
+      competencia,
+      total: resultados.length,
+      grave: resultados.filter((r) => r.nivel === 'GRAVE').length,
+      critico: resultados.filter((r) => r.nivel === 'CRITICO').length,
+      atencao: resultados.filter((r) => r.nivel === 'ATENCAO').length,
+      saudavel: resultados.filter((r) => r.nivel === 'SAUDAVEL').length,
+      empresas: resultados,
+    }
+  })
 }

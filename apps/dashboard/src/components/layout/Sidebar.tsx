@@ -34,6 +34,7 @@ const navItems = [
   { href: '/fiscal/lalur', label: 'LALUR', icon: '📒' },
   { href: '/fiscal/simulador-tributario', label: 'Simulador Tributário', icon: '🧮' },
   { href: '/fiscal/planejamento-tributario', label: 'Planejamento Tributário', icon: '📈' },
+  { href: '/fiscal/saude', label: 'Saúde Fiscal', icon: '🏥' },
   { href: '/fiscal/icms-st', label: 'ICMS-ST', icon: '🔁' },
   { href: '/fiscal/encerramento-sn', label: 'Encerramento SN', icon: '🔒' },
   { href: '/fiscal/livro-fiscal', label: 'Livro Fiscal', icon: '📖' },
