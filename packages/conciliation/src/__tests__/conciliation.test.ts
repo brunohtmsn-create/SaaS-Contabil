@@ -438,7 +438,11 @@ describe('ConciliationService — conciliarNFSeTomadas()', () => {
 
   it('empresa não encontrada → usa cnpj="" via nullish coalescing (não lança erro)', async () => {
     mockEmpresaCliente.findUnique.mockResolvedValueOnce(null)
-    const doc = makeDoc({ id: 'doc-sem-emp', cnpjEmitente: '11111111000191', valorTotal: new Decimal('500') })
+    const doc = makeDoc({
+      id: 'doc-sem-emp',
+      cnpjEmitente: '11111111000191',
+      valorTotal: new Decimal('500'),
+    })
     mockDocumentoFiscal.findMany.mockResolvedValue([doc])
 
     const service = new ConciliationService()

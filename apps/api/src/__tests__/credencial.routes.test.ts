@@ -334,9 +334,7 @@ describe('POST /credenciais (multipart — certificado .pfx)', () => {
 
     for (const [k, v] of Object.entries(fields)) {
       bufs.push(
-        Buffer.from(
-          `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`
-        )
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`)
       )
     }
 

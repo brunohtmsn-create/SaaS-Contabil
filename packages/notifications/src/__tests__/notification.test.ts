@@ -439,7 +439,10 @@ describe('NotificationService — despacharWhatsApp por tipo', () => {
       tenantId: 't-1',
       dados: { empresa: 'Delta' },
     })
-    expect(WhatsAppService.mensagemAlertaExclusaoSN).toHaveBeenCalledWith('Delta', 'Receita excedida')
+    expect(WhatsAppService.mensagemAlertaExclusaoSN).toHaveBeenCalledWith(
+      'Delta',
+      'Receita excedida'
+    )
     expect(mockWhatsApp.enviar).toHaveBeenCalledOnce()
   })
 

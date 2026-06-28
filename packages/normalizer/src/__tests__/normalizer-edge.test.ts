@@ -477,7 +477,12 @@ describe('NormalizerService — chaveUnica NFSe com campos nulos', () => {
   })
 
   it('NFE sem chaveAcesso → chaveUnica gerada via fallback cnpj-numero-serie', async () => {
-    const rawSemChave = makeRaw({ tipo: 'NFE', chaveAcesso: undefined, numero: '0000777', serie: '002' })
+    const rawSemChave = makeRaw({
+      tipo: 'NFE',
+      chaveAcesso: undefined,
+      numero: '0000777',
+      serie: '002',
+    })
 
     const svc = new NormalizerService()
     await svc.normalizar(rawSemChave as any, 'tenant-test', 'empresa-test')
