@@ -26,6 +26,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockEcac = {
   consultarSituacaoFiscal: vi.fn(),
   baixarCertidao: vi.fn(),
+  sincronizarDebitos: vi.fn(),
 }
 
 const mockSimples = {
@@ -86,6 +87,7 @@ beforeEach(() => {
   mockDb.portalJob.update.mockResolvedValue({})
   mockEcac.consultarSituacaoFiscal.mockResolvedValue({ situacao: 'REGULAR', pendencias: [] })
   mockEcac.baixarCertidao.mockResolvedValue('portais/certidao-2025-01.pdf')
+  mockEcac.sincronizarDebitos.mockResolvedValue({ totalDebitos: 0, debitos: [] })
   mockSimples.transmitirPGDAS.mockResolvedValue('PGDAS-RECIBO-001')
   mockSefazSp.transmitirDeSTDA.mockResolvedValue({
     protocolo: 'PROTO-001',
@@ -160,6 +162,25 @@ describe('PortalOrchestrator — roteamento de operações', () => {
       CRED_BUF,
       ''
     )
+  })
+
+  it('ECAC:SINCRONIZAR_DEBITOS → chama sincronizarDebitos e retorna resultado', async () => {
+    const esperado = {
+      totalDebitos: 2,
+      debitos: [{ descricao: 'PGDAS', valor: 'R$ 500', vencimento: null, situacao: 'PENDENTE' }],
+    }
+    mockEcac.sincronizarDebitos.mockResolvedValueOnce(esperado)
+
+    const orch = new PortalOrchestrator()
+    const resultado = await orch.executar(makeJob('ECAC', 'SINCRONIZAR_DEBITOS'), CRED_BUF)
+
+    expect(mockEcac.sincronizarDebitos).toHaveBeenCalledWith(
+      't-1',
+      'emp-1',
+      '11111111000111',
+      CRED_BUF
+    )
+    expect(resultado).toEqual(esperado)
   })
 
   it('SIMPLES_NACIONAL:TRANSMITIR_PGDAS → chama transmitirPGDAS', async () => {

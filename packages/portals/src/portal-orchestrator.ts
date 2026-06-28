@@ -62,6 +62,15 @@ export class PortalOrchestrator {
           )
           break
 
+        case 'ECAC:SINCRONIZAR_DEBITOS':
+          resultado = await this.ecac.sincronizarDebitos(
+            job.tenantId,
+            job.empresaId,
+            job.cnpj,
+            credencialBuffer
+          )
+          break
+
         case 'SIMPLES_NACIONAL:TRANSMITIR_PGDAS':
           resultado = await this.simplesnacional.transmitirPGDAS(
             job.tenantId,

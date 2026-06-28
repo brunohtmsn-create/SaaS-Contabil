@@ -18,10 +18,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockPage, mockContext, mockBrowser, mockStorage, mockAudit } = vi.hoisted(() => {
+const { mockPage, mockContext, mockBrowser, mockStorage, mockAudit, mockDb } = vi.hoisted(() => {
   const mockPage = {
     goto: vi.fn().mockResolvedValue(undefined),
     screenshot: vi.fn().mockResolvedValue(Buffer.from('screenshot')),
+    waitForSelector: vi.fn().mockResolvedValue(null),
+    locator: vi.fn().mockReturnValue({ all: vi.fn().mockResolvedValue([]) }),
   }
   const mockContext = { newPage: vi.fn().mockResolvedValue(mockPage) }
   const mockBrowser = {
@@ -34,6 +36,7 @@ const { mockPage, mockContext, mockBrowser, mockStorage, mockAudit } = vi.hoiste
     mockBrowser,
     mockStorage: { upload: vi.fn().mockResolvedValue({ s3Key: 'screenshots/ecac.png' }) },
     mockAudit: { registrar: vi.fn().mockResolvedValue(undefined) },
+    mockDb: { alerta: { create: vi.fn().mockResolvedValue({ id: 'alerta-1' }) } },
   }
 })
 
@@ -53,7 +56,7 @@ vi.mock('@saas-contabil/audit', () => ({
 }))
 
 vi.mock('@saas-contabil/database', () => ({
-  getPrismaClient: vi.fn(() => ({})),
+  getPrismaClient: vi.fn(() => mockDb),
 }))
 
 vi.mock('@saas-contabil/shared', async (importOriginal) => {
@@ -88,6 +91,9 @@ beforeEach(() => {
   mockAudit.registrar.mockResolvedValue(undefined)
   mockStorage.upload.mockResolvedValue({ s3Key: 'screenshots/ecac.png' })
   mockPage.goto.mockResolvedValue(undefined)
+  mockPage.waitForSelector.mockResolvedValue(null)
+  mockPage.locator.mockReturnValue({ all: vi.fn().mockResolvedValue([]) })
+  mockDb.alerta.create.mockResolvedValue({ id: 'alerta-1' })
 })
 
 // ===========================================================================
@@ -238,5 +244,165 @@ describe('EcacPortal.baixarCertidao()', () => {
     const result = await portal.baixarCertidao(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF, COMP)
 
     expect(result).toContain(COMP)
+  })
+})
+
+// ===========================================================================
+// sincronizarDebitos
+// ===========================================================================
+
+describe('EcacPortal.sincronizarDebitos()', () => {
+  it('abre browser, navega para URLs do e-CAC e fecha browser', async () => {
+    const portal = new EcacPortal()
+    await portal.sincronizarDebitos(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF)
+
+    const { chromium } = await import('playwright')
+    expect(chromium.launch).toHaveBeenCalledWith({ headless: true })
+    expect(mockPage.goto).toHaveBeenCalledWith(
+      expect.stringContaining('receita.fazenda.gov.br'),
+      expect.any(Object)
+    )
+    expect(mockBrowser.close).toHaveBeenCalled()
+  })
+
+  it('sem tabela de débitos → retorna totalDebitos=0 e debitos=[]', async () => {
+    mockPage.waitForSelector.mockResolvedValue(null)
+    mockPage.locator.mockReturnValue({ all: vi.fn().mockResolvedValue([]) })
+
+    const portal = new EcacPortal()
+    const result = await portal.sincronizarDebitos(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF)
+
+    expect(result.totalDebitos).toBe(0)
+    expect(result.debitos).toEqual([])
+    expect(mockDb.alerta.create).not.toHaveBeenCalled()
+  })
+
+  it('com débitos → extrai linhas e retorna lista', async () => {
+    const mockColuna = (texto: string) => ({
+      textContent: vi.fn().mockResolvedValue(texto),
+    })
+    const mockLinha = {
+      locator: vi.fn().mockReturnValue({
+        all: vi
+          .fn()
+          .mockResolvedValue([
+            mockColuna('IRPJ 2024'),
+            mockColuna('R$ 1.500,00'),
+            mockColuna('20/03/2025'),
+            mockColuna('PENDENTE'),
+          ]),
+      }),
+    }
+    mockPage.waitForSelector.mockResolvedValue({ selector: 'found' })
+    mockPage.locator.mockReturnValueOnce({ all: vi.fn().mockResolvedValue([mockLinha]) }) // tbody tr
+
+    const portal = new EcacPortal()
+    const result = await portal.sincronizarDebitos(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF)
+
+    expect(result.totalDebitos).toBe(1)
+    expect(result.debitos[0]).toMatchObject({
+      descricao: 'IRPJ 2024',
+      valor: 'R$ 1.500,00',
+      situacao: 'PENDENTE',
+    })
+  })
+
+  it('com débitos → cria alerta RISCO_EXCLUSAO_SN no banco', async () => {
+    const mockColuna = (texto: string) => ({
+      textContent: vi.fn().mockResolvedValue(texto),
+    })
+    const mockLinha = {
+      locator: vi.fn().mockReturnValue({
+        all: vi
+          .fn()
+          .mockResolvedValue([
+            mockColuna('PGDAS 2024-12'),
+            mockColuna('R$ 500,00'),
+            mockColuna('15/01/2025'),
+            mockColuna('VENCIDO'),
+          ]),
+      }),
+    }
+    mockPage.waitForSelector.mockResolvedValue({ selector: 'found' })
+    mockPage.locator.mockReturnValueOnce({ all: vi.fn().mockResolvedValue([mockLinha]) })
+
+    const portal = new EcacPortal()
+    await portal.sincronizarDebitos(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF)
+
+    expect(mockDb.alerta.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: TENANT_ID,
+          empresaId: EMPRESA_ID,
+          tipo: 'RISCO_EXCLUSAO_SN',
+          mensagem: expect.stringContaining(CNPJ),
+        }),
+      })
+    )
+  })
+
+  it('registra auditoria PORTAL_ACESSO_REALIZADO com operação SINCRONIZAR_DEBITOS', async () => {
+    const portal = new EcacPortal()
+    await portal.sincronizarDebitos(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF)
+
+    expect(mockAudit.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: TENANT_ID,
+        cnpj: CNPJ,
+        evento: 'PORTAL_ACESSO_REALIZADO',
+        estadoNovo: expect.objectContaining({ operacao: 'SINCRONIZAR_DEBITOS' }),
+      })
+    )
+  })
+
+  it('em caso de erro: faz screenshot e salva no S3', async () => {
+    mockPage.goto
+      .mockRejectedValueOnce(new Error('portal indisponível'))
+      .mockRejectedValueOnce(new Error('portal indisponível'))
+      .mockRejectedValueOnce(new Error('portal indisponível'))
+      .mockRejectedValueOnce(new Error('portal indisponível'))
+
+    const portal = new EcacPortal()
+    await expect(portal.sincronizarDebitos(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF)).rejects.toThrow()
+
+    expect(mockPage.screenshot).toHaveBeenCalled()
+    expect(mockStorage.upload).toHaveBeenCalledWith(
+      expect.stringContaining('ecac'),
+      expect.any(Buffer),
+      'image/png'
+    )
+  })
+
+  it('em caso de erro: registra auditoria PORTAL_ACESSO_FALHOU e relança erro', async () => {
+    const errMsg = 'timeout na navegação'
+    mockPage.goto
+      .mockRejectedValueOnce(new Error(errMsg))
+      .mockRejectedValueOnce(new Error(errMsg))
+      .mockRejectedValueOnce(new Error(errMsg))
+      .mockRejectedValueOnce(new Error(errMsg))
+
+    const portal = new EcacPortal()
+    await expect(portal.sincronizarDebitos(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF)).rejects.toThrow(
+      errMsg
+    )
+
+    const falhaCall = mockAudit.registrar.mock.calls.find(
+      (c) => c[0].evento === 'PORTAL_ACESSO_FALHOU'
+    )
+    expect(falhaCall).toBeDefined()
+    expect(falhaCall![0].estadoNovo.operacao).toBe('SINCRONIZAR_DEBITOS')
+  })
+
+  it('em caso de erro: fecha browser (finally)', async () => {
+    mockPage.goto
+      .mockRejectedValueOnce(new Error('err'))
+      .mockRejectedValueOnce(new Error('err'))
+      .mockRejectedValueOnce(new Error('err'))
+      .mockRejectedValueOnce(new Error('err'))
+
+    const portal = new EcacPortal()
+    await expect(portal.sincronizarDebitos(TENANT_ID, EMPRESA_ID, CNPJ, CERT_BUF)).rejects.toThrow()
+
+    expect(mockBrowser.close).toHaveBeenCalled()
   })
 })
