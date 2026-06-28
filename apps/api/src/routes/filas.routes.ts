@@ -15,7 +15,6 @@ const NOMES_FILAS = [
 export async function filasRoutes(app: FastifyInstance) {
   const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
     maxRetriesPerRequest: null,
-    enableReadyCheck: false,
   })
 
   // GET /filas — resumo de todas as filas (só ADMIN)
