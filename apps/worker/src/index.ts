@@ -5,7 +5,7 @@ import { scraperJob } from './jobs/scraper.job.js'
 import { fiscalJob } from './jobs/fiscal.job.js'
 import { portalJob } from './jobs/portal.job.js'
 import { monitoramentoDiario } from './jobs/monitoramento.job.js'
-import { gerarRelatorioMensal } from './jobs/relatorio.job.js'
+import { relatorioJobDispatcher } from './jobs/relatorio.job.js'
 import { bancarioJob } from './jobs/bancario.job.js'
 
 const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
@@ -56,7 +56,7 @@ const workers = [
   new Worker(QUEUE_FISCAL, fiscalJob, { connection: redis, concurrency: 5 }),
   new Worker(QUEUE_PORTAL, portalJob, { connection: redis, concurrency: 2 }),
   new Worker(QUEUE_MONITORAMENTO, monitoramentoDiario, { connection: redis, concurrency: 1 }),
-  new Worker(QUEUE_RELATORIO, gerarRelatorioMensal, { connection: redis, concurrency: 2 }),
+  new Worker(QUEUE_RELATORIO, relatorioJobDispatcher, { connection: redis, concurrency: 2 }),
   new Worker(QUEUE_BANCARIO, bancarioJob, { connection: redis, concurrency: 2 }),
 ]
 

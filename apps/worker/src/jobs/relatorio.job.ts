@@ -1,9 +1,8 @@
 import { Job } from 'bullmq'
 import { getPrismaClient } from '@saas-contabil/database'
 import { StorageService } from '@saas-contabil/storage'
-import { S3KeyBuilder } from '@saas-contabil/storage'
 import { NotificationService } from '@saas-contabil/notifications'
-import { Decimal } from '@saas-contabil/shared'
+import { Decimal, nowBR } from '@saas-contabil/shared'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -197,7 +196,7 @@ export async function gerarRelatorioMensal(job: Job<RelatorioJobData>): Promise<
           s3Key,
           downloadUrl: signedUrl,
           empresasCount: empresas.length,
-          geradoEm: new Date().toISOString(),
+          geradoEm: nowBR().toISOString(),
         },
         lido: false,
       },
@@ -221,4 +220,104 @@ export async function gerarRelatorioMensal(job: Job<RelatorioJobData>): Promise<
     `[RelatorioJob] Concluído — tenant=${tenantId} competencia=${competencia} ` +
       `empresas=${empresas.length} s3Key=${s3Key}`
   )
+}
+
+// ─── Relatório por empresa ─────────────────────────────────────────────────
+
+type RelatorioEmpresaJobData = {
+  tenantId: string
+  empresaId: string
+  competencia: string
+}
+
+export async function gerarRelatorioEmpresa(job: Job<RelatorioEmpresaJobData>): Promise<void> {
+  const { tenantId, empresaId, competencia } = job.data
+
+  await job.log(`[RelatorioEmpresaJob] empresa=${empresaId} competencia=${competencia}`)
+  await job.updateProgress(10)
+
+  const empresa = await db.empresaCliente.findFirst({
+    where: { id: empresaId, tenantId },
+    select: {
+      id: true,
+      cnpj: true,
+      razaoSocial: true,
+      apuracoesFiscais: {
+        where: { tenantId, competencia },
+        select: { tipo: true, status: true, dados: true },
+      },
+    },
+  })
+
+  if (!empresa) {
+    throw new Error(`Empresa ${empresaId} não encontrada para tenant ${tenantId}`)
+  }
+
+  await job.updateProgress(30)
+
+  const CABECALHO: LinhaRelatorio = {
+    cnpj: 'CNPJ',
+    razaoSocial: 'Razão Social',
+    competencia: 'Competência',
+    tipo: 'Tipo',
+    status: 'Status',
+    valorDas: 'Valor DAS',
+    rbTotal: 'RB Total',
+    aliquotaEfetiva: 'Alíquota Efetiva (%)',
+  }
+
+  const linhas: LinhaRelatorio[] = [CABECALHO]
+
+  if (empresa.apuracoesFiscais.length === 0) {
+    linhas.push({
+      cnpj: empresa.cnpj,
+      razaoSocial: empresa.razaoSocial,
+      competencia,
+      tipo: '-',
+      status: 'SEM_APURACAO',
+      valorDas: '0.00',
+      rbTotal: '0.00',
+      aliquotaEfetiva: '0.00',
+    })
+  } else {
+    for (const apuracao of empresa.apuracoesFiscais) {
+      const valorDas = extrairValorDAS(apuracao.dados)
+      const rbTotal = extrairRBTotal(apuracao.dados)
+      linhas.push({
+        cnpj: empresa.cnpj,
+        razaoSocial: empresa.razaoSocial,
+        competencia,
+        tipo: apuracao.tipo,
+        status: apuracao.status,
+        valorDas: valorDas.toDecimalPlaces(2).toString(),
+        rbTotal: rbTotal.toDecimalPlaces(2).toString(),
+        aliquotaEfetiva: calcularAliquotaEfetiva(valorDas, rbTotal),
+      })
+    }
+  }
+
+  await job.updateProgress(60)
+
+  const csvContent = linhas.map(linhaParaCSV).join('\n')
+  const csvBuffer = Buffer.from(csvContent, 'utf-8')
+  const s3Key = `${tenantId}/relatorios/${competencia}/empresa-${empresaId}.csv`
+
+  await storage.upload(s3Key, csvBuffer, 'text/csv;charset=utf-8', {
+    tenantId,
+    empresaId,
+    competencia,
+  })
+
+  await job.updateProgress(90)
+  await job.log(`[RelatorioEmpresaJob] CSV enviado para S3 — key=${s3Key}`)
+  await job.updateProgress(100)
+}
+
+// ─── Dispatcher principal da fila relatorio ────────────────────────────────
+
+export async function relatorioJobDispatcher(job: Job): Promise<void> {
+  if (job.name === 'relatorio-empresa') {
+    return gerarRelatorioEmpresa(job as Job<RelatorioEmpresaJobData>)
+  }
+  return gerarRelatorioMensal(job as Job<RelatorioJobData>)
 }

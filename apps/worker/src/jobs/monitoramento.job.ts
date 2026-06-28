@@ -18,6 +18,12 @@ export async function monitoramentoDiario(job: Job): Promise<void> {
   for (const tenant of tenants) {
     await job.log(`--- Processando tenant: ${tenant.subdominio} ---`)
 
+    // Busca a primeira empresa ativa (necessária para alertas de nível tenant)
+    const primeiraEmpresa = await db.empresaCliente.findFirst({
+      where: { tenantId: tenant.id, ativa: true },
+      select: { id: true },
+    })
+
     // 1. Verificar vencimentos de obrigações (próximos 7 dias)
     const alertasVenc = await alertasService.verificarProximosVencimentos(tenant.id, 7)
     for (const alerta of alertasVenc) {
@@ -84,13 +90,15 @@ export async function monitoramentoDiario(job: Job): Promise<void> {
       })
     }
 
+    if (!primeiraEmpresa) continue
+
     // 4. Verificar documentos com PENDENTE_REVISAO há mais de 48h sem ação
     const limite48h = addDays(nowBR(), -2)
     const docsPendentes = await db.documentoFiscal.count({
       where: {
         tenantId: tenant.id,
         status: 'PENDENTE_REVISAO',
-        atualizadoEm: { lte: limite48h },
+        processedAt: { lte: limite48h },
       },
     })
 
@@ -109,6 +117,7 @@ export async function monitoramentoDiario(job: Job): Promise<void> {
         await db.alerta.create({
           data: {
             tenantId: tenant.id,
+            empresaId: primeiraEmpresa.id,
             tipo: 'DIVERGENCIA_CONCILIACAO',
             mensagem: `${docsPendentes} documento(s) aguardando revisão humana há mais de 48 horas`,
             dados: {
@@ -152,6 +161,7 @@ export async function monitoramentoDiario(job: Job): Promise<void> {
           await db.alerta.create({
             data: {
               tenantId: tenant.id,
+              empresaId: primeiraEmpresa.id,
               tipo: 'PGDAS_PENDENTE',
               mensagem: `${pgdasNaoTransmitidos} PGDAS da competência ${competenciaAtual} ainda não transmitido(s). Prazo: dia 20.`,
               dados: {
