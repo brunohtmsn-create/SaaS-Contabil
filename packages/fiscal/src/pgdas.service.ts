@@ -33,7 +33,7 @@ export class PGDASService {
       },
     })
 
-    const receitas = this.segregarReceitas(docs, empresa.cnpj, competencia)
+    const receitas = this.segregarReceitas(docs, empresa.cnpj, competencia, empresa.cnae)
 
     const [rb12, resultadoFatorR] = await Promise.all([
       this.calcularRB12Meses(tenantId, empresaId, competencia),
@@ -102,17 +102,55 @@ export class PGDASService {
     return resultado
   }
 
-  private segregarReceitas(docs: any[], cnpj: string, competencia: string): ReceitaSegregada {
+  private segregarReceitas(
+    docs: any[],
+    cnpj: string,
+    competencia: string,
+    cnae?: string
+  ): ReceitaSegregada {
     let anexoI = new Decimal(0)
+    let anexoII = new Decimal(0)
     let anexoIII = new Decimal(0)
-    let anexoV = new Decimal(0)
+    let anexoIV = new Decimal(0)
+    let exportacao = new Decimal(0)
+
+    // Indústria: CNAE 10–33 (Seção C da CNBR — manufatura)
+    const isIndustria = cnae
+      ? parseInt(cnae.slice(0, 2)) >= 10 && parseInt(cnae.slice(0, 2)) <= 33
+      : false
+
+    // Serviços específicos Anexo IV: construção, transporte, limpeza, vigilância
+    // CNAE: 41/42/43 (Construção), 49 (Transp. Terrestre), 80 (Vigilância), 81 (Serv. Edificações)
+    const isAnexoIV = cnae
+      ? ['41', '42', '43', '49', '80', '81'].some((p) => cnae.startsWith(p))
+      : false
 
     for (const doc of docs) {
       const valor = new Decimal(doc.valorTotal.toString())
-      if (doc.tipo === 'NFCE' || (doc.tipo === 'NFE' && doc.cfop?.startsWith('5'))) {
+      const cfop = doc.cfop ?? ''
+
+      if (doc.tipo === 'NFCE') {
+        // NFC-e é sempre varejo → Anexo I
         anexoI = anexoI.plus(valor)
+      } else if (doc.tipo === 'NFE') {
+        // Exportação: CFOPs 7xxx
+        if (cfop.startsWith('7')) {
+          exportacao = exportacao.plus(valor)
+        } else if (isIndustria && (cfop.startsWith('5') || cfop.startsWith('6'))) {
+          // Indústria com CFOP 5xxx/6xxx → Anexo II
+          anexoII = anexoII.plus(valor)
+        } else if (cfop.startsWith('5') || cfop.startsWith('6')) {
+          // Comércio atacado/varejo → Anexo I
+          anexoI = anexoI.plus(valor)
+        }
       } else if (doc.tipo === 'NFSE_EMITIDA') {
-        anexoIII = anexoIII.plus(valor)
+        if (isAnexoIV) {
+          // Construção civil e serviços específicos → Anexo IV (ISS sobre nota)
+          anexoIV = anexoIV.plus(valor)
+        } else {
+          // Serviços em geral → Anexo III (ou V, determinado pelo Fator R no determinarAnexoPrincipal)
+          anexoIII = anexoIII.plus(valor)
+        }
       }
     }
 
@@ -120,15 +158,15 @@ export class PGDASService {
       cnpj,
       competencia,
       anexoI,
-      anexoII: new Decimal(0),
+      anexoII,
       anexoIII,
-      anexoIV: new Decimal(0),
-      anexoV,
-      exportacao: new Decimal(0),
+      anexoIV,
+      anexoV: new Decimal(0),
+      exportacao,
       substituicaoTributaria: new Decimal(0),
       imunes: new Decimal(0),
       isentas: new Decimal(0),
-      total: anexoI.plus(anexoIII).plus(anexoV),
+      total: anexoI.plus(anexoII).plus(anexoIII).plus(anexoIV).plus(exportacao),
     }
   }
 
@@ -158,9 +196,17 @@ export class PGDASService {
   }
 
   private determinarAnexoPrincipal(receitas: ReceitaSegregada, fatorR: Decimal): string {
-    if (receitas.anexoI.gt(receitas.anexoIII) && receitas.anexoI.gt(receitas.anexoV)) {
-      return 'ANEXO_I'
+    // Receita dominante determina o anexo principal de enquadramento
+    const max = [
+      { anexo: 'ANEXO_I', valor: receitas.anexoI },
+      { anexo: 'ANEXO_II', valor: receitas.anexoII },
+      { anexo: 'ANEXO_IV', valor: receitas.anexoIV },
+    ].reduce((a, b) => (b.valor.gt(a.valor) ? b : a))
+
+    if (max.valor.gt(receitas.anexoIII) && max.valor.gt(new Decimal(0))) {
+      return max.anexo
     }
+    // Serviços gerais: Fator R >= 28% → Anexo III, senão → Anexo V
     if (fatorR.gte(28)) return 'ANEXO_III'
     return 'ANEXO_V'
   }

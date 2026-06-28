@@ -30,6 +30,9 @@ import {
   SimuladorTributarioService,
   PlanejamentoTributarioService,
   RelatorioFiscalService,
+  IcmsStService,
+  EncerramentoSNService,
+  LivroFiscalService,
 } from '@saas-contabil/fiscal'
 
 type FiscalJobData = {
@@ -68,6 +71,9 @@ type FiscalJobData = {
     | 'SIMULADOR_TRIBUTARIO'
     | 'PLANEJAMENTO_TRIBUTARIO'
     | 'RELATORIO_FISCAL'
+    | 'ICMS_ST'
+    | 'ENCERRAMENTO_SN'
+    | 'LIVRO_FISCAL'
     | 'TODOS'
 }
 
@@ -302,6 +308,21 @@ export async function fiscalJob(job: Job<FiscalJobData>): Promise<void> {
     case 'RELATORIO_FISCAL': {
       const relatorio = new RelatorioFiscalService()
       await relatorio.gerar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'ICMS_ST': {
+      const icmsSt = new IcmsStService()
+      await icmsSt.calcular(tenantId, empresaId, competencia)
+      break
+    }
+    case 'ENCERRAMENTO_SN': {
+      const encerramento = new EncerramentoSNService()
+      await encerramento.encerrar(tenantId, empresaId, competencia)
+      break
+    }
+    case 'LIVRO_FISCAL': {
+      const livro = new LivroFiscalService()
+      await livro.gerar(tenantId, empresaId, competencia)
       break
     }
     case 'TODOS': {

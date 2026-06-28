@@ -75,6 +75,8 @@ export type {
 } from './diagnostico-fiscal.service.js'
 export { RelatorioFiscalService } from './relatorio-fiscal.service.js'
 export type { ResultadoRelatorioFiscal, LinhaRelatorio } from './relatorio-fiscal.service.js'
+export { IcmsStService } from './icms-st.service.js'
+export type { ResultadoIcmsSt, ItemIcmsSt } from './icms-st.service.js'
 export type {
   ResultadoPGDAS,
   ReceitaSegregada,
@@ -82,3 +84,7 @@ export type {
   ResultadoFGTS,
   ResultadoGRRF,
 } from './types.js'
+export { EncerramentoSNService } from './encerramento-sn.service.js'
+export type { ResultadoEncerramentoSN, TipoEmpresaSN } from './encerramento-sn.service.js'
+export { LivroFiscalService } from './livro-fiscal.service.js'
+export type { LivroFiscal, LinhaLivro } from './livro-fiscal.service.js'

@@ -35,6 +35,9 @@ import {
   PlanejamentoTributarioService,
   DiagnosticoFiscalService,
   RelatorioFiscalService,
+  IcmsStService,
+  EncerramentoSNService,
+  LivroFiscalService,
 } from '@saas-contabil/fiscal'
 import { Queue } from 'bullmq'
 import { Redis as IORedis } from 'ioredis'
@@ -1277,5 +1280,97 @@ export async function fiscalRoutes(app: FastifyInstance) {
 
     const service = new RelatorioFiscalService()
     return service.gerar(tenantId, empresaId, competencia)
+  })
+
+  // -------------------------------------------------------------------------
+  // ICMS-ST — Substituição Tributária (Comércio e Indústria SN)
+  // -------------------------------------------------------------------------
+
+  app.post('/icms-st/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new IcmsStService()
+    return service.calcular(tenantId, empresaId, competencia)
+  })
+
+  app.get('/icms-st/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const db = getPrismaClient()
+
+    const apuracao = await db.apuracaoFiscal.findUnique({
+      where: {
+        tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia, tipo: 'ICMS_ST' },
+      },
+    })
+    if (!apuracao) return reply.code(404).send({ error: 'ICMS-ST não encontrado para o período' })
+    return apuracao
+  })
+
+  // -------------------------------------------------------------------------
+  // Encerramento SN — Processo completo mensal para todos os tipos de empresa
+  // -------------------------------------------------------------------------
+
+  app.post('/encerramento-sn/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new EncerramentoSNService()
+    return service.encerrar(tenantId, empresaId, competencia)
+  })
+
+  app.post('/encerramento-sn/batch/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { competencia } = z.object({ competencia: z.string() }).parse(request.params)
+    const db = getPrismaClient()
+
+    const empresas = await db.empresaCliente.findMany({
+      where: { tenantId, regime: 'SIMPLES_NACIONAL', ativa: true },
+      select: { id: true, cnpj: true },
+    })
+
+    if (empresas.length === 0) return reply.code(422).send({ error: 'Nenhuma empresa SN ativa' })
+
+    const jobs = await Promise.allSettled(
+      empresas.map((e) =>
+        fiscalQueue.add('fiscal', {
+          tenantId,
+          empresaId: e.id,
+          cnpj: e.cnpj,
+          competencia,
+          operacao: 'ENCERRAMENTO_SN',
+        })
+      )
+    )
+
+    const erros = jobs.filter((j) => j.status === 'rejected').length
+    return { total: empresas.length, agendados: empresas.length - erros, erros }
+  })
+
+  // -------------------------------------------------------------------------
+  // Livro Fiscal — Relatório consolidado de entradas/saídas/serviços
+  // -------------------------------------------------------------------------
+
+  app.post('/livro-fiscal/:empresaId/:competencia', async (request) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+
+    const service = new LivroFiscalService()
+    return service.gerar(tenantId, empresaId, competencia)
+  })
+
+  app.get('/livro-fiscal/:empresaId/:competencia', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { empresaId, competencia } = params.parse(request.params)
+    const db = getPrismaClient()
+
+    const apuracao = await db.apuracaoFiscal.findFirst({
+      where: { tenantId, empresaId, competencia, tipo: 'ISS' },
+      orderBy: { criadoEm: 'desc' },
+    })
+    if (!apuracao)
+      return reply.code(404).send({ error: 'Livro fiscal não encontrado para o período' })
+    return apuracao
   })
 }

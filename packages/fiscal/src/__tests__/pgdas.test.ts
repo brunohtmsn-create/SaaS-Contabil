@@ -82,13 +82,13 @@ describe('PGDASService — segregarReceitas()', () => {
     expect(receitas.total.toFixed(2)).toBe('2500.00')
   })
 
-  it('NF-e com CFOP 6.xxx (saída interestadual) NÃO vai para nenhum anexo', () => {
-    // CFOP 6.xxx não começa com '5', então não é classificado no Anexo I pelo serviço atual
+  it('NF-e com CFOP 6.xxx (saída interestadual comércio) vai para Anexo I', () => {
+    // CFOP 6.xxx = venda interestadual → receita de comércio, vai para Anexo I
     const docs = [makeDoc('NFE', '3000.00', '6.102')]
     const receitas = (service as any).segregarReceitas(docs, '00.000.000/0001-00', '2025-01')
 
-    expect(receitas.anexoI.toFixed(2)).toBe('0.00')
-    expect(receitas.total.toFixed(2)).toBe('0.00')
+    expect(receitas.anexoI.toFixed(2)).toBe('3000.00')
+    expect(receitas.total.toFixed(2)).toBe('3000.00')
   })
 
   it('NFSe emitida vai para Anexo III', () => {
