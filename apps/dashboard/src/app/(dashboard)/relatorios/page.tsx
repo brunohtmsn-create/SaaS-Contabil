@@ -22,7 +22,29 @@ type HistoricoItem = {
   lido: boolean
 }
 
+type ObrigacaoVencendo = {
+  id: string
+  tipo: string
+  competencia: string
+  vencimento: string
+  valor: string | null
+  empresa: { razaoSocial: string; cnpj: string }
+}
+
+type ObrigacoesVencendoResponse = {
+  periodo: { de: string; ate: string }
+  total: number
+  obrigacoes: ObrigacaoVencendo[]
+}
+
 const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+
+const DIAS_OPTIONS = [
+  { value: '3', label: '3 dias' },
+  { value: '7', label: '7 dias' },
+  { value: '15', label: '15 dias' },
+  { value: '30', label: '30 dias' },
+]
 
 export default function RelatoriosPage() {
   const qc = useQueryClient()
@@ -31,6 +53,7 @@ export default function RelatoriosPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
   const [baixando, setBaixando] = useState(false)
+  const [diasVencendo, setDiasVencendo] = useState('7')
 
   const { data: apuracoes = [], isLoading } = useQuery<Apuracao[]>({
     queryKey: ['apuracoes-consolidadas', competencia],
@@ -41,6 +64,15 @@ export default function RelatoriosPage() {
     queryKey: ['relatorios-historico'],
     queryFn: () => api.get('/relatorios/historico?limit=12').then((r) => r.data),
   })
+
+  const { data: vencendoData, isLoading: isLoadingVencendo } = useQuery<ObrigacoesVencendoResponse>(
+    {
+      queryKey: ['obrigacoes-vencendo', diasVencendo],
+      queryFn: () =>
+        api.get(`/relatorios/obrigacoes-vencendo?dias=${diasVencendo}`).then((r) => r.data),
+      staleTime: 60000,
+    }
+  )
 
   const gerarRelatorio = useMutation({
     mutationFn: () => api.post(`/relatorios/consolidado/${competencia}`).then((r) => r.data),
@@ -193,6 +225,99 @@ export default function RelatoriosPage() {
                 <td />
               </tr>
             </tfoot>
+          </table>
+        )}
+      </div>
+
+      {/* Obrigações vencendo */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-900">Obrigações Vencendo</h2>
+            {vencendoData && (
+              <p className="text-xs text-slate-400 mt-0.5">
+                {vencendoData.total} obrigação(ões) nos próximos {diasVencendo} dias
+              </p>
+            )}
+          </div>
+          <div className="flex gap-1">
+            {DIAS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setDiasVencendo(opt.value)}
+                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  diasVencendo === opt.value
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {isLoadingVencendo ? (
+          <div className="p-6 text-center text-slate-400 text-sm">Carregando...</div>
+        ) : !vencendoData || vencendoData.obrigacoes.length === 0 ? (
+          <div className="p-6 text-center text-slate-400 text-sm">
+            Nenhuma obrigação vencendo nos próximos {diasVencendo} dias.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Empresa</th>
+                <th className="px-4 py-3 text-left">Obrigação</th>
+                <th className="px-4 py-3 text-left">Competência</th>
+                <th className="px-4 py-3 text-center">Vencimento</th>
+                <th className="px-4 py-3 text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {vencendoData.obrigacoes.map((obr) => {
+                const venc = new Date(obr.vencimento)
+                const hoje = new Date()
+                const diffDias = Math.ceil(
+                  (venc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)
+                )
+                const urgente = diffDias <= 3
+
+                return (
+                  <tr key={obr.id} className={urgente ? 'bg-red-50' : 'hover:bg-slate-50'}>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-800 truncate max-w-[180px]">
+                        {obr.empresa.razaoSocial}
+                      </p>
+                      <p className="font-mono text-xs text-slate-400">{obr.empresa.cnpj}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600">
+                        {obr.tipo.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{obr.competencia}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          urgente
+                            ? 'bg-red-100 text-red-700'
+                            : diffDias <= 7
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-green-100 text-green-700'
+                        }`}
+                      >
+                        {venc.toLocaleDateString('pt-BR')}
+                        {urgente && ` (${diffDias}d)`}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {obr.valor ? fmt.format(Number(obr.valor)) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
           </table>
         )}
       </div>
