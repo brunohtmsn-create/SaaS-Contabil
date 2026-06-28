@@ -87,12 +87,25 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
   app.get('/alertas', async (request) => {
     const { tenantId } = request.user as any
+    const { lido, tipo, empresaId, limite } = request.query as {
+      lido?: string
+      tipo?: string
+      empresaId?: string
+      limite?: string
+    }
+
+    const where: Record<string, unknown> = { tenantId }
+    if (lido === 'true') where['lido'] = true
+    else if (lido === 'false') where['lido'] = false
+    else if (lido !== 'todos') where['lido'] = false
+    if (tipo) where['tipo'] = tipo
+    if (empresaId) where['empresaId'] = empresaId
 
     return db.alerta.findMany({
-      where: { tenantId, lido: false },
+      where,
       include: { empresa: { select: { cnpj: true, razaoSocial: true } } },
       orderBy: { criadoEm: 'desc' },
-      take: 50,
+      take: limite ? Math.min(Number(limite), 200) : 100,
     })
   })
 
@@ -101,5 +114,14 @@ export async function dashboardRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     await db.alerta.updateMany({ where: { id, tenantId }, data: { lido: true } })
     return { success: true }
+  })
+
+  app.patch('/alertas/ler-todos', async (request) => {
+    const { tenantId } = request.user as any
+    const { tipo } = request.query as { tipo?: string }
+    const where: Record<string, unknown> = { tenantId, lido: false }
+    if (tipo) where['tipo'] = tipo
+    const { count } = await db.alerta.updateMany({ where, data: { lido: true } })
+    return { success: true, count }
   })
 }

@@ -39,6 +39,7 @@ const navItems = [
   { href: '/fiscal/livro-fiscal', label: 'Livro Fiscal', icon: '📖' },
   { href: '/fiscal/diagnostico', label: 'Diagnóstico Fiscal', icon: '🩺' },
   { href: '/fiscal/relatorio', label: 'Relatório Fiscal', icon: '📋' },
+  { href: '/notificacoes', label: 'Notificações', icon: '🔔' },
   { href: '/obrigacoes', label: 'Obrigações', icon: '📅' },
   { href: '/fgts', label: 'FGTS Digital', icon: '🏦' },
   { href: '/conciliacao', label: 'Conciliação', icon: '⚖️' },
