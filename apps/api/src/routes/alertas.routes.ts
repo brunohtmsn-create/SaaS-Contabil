@@ -22,7 +22,7 @@ export async function alertasRoutes(app: FastifyInstance) {
     if (tipo) where.tipo = tipo
     if (empresaId) where.empresaId = empresaId
 
-    return db.alerta.findMany({
+    return (db.alerta as any).findMany({
       where,
       include: { empresa: { select: { cnpj: true, razaoSocial: true } } },
       orderBy: { criadoEm: 'desc' },
@@ -69,7 +69,7 @@ export async function alertasRoutes(app: FastifyInstance) {
     const where: any = { tenantId, lido: false }
     if (tipo) where.tipo = tipo
 
-    const { count } = await db.alerta.updateMany({ where, data: { lido: true } })
+    const { count } = await (db.alerta as any).updateMany({ where, data: { lido: true } })
     return { success: true, count }
   })
 
@@ -78,7 +78,7 @@ export async function alertasRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
     const { id } = request.params as { id: string }
 
-    const { count } = await db.alerta.updateMany({
+    const { count } = await (db.alerta as any).updateMany({
       where: { id, tenantId },
       data: { lido: true },
     })
@@ -92,10 +92,10 @@ export async function alertasRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
     const { id } = request.params as { id: string }
 
-    const alerta = await db.alerta.findFirst({ where: { id, tenantId } })
+    const alerta = await (db.alerta as any).findFirst({ where: { id, tenantId } })
     if (!alerta) return reply.code(404).send({ error: 'Alerta não encontrado' })
 
-    await db.alerta.delete({ where: { id } })
+    await (db.alerta as any).delete({ where: { id } })
     return { success: true }
   })
 
@@ -104,9 +104,9 @@ export async function alertasRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
 
     const [total, naoLidos, porTipo] = await Promise.all([
-      db.alerta.count({ where: { tenantId } }),
-      db.alerta.count({ where: { tenantId, lido: false } }),
-      db.alerta.groupBy({
+      (db.alerta as any).count({ where: { tenantId } }),
+      (db.alerta as any).count({ where: { tenantId, lido: false } }),
+      (db.alerta as any).groupBy({
         by: ['tipo'],
         where: { tenantId, lido: false },
         _count: true,
