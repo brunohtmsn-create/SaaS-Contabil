@@ -129,7 +129,12 @@ export async function portalRoutes(app: FastifyInstance) {
     if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
 
     const credencial = await db.credencial.findFirst({
-      where: { tenantId, empresaId, tipo: { in: ['CERTIFICADO_A1_ECNPJ', 'CERTIFICADO_A1_ECPF'] }, status: 'ATIVO' },
+      where: {
+        tenantId,
+        empresaId,
+        tipo: { in: ['CERTIFICADO_A1_ECNPJ', 'CERTIFICADO_A1_ECPF'] },
+        status: 'ATIVO',
+      },
     })
     if (!credencial) return reply.code(422).send({ error: 'Certificado A1 ativo não encontrado' })
 
@@ -175,7 +180,12 @@ export async function portalRoutes(app: FastifyInstance) {
     if (!empresa) return reply.code(404).send({ error: 'Empresa não encontrada' })
 
     const credencial = await db.credencial.findFirst({
-      where: { tenantId, empresaId, tipo: { in: ['CERTIFICADO_A1_ECNPJ', 'CERTIFICADO_A1_ECPF'] }, status: 'ATIVO' },
+      where: {
+        tenantId,
+        empresaId,
+        tipo: { in: ['CERTIFICADO_A1_ECNPJ', 'CERTIFICADO_A1_ECPF'] },
+        status: 'ATIVO',
+      },
     })
     if (!credencial) return reply.code(422).send({ error: 'Certificado A1 ativo não encontrado' })
 

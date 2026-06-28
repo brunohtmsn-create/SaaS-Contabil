@@ -18,6 +18,7 @@ const PORTAL_ICONS: Record<string, string> = {
   SEFAZ_FEDERAL: '🏛️',
   SIMPLES_NACIONAL: '💰',
   ECAC: '📋',
+  DCTFWEB: '📄',
   SEFAZ_ESTADUAL: '🗺️',
   PREFEITURA: '🏙️',
 }
