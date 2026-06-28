@@ -15,12 +15,12 @@ export async function alertasRoutes(app: FastifyInstance) {
       limite?: string
     }
 
-    const where: Record<string, unknown> = { tenantId }
-    if (lido === 'true') where['lido'] = true
-    else if (lido === 'false') where['lido'] = false
-    else if (lido !== 'todos') where['lido'] = false
-    if (tipo) where['tipo'] = tipo
-    if (empresaId) where['empresaId'] = empresaId
+    const where: any = { tenantId }
+    if (lido === 'true') where.lido = true
+    else if (lido === 'false') where.lido = false
+    else if (lido !== 'todos') where.lido = false
+    if (tipo) where.tipo = tipo
+    if (empresaId) where.empresaId = empresaId
 
     return db.alerta.findMany({
       where,
@@ -54,8 +54,8 @@ export async function alertasRoutes(app: FastifyInstance) {
     const { tenantId } = request.user as any
     const { tipo } = request.query as { tipo?: string }
 
-    const where: Record<string, unknown> = { tenantId, lido: false }
-    if (tipo) where['tipo'] = tipo
+    const where: any = { tenantId, lido: false }
+    if (tipo) where.tipo = tipo
 
     const { count } = await db.alerta.updateMany({ where, data: { lido: true } })
     return { success: true, count }
@@ -98,14 +98,14 @@ export async function alertasRoutes(app: FastifyInstance) {
         by: ['tipo'],
         where: { tenantId, lido: false },
         _count: { _all: true },
-        orderBy: { _count: { tipo: 'desc' } },
+        orderBy: { tipo: 'asc' },
       }),
     ])
 
     return {
       total,
       naoLidos,
-      porTipo: porTipo.map((r) => ({ tipo: r.tipo, count: r._count._all })),
+      porTipo: porTipo.map((r: any) => ({ tipo: r.tipo, count: r._count._all })),
     }
   })
 }
