@@ -3,6 +3,7 @@ import { Decimal, nowBR } from '@saas-contabil/shared'
 import { EcacPortal } from './ecac.portal.js'
 import { SimplesNacionalPortal } from './simples-nacional.portal.js'
 import { SefazSpPortal } from './sefaz-sp.portal.js'
+import { DCTFWebPortal } from './dctfweb.portal.js'
 
 export type PortalJob = {
   cnpj: string
@@ -21,6 +22,7 @@ export class PortalOrchestrator {
   private ecac = new EcacPortal()
   private simplesnacional = new SimplesNacionalPortal()
   private sefazSp = new SefazSpPortal()
+  private dctfweb = new DCTFWebPortal()
 
   async executar(job: PortalJob, credencialBuffer: Buffer): Promise<unknown> {
     const dbJob = await this.db.portalJob.create({
@@ -113,6 +115,32 @@ export class PortalOrchestrator {
             job.cnpj,
             job.competencia ?? '',
             gnres
+          )
+          break
+        }
+
+        case 'DCTFWEB:TRANSMITIR': {
+          const d = job.dados as { certSenha?: string } | undefined
+          resultado = await this.dctfweb.transmitir(
+            job.tenantId,
+            job.empresaId,
+            job.cnpj,
+            job.competencia ?? '',
+            credencialBuffer,
+            d?.certSenha ?? ''
+          )
+          break
+        }
+
+        case 'DCTFWEB:CONSULTAR': {
+          const d = job.dados as { certSenha?: string } | undefined
+          resultado = await this.dctfweb.consultar(
+            job.tenantId,
+            job.empresaId,
+            job.cnpj,
+            job.competencia ?? '',
+            credencialBuffer,
+            d?.certSenha ?? ''
           )
           break
         }
