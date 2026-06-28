@@ -94,12 +94,12 @@ export async function dashboardRoutes(app: FastifyInstance) {
       limite?: string
     }
 
-    const where: Record<string, unknown> = { tenantId }
-    if (lido === 'true') where['lido'] = true
-    else if (lido === 'false') where['lido'] = false
-    else if (lido !== 'todos') where['lido'] = false
-    if (tipo) where['tipo'] = tipo
-    if (empresaId) where['empresaId'] = empresaId
+    const where: any = { tenantId }
+    if (lido === 'true') where.lido = true
+    else if (lido === 'false') where.lido = false
+    else if (lido !== 'todos') where.lido = false
+    if (tipo) where.tipo = tipo
+    if (empresaId) where.empresaId = empresaId
 
     return db.alerta.findMany({
       where,
@@ -119,8 +119,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
   app.patch('/alertas/ler-todos', async (request) => {
     const { tenantId } = request.user as any
     const { tipo } = request.query as { tipo?: string }
-    const where: Record<string, unknown> = { tenantId, lido: false }
-    if (tipo) where['tipo'] = tipo
+    const where: any = { tenantId, lido: false }
+    if (tipo) where.tipo = tipo
     const { count } = await db.alerta.updateMany({ where, data: { lido: true } })
     return { success: true, count }
   })
