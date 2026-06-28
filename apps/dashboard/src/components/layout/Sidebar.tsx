@@ -49,6 +49,7 @@ const navItems = [
   { href: '/auditoria', label: 'Auditoria', icon: '🔍' },
   { href: '/relatorios', label: 'Relatórios', icon: '📊' },
   { href: '/credenciais', label: 'Credenciais', icon: '🔐' },
+  { href: '/admin/filas', label: 'Filas (Admin)', icon: '⚡' },
   { href: '/configuracoes', label: 'Configurações', icon: '⚙️' },
 ]
 
