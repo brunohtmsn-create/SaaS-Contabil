@@ -37,9 +37,8 @@ type ResultadoEncerramento = {
 
 type ResultadoBatch = {
   total: number
-  sucesso: number
+  agendados: number
   erros: number
-  resultados: ResultadoEncerramento[]
 }
 
 const PASSOS_LABELS: Record<keyof PassosEncerramento, string> = {
@@ -296,68 +295,28 @@ export default function EncerramentoSNPage() {
 
       {/* Resultado batch */}
       {batchResultado && (
-        <div className="space-y-4">
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-gray-800">
-              Resultado Lote — {competencia}
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <p className="text-xs text-gray-500">Total Processado</p>
-                <p className="text-3xl font-bold text-gray-900">{batchResultado.total}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Sucesso</p>
-                <p className="text-3xl font-bold text-green-600">{batchResultado.sucesso}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Com Erros</p>
-                <p className="text-3xl font-bold text-red-600">{batchResultado.erros}</p>
-              </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-4 text-sm font-semibold text-gray-800">
+            Jobs Enfileirados — {competencia}
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-gray-500">Empresas SN</p>
+              <p className="text-3xl font-bold text-gray-900">{batchResultado.total}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Jobs Agendados</p>
+              <p className="text-3xl font-bold text-green-600">{batchResultado.agendados}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Falhas ao Enfileirar</p>
+              <p className="text-3xl font-bold text-red-600">{batchResultado.erros}</p>
             </div>
           </div>
-
-          {batchResultado.resultados.length > 0 && (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-              <div className="border-b border-gray-100 px-4 py-3">
-                <h3 className="text-sm font-semibold text-gray-800">Detalhe por Empresa</h3>
-              </div>
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                  <tr>
-                    <th className="px-4 py-2 text-left">CNPJ</th>
-                    <th className="px-4 py-2 text-left">Tipo</th>
-                    <th className="px-4 py-2 text-right">DAS</th>
-                    <th className="px-4 py-2 text-right">GNRE</th>
-                    <th className="px-4 py-2 text-right">ISS</th>
-                    <th className="px-4 py-2 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {batchResultado.resultados.map((r) => (
-                    <tr key={r.empresaId} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-mono text-xs text-gray-600">{r.cnpj}</td>
-                      <td className="px-4 py-2 text-gray-600">{r.tipo}</td>
-                      <td className="px-4 py-2 text-right">{fmt(r.valorDAS)}</td>
-                      <td className="px-4 py-2 text-right">{fmt(r.valorGNRE)}</td>
-                      <td className="px-4 py-2 text-right">{fmt(r.valorISS)}</td>
-                      <td className="px-4 py-2 text-center">
-                        {r.erros.length > 0 ? (
-                          <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                            {r.erros.length} erro(s)
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
-                            OK
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <p className="mt-3 text-xs text-gray-400">
+            O processamento ocorre em background via worker. Acompanhe os resultados na página
+            Fiscal após a conclusão.
+          </p>
         </div>
       )}
     </div>
