@@ -44,7 +44,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run pnpm audit (high+)
-        run: pnpm audit --audit-level=high --ignore-unfixable
+        run: pnpm audit --audit-level=high
 
   env-gitignore-check:
     name: Verify .env is in .gitignore
