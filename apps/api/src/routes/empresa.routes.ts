@@ -35,6 +35,66 @@ export async function empresaRoutes(app: FastifyInstance) {
     return empresa
   })
 
+  // GET /empresas/consultar-cnpj/:cnpj — consulta dados cadastrais na BrasilAPI
+  // Usado para pré-preencher o formulário de cadastro (não persiste nada)
+  app.get('/consultar-cnpj/:cnpj', async (request, reply) => {
+    const { cnpj } = request.params as { cnpj: string }
+    const digits = cnpj.replace(/\D/g, '')
+
+    if (digits.length !== 14 || !validarCNPJ(digits)) {
+      return reply.code(400).send({ error: 'CNPJ inválido' })
+    }
+
+    let res: Response
+    try {
+      res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`, {
+        signal: AbortSignal.timeout(10_000),
+      })
+    } catch {
+      return reply
+        .code(502)
+        .send({ error: 'Falha ao consultar a Receita Federal — tente novamente' })
+    }
+
+    if (res.status === 404) {
+      return reply.code(404).send({ error: 'CNPJ não encontrado na Receita Federal' })
+    }
+    if (!res.ok) {
+      return reply.code(502).send({ error: 'Serviço de consulta indisponível — tente novamente' })
+    }
+
+    const dados = (await res.json()) as {
+      razao_social?: string
+      nome_fantasia?: string
+      cnae_fiscal?: number
+      uf?: string
+      municipio?: string
+      codigo_municipio_ibge?: number
+      data_inicio_atividade?: string
+      opcao_pelo_simples?: boolean | null
+      opcao_pelo_mei?: boolean | null
+      descricao_situacao_cadastral?: string
+    }
+
+    // Sugestão de regime a partir das opções declaradas (contador confirma no formulário)
+    let regimeSugerido: string | null = null
+    if (dados.opcao_pelo_mei) regimeSugerido = 'MEI'
+    else if (dados.opcao_pelo_simples) regimeSugerido = 'SIMPLES_NACIONAL'
+
+    return {
+      cnpj: digits,
+      razaoSocial: dados.razao_social ?? '',
+      nomeFantasia: dados.nome_fantasia ?? '',
+      cnae: dados.cnae_fiscal ? String(dados.cnae_fiscal) : '',
+      uf: dados.uf ?? '',
+      municipio: dados.municipio ?? '',
+      ibge: dados.codigo_municipio_ibge ? String(dados.codigo_municipio_ibge) : '',
+      dataAbertura: dados.data_inicio_atividade ?? '',
+      regimeSugerido,
+      situacaoCadastral: dados.descricao_situacao_cadastral ?? '',
+    }
+  })
+
   app.post('/', async (request, reply) => {
     const { tenantId } = request.user as any
     const data = createEmpresaSchema.parse(request.body)

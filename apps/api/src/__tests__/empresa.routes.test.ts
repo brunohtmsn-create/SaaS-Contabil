@@ -344,6 +344,127 @@ describe('POST /empresas', () => {
 })
 
 // ===========================================================================
+// GET /empresas/consultar-cnpj/:cnpj
+// ===========================================================================
+
+describe('GET /empresas/consultar-cnpj/:cnpj', () => {
+  const brasilApiResposta = {
+    razao_social: 'Empresa Consultada Ltda',
+    nome_fantasia: 'Consultada',
+    cnae_fiscal: 6201500,
+    uf: 'SP',
+    municipio: 'SAO PAULO',
+    codigo_municipio_ibge: 3550308,
+    data_inicio_atividade: '2019-03-20',
+    opcao_pelo_simples: true,
+    opcao_pelo_mei: false,
+    descricao_situacao_cadastral: 'ATIVA',
+  }
+
+  const mockFetch = vi.fn()
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch)
+    mockFetch.mockReset()
+  })
+
+  it('CNPJ válido → 200 com dados mapeados e regime sugerido', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => brasilApiResposta,
+    })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.razaoSocial).toBe('Empresa Consultada Ltda')
+    expect(body.cnae).toBe('6201500')
+    expect(body.ibge).toBe('3550308')
+    expect(body.dataAbertura).toBe('2019-03-20')
+    expect(body.regimeSugerido).toBe('SIMPLES_NACIONAL')
+    expect(body.situacaoCadastral).toBe('ATIVA')
+  })
+
+  it('aceita CNPJ com máscara (pontuação)', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => brasilApiResposta,
+    })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11.222.333%2F0001-81')
+
+    expect(res.statusCode).toBe(200)
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('11222333000181'),
+      expect.any(Object)
+    )
+  })
+
+  it('opcao_pelo_mei=true → regimeSugerido MEI', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ...brasilApiResposta, opcao_pelo_mei: true }),
+    })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.json().regimeSugerido).toBe('MEI')
+  })
+
+  it('sem opção pelo Simples nem MEI → regimeSugerido null', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ...brasilApiResposta,
+        opcao_pelo_simples: false,
+        opcao_pelo_mei: false,
+      }),
+    })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.json().regimeSugerido).toBeNull()
+  })
+
+  it('CNPJ com dígitos verificadores inválidos → 400 sem chamar BrasilAPI', async () => {
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000100')
+
+    expect(res.statusCode).toBe(400)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('BrasilAPI retorna 404 → 404 CNPJ não encontrado', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({}) })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/não encontrado/i)
+  })
+
+  it('BrasilAPI fora do ar (erro de rede) → 502', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('network error'))
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.statusCode).toBe(502)
+  })
+
+  it('BrasilAPI retorna 500 → 502', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.statusCode).toBe(502)
+  })
+})
+
+// ===========================================================================
 // POST /empresas/importar
 // ===========================================================================
 

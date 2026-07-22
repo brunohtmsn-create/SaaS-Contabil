@@ -77,6 +77,40 @@ export default function NovaEmpresaPage() {
     setErros((prev) => ({ ...prev, [field]: '' }))
   }
 
+  const [situacaoCadastral, setSituacaoCadastral] = useState('')
+
+  const consultarCNPJ = useMutation({
+    mutationFn: (cnpj: string) => api.get(`/empresas/consultar-cnpj/${cnpj}`).then((r) => r.data),
+    onSuccess: (dados) => {
+      setForm((prev) => ({
+        ...prev,
+        razaoSocial: dados.razaoSocial || prev.razaoSocial,
+        nomeFantasia: dados.nomeFantasia || prev.nomeFantasia,
+        cnae: dados.cnae || prev.cnae,
+        uf: dados.uf || prev.uf,
+        municipio: dados.municipio || prev.municipio,
+        ibge: dados.ibge || prev.ibge,
+        dataAbertura: dados.dataAbertura || prev.dataAbertura,
+        regime: dados.regimeSugerido ?? prev.regime,
+      }))
+      setSituacaoCadastral(dados.situacaoCadastral ?? '')
+      setErros({})
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error ?? 'Falha ao consultar CNPJ'
+      setErros((prev) => ({ ...prev, cnpj: msg }))
+    },
+  })
+
+  function handleConsultarCNPJ() {
+    const digits = form.cnpj.replace(/\D/g, '')
+    if (digits.length !== 14) {
+      setErros((prev) => ({ ...prev, cnpj: 'Informe os 14 dígitos do CNPJ para consultar' }))
+      return
+    }
+    consultarCNPJ.mutate(digits)
+  }
+
   const formatCNPJ = (v: string) => {
     const d = v.replace(/\D/g, '').slice(0, 14)
     return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
@@ -126,14 +160,31 @@ export default function NovaEmpresaPage() {
         {/* CNPJ */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ *</label>
-          <input
-            type="text"
-            value={form.cnpj}
-            onChange={(e) => setForm((prev) => ({ ...prev, cnpj: formatCNPJ(e.target.value) }))}
-            placeholder="00.000.000/0000-00"
-            className={`w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${erros.cnpj ? 'border-red-400' : 'border-slate-200'}`}
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={form.cnpj}
+              onChange={(e) => setForm((prev) => ({ ...prev, cnpj: formatCNPJ(e.target.value) }))}
+              placeholder="00.000.000/0000-00"
+              className={`flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${erros.cnpj ? 'border-red-400' : 'border-slate-200'}`}
+            />
+            <button
+              type="button"
+              onClick={handleConsultarCNPJ}
+              disabled={consultarCNPJ.isPending}
+              className="px-4 py-2 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              {consultarCNPJ.isPending ? 'Consultando...' : 'Buscar na Receita'}
+            </button>
+          </div>
           {erros.cnpj && <p className="text-xs text-red-600 mt-1">{erros.cnpj}</p>}
+          {situacaoCadastral && (
+            <p
+              className={`text-xs mt-1 font-medium ${situacaoCadastral === 'ATIVA' ? 'text-green-600' : 'text-orange-600'}`}
+            >
+              Situação cadastral na Receita: {situacaoCadastral}
+            </p>
+          )}
         </div>
 
         {/* Razão Social */}
