@@ -16,6 +16,16 @@ const createEmpresaSchema = z.object({
   dataAbertura: z.string(),
 })
 
+// Cache em memória da consulta CNPJ — dados cadastrais mudam raramente;
+// evita rate limit da BrasilAPI durante onboarding em massa
+const CNPJ_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const CNPJ_CACHE_MAX = 5000
+const cnpjCache = new Map<string, { expiraEm: number; dados: unknown }>()
+
+export function limparCacheCNPJ(): void {
+  cnpjCache.clear()
+}
+
 export async function empresaRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
 
@@ -43,6 +53,11 @@ export async function empresaRoutes(app: FastifyInstance) {
 
     if (digits.length !== 14 || !validarCNPJ(digits)) {
       return reply.code(400).send({ error: 'CNPJ inválido' })
+    }
+
+    const emCache = cnpjCache.get(digits)
+    if (emCache && emCache.expiraEm > Date.now()) {
+      return emCache.dados
     }
 
     let res: Response
@@ -81,7 +96,7 @@ export async function empresaRoutes(app: FastifyInstance) {
     if (dados.opcao_pelo_mei) regimeSugerido = 'MEI'
     else if (dados.opcao_pelo_simples) regimeSugerido = 'SIMPLES_NACIONAL'
 
-    return {
+    const resultado = {
       cnpj: digits,
       razaoSocial: dados.razao_social ?? '',
       nomeFantasia: dados.nome_fantasia ?? '',
@@ -93,6 +108,15 @@ export async function empresaRoutes(app: FastifyInstance) {
       regimeSugerido,
       situacaoCadastral: dados.descricao_situacao_cadastral ?? '',
     }
+
+    // Eviction simples: remove a entrada mais antiga quando o cache enche
+    if (cnpjCache.size >= CNPJ_CACHE_MAX) {
+      const maisAntiga = cnpjCache.keys().next().value
+      if (maisAntiga) cnpjCache.delete(maisAntiga)
+    }
+    cnpjCache.set(digits, { expiraEm: Date.now() + CNPJ_CACHE_TTL_MS, dados: resultado })
+
+    return resultado
   })
 
   app.post('/', async (request, reply) => {

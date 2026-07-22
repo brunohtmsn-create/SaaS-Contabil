@@ -52,7 +52,7 @@ vi.mock('@saas-contabil/shared', async (importOriginal) => {
   return { ...actual, nowBR: vi.fn(() => new Date('2025-06-01T12:00:00Z')) }
 })
 
-import { empresaRoutes } from '../routes/empresa.routes.js'
+import { empresaRoutes, limparCacheCNPJ } from '../routes/empresa.routes.js'
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -366,6 +366,7 @@ describe('GET /empresas/consultar-cnpj/:cnpj', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', mockFetch)
     mockFetch.mockReset()
+    limparCacheCNPJ()
   })
 
   it('CNPJ válido → 200 com dados mapeados e regime sugerido', async () => {
@@ -461,6 +462,35 @@ describe('GET /empresas/consultar-cnpj/:cnpj', () => {
     const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
 
     expect(res.statusCode).toBe(502)
+  })
+
+  it('segunda consulta do mesmo CNPJ usa cache (não chama BrasilAPI de novo)', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => brasilApiResposta,
+    })
+
+    const res1 = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+    const res2 = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res1.statusCode).toBe(200)
+    expect(res2.statusCode).toBe(200)
+    expect(res2.json().razaoSocial).toBe('Empresa Consultada Ltda')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('erro da BrasilAPI não entra no cache — próxima consulta tenta de novo', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => brasilApiResposta })
+
+    const res1 = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+    const res2 = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res1.statusCode).toBe(502)
+    expect(res2.statusCode).toBe(200)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
   })
 })
 
