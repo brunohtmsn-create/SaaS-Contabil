@@ -332,6 +332,45 @@ describe('ScraperOrchestrator — healthCheckPrefeituras()', () => {
 })
 
 // ===========================================================================
+// healthCheckPrefeitura() individual + listarPrefeituras()
+// ===========================================================================
+
+describe('ScraperOrchestrator — healthCheckPrefeitura() individual', () => {
+  it('portal disponível → true', async () => {
+    const orch = new ScraperOrchestrator()
+    const result = await orch.healthCheckPrefeitura('3550308')
+
+    expect(result).toBe(true)
+  })
+
+  it('adapter lança erro → false (não propaga)', async () => {
+    mockPref3550308.healthCheck.mockRejectedValueOnce(new Error('Site fora do ar'))
+
+    const orch = new ScraperOrchestrator()
+    const result = await orch.healthCheckPrefeitura('3550308')
+
+    expect(result).toBe(false)
+  })
+
+  it('IBGE sem adapter registrado → lança erro com lista de disponíveis', async () => {
+    const orch = new ScraperOrchestrator()
+
+    await expect(orch.healthCheckPrefeitura('9999999')).rejects.toThrow(/nenhum adapter registrado/)
+  })
+})
+
+describe('ScraperOrchestrator — listarPrefeituras()', () => {
+  it('retorna todos os códigos IBGE registrados', () => {
+    const orch = new ScraperOrchestrator()
+    const lista = orch.listarPrefeituras()
+
+    expect(lista).toHaveLength(31)
+    expect(lista).toContain('3550308')
+    expect(lista).toContain('3304557')
+  })
+})
+
+// ===========================================================================
 // capturarNFe() e capturarNFCe() — métodos individuais
 // ===========================================================================
 

@@ -11,6 +11,7 @@
     "dev": "pnpm -r --parallel run dev",
     "test": "pnpm -r run test",
     "lint": "pnpm -r run lint",
+    "scraper:health-check": "pnpm --filter @saas-contabil/scraper run health-check",
     "db:migrate": "pnpm --filter @saas-contabil/api run db:migrate",
     "db:seed": "pnpm --filter @saas-contabil/api run db:seed",
     "db:studio": "pnpm --filter @saas-contabil/api run db:studio"

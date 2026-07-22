@@ -203,6 +203,30 @@ export class ScraperOrchestrator {
     }
   }
 
+  /** Lista os códigos IBGE com adapter de prefeitura registrado. */
+  listarPrefeituras(): string[] {
+    return [...this.prefeituras.keys()]
+  }
+
+  /**
+   * Executa healthCheck de uma prefeitura específica pelo código IBGE.
+   * Lança erro se o código IBGE não tiver adapter registrado.
+   */
+  async healthCheckPrefeitura(ibge: string): Promise<boolean> {
+    const adapter = this.prefeituras.get(ibge)
+    if (!adapter) {
+      throw new Error(
+        `ScraperOrchestrator: nenhum adapter registrado para IBGE ${ibge}. ` +
+          `Prefeituras disponíveis: ${[...this.prefeituras.keys()].join(', ')}`
+      )
+    }
+    try {
+      return await adapter.healthCheck()
+    } catch {
+      return false
+    }
+  }
+
   /**
    * Executa healthCheck em todos os adapters de prefeitura registrados.
    * Retorna um mapa IBGE → boolean indicando disponibilidade do portal.
