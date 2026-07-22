@@ -1,6 +1,8 @@
 # Memória do Projeto — SaaS Contábil Automatizado
 
-> Atualizado em: 2026-06-03 (sessão 5)
+> Atualizado em: 2026-07-22 (sessão 6)
+>
+> Para o registro cronológico de mudanças por sessão, ver `docs/CHANGELOG.md`.
 
 ---
 
@@ -242,7 +244,7 @@ infra/
 - [x] **Enums:** TipoObrigacao (inclui DASN, FGTS_DIGITAL, DMS, ECD, ECF), TipoApuracao (inclui IRPJ_LP, CSLL_LP, PIS, COFINS, ECD, ECF, IRPJ_LR, CSLL_LR, DCTFWEB), TipoEventoAudit (inclui DASN_GERADA, CALENDARIO_ANUAL_GERADO, DMS_APURADA, IRPJ_CSLL_LP_APURADO, PIS_COFINS_LP_APURADO, ECF_GERADO, IRPJ_CSLL_LR_APURADO)
 - [x] **Prisma Client** regenerado após cada adição de enum
 
-### Testes (Total: ~1.657 testes passando)
+### Testes (Total: ~1.900+ testes passando)
 
 | Pacote                 | Testes | Status |
 | ---------------------- | ------ | ------ |
@@ -256,9 +258,13 @@ infra/
 | packages/fiscal        | 607    | ✅     |
 | packages/portals       | 58     | ✅     |
 | packages/contabil      | 97     | ✅     |
-| packages/scraper       | 44     | ✅     |
+| packages/scraper       | 130    | ✅     |
 | apps/worker            | 93     | ✅     |
-| apps/api               | 380    | ✅     |
+| apps/api               | 600    | ✅     |
+
+> Contagens de `apps/api` (600) e `packages/scraper` (130) verificadas na
+> sessão 6. As demais refletem a última execução registrada e podem ter
+> crescido — rodar `pnpm -r test` para o total exato.
 
 ---
 
@@ -348,22 +354,29 @@ infra/
 
 ## Histórico de Decisões Técnicas
 
-| Data    | Decisão                                          | Motivo                                                                             |
-| ------- | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| 2026-06 | Fastify v4 → v5                                  | CVEs críticos no jwt e multipart                                                   |
-| 2026-06 | Next.js 14.2.5 → 14.2.35                         | Patches de segurança críticos                                                      |
-| 2026-06 | nodemailer v6 → v7                               | CVEs corrigidos                                                                    |
-| 2026-06 | Rate limit global 300 req/min                    | Proteção contra DDoS                                                               |
-| 2026-06 | Rate limit login 10 req/min                      | Proteção contra força bruta                                                        |
-| 2026-06 | `--ignore-unfixable` no CI                       | CVEs do Next.js 14 sem fix (requer v15)                                            |
-| 2026-06 | `Date.UTC()` para vencimentos                    | `date-fns-tz` não disponível no pacote fiscal                                      |
-| 2026-06 | Auto-calendário no cadastro SN/MEI               | UX: evitar passo manual no onboarding                                              |
-| 2026-06 | `Promise.allSettled` no batch                    | Não bloqueia na primeira falha de empresa                                          |
-| 2026-06 | `nowBR` mocked para `2025-06-01` nos testes      | Data fixa para comparações de vencimento                                           |
-| 2026-06 | Calendário LP/LR auto-detecta regime no endpoint | Endpoint único `/calendario/:id/:ano` chama serviço correto                        |
-| 2026-06 | T4 LP pode vencer em fevereiro                   | 31/01 pode cair em fds, deslocando para 02/02 — teste usa `toBeLessThanOrEqual(1)` |
-| 2026-06 | ECDService no pacote contabil (não fiscal)       | Arquitetura: ECD é obrigação contábil; fiscal seria duplicação errada              |
-| 2026-06 | DCTFMensal usa tipo DCTFWEB no banco             | TipoApuracao não tem DCTF_MENSAL; DCTFWEB é o tipo unificado                       |
-| 2026-06 | Código de receita PIS LP=6912, LR=5856           | DCTF Mensal diferencia LP (cumulativo) de LR (não-cumulativo)                      |
-| 2026-06 | SPED Contribuições prazo dia 10 (não dia 15)     | EFD PIS/COFINS tem prazo diferente do SPED Fiscal (dia 15) e DCTF (dia 15)         |
-| 2026-06 | SpedFiscalService usa tipo DESTDA no banco       | TipoApuracao não tem SPED_FISCAL; DESTDA é o tipo mais próximo disponível          |
+| Data    | Decisão                                          | Motivo                                                                                  |
+| ------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| 2026-06 | Fastify v4 → v5                                  | CVEs críticos no jwt e multipart                                                        |
+| 2026-06 | Next.js 14.2.5 → 14.2.35                         | Patches de segurança críticos                                                           |
+| 2026-06 | nodemailer v6 → v7                               | CVEs corrigidos                                                                         |
+| 2026-06 | Rate limit global 300 req/min                    | Proteção contra DDoS                                                                    |
+| 2026-06 | Rate limit login 10 req/min                      | Proteção contra força bruta                                                             |
+| 2026-06 | `--ignore-unfixable` no CI                       | CVEs do Next.js 14 sem fix (requer v15)                                                 |
+| 2026-06 | `Date.UTC()` para vencimentos                    | `date-fns-tz` não disponível no pacote fiscal                                           |
+| 2026-06 | Auto-calendário no cadastro SN/MEI               | UX: evitar passo manual no onboarding                                                   |
+| 2026-06 | `Promise.allSettled` no batch                    | Não bloqueia na primeira falha de empresa                                               |
+| 2026-06 | `nowBR` mocked para `2025-06-01` nos testes      | Data fixa para comparações de vencimento                                                |
+| 2026-06 | Calendário LP/LR auto-detecta regime no endpoint | Endpoint único `/calendario/:id/:ano` chama serviço correto                             |
+| 2026-06 | T4 LP pode vencer em fevereiro                   | 31/01 pode cair em fds, deslocando para 02/02 — teste usa `toBeLessThanOrEqual(1)`      |
+| 2026-06 | ECDService no pacote contabil (não fiscal)       | Arquitetura: ECD é obrigação contábil; fiscal seria duplicação errada                   |
+| 2026-06 | DCTFMensal usa tipo DCTFWEB no banco             | TipoApuracao não tem DCTF_MENSAL; DCTFWEB é o tipo unificado                            |
+| 2026-06 | Código de receita PIS LP=6912, LR=5856           | DCTF Mensal diferencia LP (cumulativo) de LR (não-cumulativo)                           |
+| 2026-06 | SPED Contribuições prazo dia 10 (não dia 15)     | EFD PIS/COFINS tem prazo diferente do SPED Fiscal (dia 15) e DCTF (dia 15)              |
+| 2026-06 | SpedFiscalService usa tipo DESTDA no banco       | TipoApuracao não tem SPED_FISCAL; DESTDA é o tipo mais próximo disponível               |
+| 2026-07 | Removido `--ignore-unfixable` do pnpm audit      | Flag inexistente no pnpm 9; abortava o job antes de qualquer verificação                |
+| 2026-07 | CVE-2026-53571 (vite) em `ignoreCves`            | Bypass restrito ao Windows, dev-only; fix exige vite ≥6.4.3 incompatível com vitest 1.x |
+| 2026-07 | Cast `(db.alerta as any)` nas rotas de alertas   | Tipos Prisma só existem no CI (pós-`generate`); erro não reproduz local                 |
+| 2026-07 | Cache de CNPJ em memória (não Redis)             | Dado cadastral muda raramente; objetivo é só evitar rate limit no onboarding            |
+| 2026-07 | Erros/404 da BrasilAPI não entram no cache       | Evita "grudar" falha transitória; próxima consulta tenta de novo                        |
+| 2026-07 | Parse de CSV no client, validação no servidor    | Feedback imediato de formato + servidor valida cada empresa individualmente             |
+| 2026-07 | Importação em lote com `safeParse` por linha     | Uma linha inválida não pode abortar o lote inteiro no onboarding do piloto              |
