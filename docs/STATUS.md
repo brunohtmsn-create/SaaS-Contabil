@@ -1,18 +1,23 @@
 # Status do Projeto — SaaS Contábil Automatizado
 
-**Última atualização:** 2026-05-22
-**Branch ativa:** `claude/automated-project-system-Kdkzw` → main
+**Última atualização:** 2026-07-22
+**Branch ativa:** `claude/automated-project-system-Kdkzw` → main (PR #86)
 **Repositório:** https://github.com/brunohtmsn-create/SaaS-Contabil
 
 ---
 
 ## Em qual etapa estamos?
 
-**FASE 2 — Contábil completo + e-Social + FGTS Digital — IMPLEMENTADA**
+**FASE 3 — Lucro Presumido e Real — IMPLEMENTADA (código completo)**
 
 - ✅ **Fase 1:** Fiscal + Captura (MVP) — código completo
 - ✅ **Fase 2:** Contábil completo + e-Social + FGTS Digital — código completo
-- ⏳ **Fase 3:** Lucro Presumido e Real — não iniciado
+- ✅ **Fase 3:** Lucro Presumido e Real — código completo
+- ⏳ **Próxima etapa:** homologação com dados reais do escritório piloto
+
+O gap atual não é código: é **operação real** — validar scrapers e portais
+governamentais com certificados de verdade, rodar um fechamento de ponta a
+ponta e fazer o onboarding das ~500 empresas do piloto.
 
 ---
 
@@ -24,7 +29,7 @@
 - ✅ `docker-compose.yml` — PostgreSQL 16 + Redis 7 + MinIO
 - ✅ `.env.example` com todas as variáveis obrigatórias
 - ✅ TypeScript strict em todo o projeto (Node.js 22)
-- ✅ GitHub Actions CI: testes fiscais + typecheck + prettier
+- ✅ GitHub Actions CI: testes por pacote + typecheck + prettier + pnpm audit + secret scan
 
 ### packages/shared
 
@@ -36,7 +41,7 @@
 
 ### packages/database
 
-- ✅ Schema Prisma: 16 modelos, 30+ enums
+- ✅ Schema Prisma: 16+ modelos, 30+ enums
 - ✅ Seed do escritório piloto (Bruno Conde)
 
 ### packages/credentials
@@ -59,7 +64,7 @@
 
 ### packages/scraper
 
-- ✅ `BasePLaywrightAdapter` — Chromium headless, retry exponencial
+- ✅ `BasePlaywrightAdapter` — Chromium headless, retry exponencial
 - ✅ NF-e SEFAZ (SOAP NfeDistribuicaoDFe)
 - ✅ NFC-e SEFAZ
 - ✅ NFSe Portal Nacional (REST)
@@ -79,19 +84,49 @@
 - ✅ Bloqueio em score < 80 (regra absoluta)
 - ✅ Audit trail por conciliação
 
-### packages/fiscal
+### packages/fiscal — 37 serviços
+
+**Simples Nacional:**
 
 - ✅ **PGDASService** — segregação por anexo, Fator R, DAS, Obrigação dia 20
+- ✅ **FatorRService** — folha 12m / RB 12m via LancamentoContabil
+- ✅ **DASNService** — declaração anual (DASN/DEFIS)
+- ✅ **MonitoramentoSNService** — calendário anual, vencimentos, risco exclusão RB>4,2M
+- ✅ **EncerramentoSNService** — encerramento/exclusão do regime
+- ✅ **DeSTDAService** — vencimento dia 28
+
+**Federais (todos os regimes):**
+
+- ✅ **EFDReinfService** — R-2010/R-2020/R-4010/R-4020/R-4080/R-2099/R-4099
+- ✅ **ESocialService** — S-1200/S-1210/S-1299, INSS progressivo
+- ✅ **DCTFWebService** — pré-requisitos EFD-Reinf+eSocial, DAS+INSS+IRRF+CSRF
+- ✅ **FGTSDigitalService** — 8% + GRRF 40%, vencimento dia 20
+- ✅ **RetencoesFonteService**, **INSSPatronalService**, **DCTFMensalService**
+- ✅ **SPEDFiscalService**, **SPEDContribuicoesService**, **LivroFiscalService**
+
+**Lucro Presumido / Real (Fase 3):**
+
+- ✅ **IRPJCSLLLPService** — presunção por atividade, adicional 10%
+- ✅ **IRPJCSLLLRService** + **estimativa mensal** — lucro real anual/trimestral
+- ✅ **LALURService** — Parte A/B, adições e exclusões
+- ✅ **PrejuizosFiscaisLRService** — trava de 30%
+- ✅ **CreditosPisCofinsLRService** — regime não cumulativo
+- ✅ **PisCofinsLPService** — regime cumulativo
+- ✅ **ECFService**, **AjusteAnualLRService**, **DepreciacaoLRService**
+- ✅ **CalendarioLPLRService** — calendário de obrigações LP/LR
+
+**Estaduais/municipais:**
+
 - ✅ **DifalService** — NF-e CONCILIADAS, alíquotas por UF, fundo pobreza
 - ✅ **GNREService** — GNRE por UF
-- ✅ **DeSTDAService** — vencimento dia 28
-- ✅ **EFDReinfService** — R-2010/R-2020/R-4010/R-4020/R-4080/R-2099/R-4099
-- ✅ **ESocialService** — S-1200/S-1210/S-1299, INSS progressivo (tabela 2024)
-- ✅ **DCTFWebService** — pré-requisitos EFD-Reinf+eSocial, DAS+INSS+IRRF+CSRF
-- ✅ **FatorRService** — folha 12m / RB 12m via LancamentoContabil
-- ✅ **FGTSDigitalService** — 8% + GRRF 40%, vencimento dia 20
-- ✅ **MonitoramentoSNService** — calendário anual, vencimentos, risco exclusão RB>4,2M
+- ✅ **ICMSSTService**, **DMSService**
+
+**Inteligência:**
+
+- ✅ **SimuladorTributarioService** — comparação SN × LP × LR
+- ✅ **PlanejamentoTributarioService**, **DiagnosticoFiscalService**
 - ✅ **AlertasVencimentosService** — alertas automáticos deduplicados
+- ✅ **RelatorioFiscalService**
 
 ### packages/contabil
 
@@ -109,72 +144,88 @@
 
 ### packages/portals
 
-- ✅ `PortalOrchestrator`, `EcacPortal`, `SimplesNacionalPortal`
+- ✅ `PortalOrchestrator`, `EcacPortal` (situação fiscal, certidões, sincronização
+  de débitos), `SimplesNacionalPortal`
 
 ---
 
-## apps/api — Rotas implementadas
+## apps/api — Rotas implementadas (16 grupos)
 
-| Prefixo      | Endpoints                                                              |
-| ------------ | ---------------------------------------------------------------------- |
-| /auth        | POST login, POST refresh                                               |
-| /empresas    | GET, POST, GET/:id                                                     |
-| /documentos  | GET (paginado), GET/:id, POST /capturar/:id/:comp                      |
-| /fiscal      | PGDAS, DIFAL, GNRE, DeSTDA, EFD-Reinf, eSocial, DCTFWeb                |
-| /fiscal      | GET /apuracoes (consolidado), POST /pgdas/transmitir, GET /obrigacoes  |
-| /conciliacao | GET /status, POST /run, POST /nfse-tomadas, /nfse-emitidas, /nfce      |
-| /contabil    | lancamentos, depreciacao, ecd, open-finance, transacoes, bens          |
-| /portais     | POST /executar, GET /jobs/:id, GET /status/:id, POST /ecac/sincronizar |
-| /auditoria   | GET /eventos, GET /pendentes, POST /aprovar, GET /verificar-cadeia     |
-| /fechamento  | POST /run/:id/:comp, POST /batch/:comp, GET /status/:id/:comp          |
-| /credenciais | GET (listagem), GET /:id, DELETE /:id                                  |
-| /dashboard   | GET /overview                                                          |
-| /relatorios  | POST /consolidado/:comp                                                |
+| Prefixo        | Endpoints                                                                     |
+| -------------- | ----------------------------------------------------------------------------- |
+| /auth          | POST login, POST refresh                                                      |
+| /empresas      | GET, POST, GET/:id, PATCH/:id, DELETE/:id, GET/:id/alertas                    |
+| /empresas      | **POST /importar** (lote até 1000), **GET /consultar-cnpj/:cnpj** (BrasilAPI) |
+| /documentos    | GET (paginado), GET/:id, POST /capturar/:id/:comp, upload em lote             |
+| /fiscal        | PGDAS, DIFAL, GNRE, DeSTDA, EFD-Reinf, eSocial, DCTFWeb, LP/LR                |
+| /conciliacao   | GET /status, POST /run, POST /nfse-tomadas, /nfse-emitidas, /nfce             |
+| /contabil      | lancamentos, depreciacao, ecd, open-finance, transacoes, bens                 |
+| /portais       | POST /executar, GET /jobs/:id, GET /status/:id, POST /ecac/sincronizar        |
+| /auditoria     | GET /eventos, GET /pendentes, POST /aprovar, GET /verificar-cadeia            |
+| /fechamento    | POST /run/:id/:comp, POST /batch/:comp, GET /status/:id/:comp                 |
+| /credenciais   | GET (listagem), GET /:id, DELETE /:id                                         |
+| /dashboard     | GET /overview                                                                 |
+| /relatorios    | POST /consolidado/:comp                                                       |
+| /configuracoes | configurações ISS por município                                               |
+| /filas         | GET (status), GET /:nome/falhas, POST retry                                   |
+| /alertas       | GET, POST, PATCH /ler-todos, PATCH /:id/ler, DELETE /:id, GET /resumo         |
+| /ws            | WebSocket para atualização em tempo real                                      |
 
 ---
 
-## apps/worker — BullMQ Jobs (6 filas)
+## apps/worker — BullMQ Jobs (7 filas)
 
 | Fila          | Job                  | Fases                                 |
 | ------------- | -------------------- | ------------------------------------- |
-| fechamento    | fechamentoCompleto   | 10 fases do fluxo mensal completo     |
+| fechamento    | fechamentoCompleto   | Fluxo mensal completo                 |
 | scraper       | scraperJob           | NFE/NFCE/NFSE/TODOS + normalização    |
 | fiscal        | fiscalJob            | PGDAS/DIFAL/GNRE/DeSTDA isolados      |
 | portal        | portalJob            | e-CAC/SEFAZ/SN via Playwright         |
 | monitoramento | monitoramentoDiario  | Cron 07h BRT                          |
+| bancario      | bancarioJob          | Conciliação bancária Open Finance     |
 | relatorio     | gerarRelatorioMensal | CSV → S3 → URL assinada → notificação |
 
 ---
 
-## apps/dashboard — Páginas implementadas
+## apps/dashboard — Páginas implementadas (17 telas)
 
-| Rota           | Descrição                                                    |
-| -------------- | ------------------------------------------------------------ |
-| /dashboard     | KPIs + alertas + vencimentos + timeline                      |
-| /empresas      | Lista com busca                                              |
-| /empresas/[id] | 4 tabs: documentos, fiscal, fechamento (11 fases), auditoria |
-| /documentos    | NF-e/NFC-e/NFS-e com filtros tipo/status/busca               |
-| /fiscal        | Apurações e obrigações fiscais                               |
-| /obrigacoes    | Calendário mensal                                            |
-| /conciliacao   | Status por empresa + barra de progresso                      |
-| /contabil      | Lançamentos + bens do ativo imobilizado                      |
-| /portais       | Status operacional + ações (capturar, e-CAC, transmitir)     |
-| /auditoria     | Trilha + aprovação humana                                    |
-| /relatorios    | PGDAS consolidado + KPIs + exportar CSV                      |
-| /credenciais   | Certificados digitais + alerta vencimento 30d                |
+| Rota               | Descrição                                                    |
+| ------------------ | ------------------------------------------------------------ |
+| /dashboard         | KPIs + alertas + vencimentos + timeline                      |
+| /empresas          | Lista com busca, filtros por regime, stats                   |
+| /empresas/nova     | Cadastro com **busca automática na Receita (BrasilAPI)**     |
+| /empresas/importar | **Importação em lote via CSV** com preview e relatório       |
+| /empresas/[id]     | Tabs: documentos, fiscal, fechamento, credenciais, auditoria |
+| /documentos        | NF-e/NFC-e/NFS-e com filtros tipo/status/busca               |
+| /fiscal            | Apurações, obrigações e fechamento em lote                   |
+| /obrigacoes        | Calendário mensal                                            |
+| /conciliacao       | Status por empresa + barra de progresso                      |
+| /contabil          | Lançamentos + bens do ativo imobilizado                      |
+| /portais           | Status operacional + ações (capturar, e-CAC, transmitir)     |
+| /auditoria         | Trilha + aprovação humana                                    |
+| /relatorios        | PGDAS consolidado + KPIs + exportar CSV                      |
+| /credenciais       | Certificados digitais + alerta vencimento 30d                |
+| /compliance        | Visão de conformidade                                        |
+| /fgts              | FGTS Digital                                                 |
+| /notificacoes      | Central de notificações                                      |
+| /configuracoes     | Configurações do escritório                                  |
+| /admin/filas       | Monitoramento de filas BullMQ + retry de jobs falhos         |
 
 ---
 
 ## Testes
 
-| Pacote                                  | Testes  |
-| --------------------------------------- | ------- |
-| @saas-contabil/fiscal — pgdas.test.ts   | 57      |
-| @saas-contabil/fiscal — difal.test.ts   | 35      |
-| @saas-contabil/fiscal — fator-r.test.ts | 22      |
-| @saas-contabil/fiscal — esocial.test.ts | 28      |
-| @saas-contabil/fiscal — dctfweb.test.ts | 25      |
-| **Total**                               | **167** |
+**94 arquivos de teste · ~2.300 casos** distribuídos por todos os pacotes:
+
+| Área              | Arquivos |
+| ----------------- | -------- |
+| packages/fiscal   | 38       |
+| apps/api          | 18       |
+| apps/worker       | 7        |
+| packages/portals  | 5        |
+| packages/scraper  | 5        |
+| packages/contabil | 5        |
+| demais pacotes    | 16       |
 
 ---
 
@@ -199,23 +250,18 @@
 
 ## Próximos Passos
 
-### Testes (em andamento)
+### Homologação (prioridade)
 
-- [ ] Testes para packages/conciliation (score engine)
-- [ ] Testes para packages/audit (hash chain)
-- [ ] Testes para packages/shared (parsePeriodo, sha256, Decimal)
-- [ ] Testes para packages/normalizer
+- [ ] Deploy de ambiente de homologação (Postgres + Redis + MinIO/S3)
+- [ ] Validar scrapers contra portais reais com certificado A1 de teste
+- [ ] Onboarding piloto: importar subconjunto das ~500 empresas via CSV
+- [ ] Rodar fechamento de competência de ponta a ponta com dados reais
+- [ ] Homologar e-CAC/SEFAZ (procurações eletrônicas)
 
-### Fase 3 (Lucro Presumido e Real)
-
-- [ ] Novos regimes: LUCRO_PRESUMIDO, LUCRO_REAL nos schemas
-- [ ] Apuração IRPJ/CSLL Presumido e Real
-- [ ] Balanço patrimonial e DRE
-- [ ] SPED Contábil (ECD) para LP/LR
-
-### Melhorias
+### Melhorias técnicas
 
 - [ ] Prisma migrations com down scripts
-- [ ] Rate limiting por tenant na API
+- [ ] Rate limiting por tenant na API (hoje é global por IP)
 - [ ] Integração real 2Captcha/AntiCaptcha
-- [ ] WebSocket para atualização em tempo real do fechamento
+- [ ] Cache da consulta CNPJ (BrasilAPI) para evitar rate limit
+- [ ] Novos adaptadores de prefeitura conforme demanda do piloto
