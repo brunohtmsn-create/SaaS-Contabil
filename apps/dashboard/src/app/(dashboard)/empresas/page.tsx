@@ -76,12 +76,20 @@ export default function EmpresasPage() {
           <h1 className="text-2xl font-bold text-slate-900">Empresas</h1>
           <p className="text-slate-500 text-sm mt-1">Carteira de clientes do escritório</p>
         </div>
-        <Link
-          href="/empresas/nova"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm"
-        >
-          + Nova Empresa
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/empresas/importar"
+            className="border border-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors text-sm"
+          >
+            Importar CSV
+          </Link>
+          <Link
+            href="/empresas/nova"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm"
+          >
+            + Nova Empresa
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
