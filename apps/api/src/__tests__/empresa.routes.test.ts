@@ -344,6 +344,156 @@ describe('POST /empresas', () => {
 })
 
 // ===========================================================================
+// POST /empresas/importar
+// ===========================================================================
+
+describe('POST /empresas/importar', () => {
+  // CNPJs válidos distintos
+  const empresa1 = {
+    cnpj: '11222333000181',
+    razaoSocial: 'Empresa Um Ltda',
+    regime: 'SIMPLES_NACIONAL',
+    cnae: '6201500',
+    uf: 'SP',
+    municipio: 'São Paulo',
+    ibge: '3550308',
+    dataAbertura: '2022-01-01',
+  }
+  const empresa2 = {
+    cnpj: '11444777000161',
+    razaoSocial: 'Empresa Dois Ltda',
+    regime: 'LUCRO_PRESUMIDO',
+    cnae: '4711302',
+    uf: 'RJ',
+    municipio: 'Rio de Janeiro',
+    ibge: '3304557',
+    dataAbertura: '2021-05-10',
+  }
+
+  it('importa lote válido → 201 com contagens corretas', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([]) // nenhum CNPJ existente
+    mockDb.empresaCliente.create
+      .mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+      .mockResolvedValueOnce({ id: 'emp-i2', cnpj: empresa2.cnpj })
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1, empresa2] })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json()
+    expect(body.total).toBe(2)
+    expect(body.importadas).toBe(2)
+    expect(body.rejeitadas).toBe(0)
+    expect(body.criadas).toHaveLength(2)
+  })
+
+  it('linha inválida não bloqueia as demais', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-ok', cnpj: empresa1.cnpj })
+
+    const invalida = { ...empresa2, cnpj: '123' } // CNPJ inválido
+    const res = await req('POST', '/empresas/importar', { empresas: [invalida, empresa1] })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json()
+    expect(body.importadas).toBe(1)
+    expect(body.rejeitadas).toBe(1)
+    expect(body.erros[0].linha).toBe(1)
+    expect(body.erros[0].motivo).toMatch(/cnpj/i)
+  })
+
+  it('CNPJ já cadastrado no tenant → rejeitado com motivo', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([{ cnpj: empresa1.cnpj }])
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1] })
+
+    const body = res.json()
+    expect(body.importadas).toBe(0)
+    expect(body.erros[0].motivo).toMatch(/já cadastrado/i)
+    expect(mockDb.empresaCliente.create).not.toHaveBeenCalled()
+  })
+
+  it('CNPJ duplicado dentro do próprio arquivo → segunda ocorrência rejeitada', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1, empresa1] })
+
+    const body = res.json()
+    expect(body.importadas).toBe(1)
+    expect(body.rejeitadas).toBe(1)
+    expect(body.erros[0].motivo).toMatch(/duplicado no arquivo/i)
+  })
+
+  it('cria empresas com tenantId do JWT', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+
+    await req('POST', '/empresas/importar', { empresas: [empresa1] })
+
+    const { data } = mockDb.empresaCliente.create.mock.calls[0][0]
+    expect(data.tenantId).toBe(TENANT_ID)
+  })
+
+  it('consulta CNPJs existentes com tenantId (isolamento)', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+
+    await req('POST', '/empresas/importar', { empresas: [empresa1] })
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
+
+  it('SN → gera calendário SN; LP → gera calendário LP/LR', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create
+      .mockResolvedValueOnce({ id: 'emp-sn', cnpj: empresa1.cnpj })
+      .mockResolvedValueOnce({ id: 'emp-lp', cnpj: empresa2.cnpj })
+
+    await req('POST', '/empresas/importar', { empresas: [empresa1, empresa2] })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-sn', 2025)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-lp', 2025)
+  })
+
+  it('falha no calendário não bloqueia importação', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+    mockMonitoramento.gerarCalendarioAnual.mockRejectedValueOnce(new Error('DB error'))
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1] })
+
+    expect(res.json().importadas).toBe(1)
+  })
+
+  it('erro do banco em uma linha → registrado nos erros, demais continuam', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create
+      .mockRejectedValueOnce(new Error('constraint violation'))
+      .mockResolvedValueOnce({ id: 'emp-i2', cnpj: empresa2.cnpj })
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1, empresa2] })
+
+    const body = res.json()
+    expect(body.importadas).toBe(1)
+    expect(body.rejeitadas).toBe(1)
+    expect(body.erros[0].motivo).toMatch(/constraint violation/)
+  })
+
+  it('lista vazia → 400', async () => {
+    const res = await req('POST', '/empresas/importar', { empresas: [] })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('mais de 1000 empresas → 400', async () => {
+    const res = await req('POST', '/empresas/importar', {
+      empresas: Array.from({ length: 1001 }, () => empresa1),
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
 // PATCH /empresas/:id
 // ===========================================================================
 
