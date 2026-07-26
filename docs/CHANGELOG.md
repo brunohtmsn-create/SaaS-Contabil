@@ -9,6 +9,21 @@ O formato segue, de modo simplificado, o [Keep a Changelog](https://keepachangel
 
 ---
 
+## 2026-07-26 — CI: audit resiliente a falha de registry
+
+### Corrigido
+
+- **CI "pnpm audit — high severity"** — o `pnpm audit` passou a crashar com
+  `Unexpected token '' ... is not valid JSON`: o registry devolveu a
+  resposta em gzip e o pnpm 9.15.9 tentou `JSON.parse` sem descomprimir (bug
+  de tooling, não vulnerabilidade). O passo agora distingue os casos:
+  - **CVE high/critical encontrada** → bloqueia o pipeline (`::error::`)
+  - **Erro de rede/registry** (JSON inválido, timeout, reset) → retry até 3×
+    e, se persistir, segue com `::warning::` em vez de derrubar o build por
+    falha de infraestrutura
+
+---
+
 ## 2026-07-22 — Onboarding do piloto + estabilização de CI
 
 Foco: destravar o pipeline de CI e construir o fluxo de **cadastro/onboarding

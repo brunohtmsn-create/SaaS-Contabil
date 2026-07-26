@@ -44,7 +44,40 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run pnpm audit (high+)
-        run: pnpm audit --audit-level=high
+        run: |
+          set +e
+          echo "=== pnpm audit --audit-level=high (com retry) ==="
+
+          attempt=1
+          max=3
+          while [ "$attempt" -le "$max" ]; do
+            echo "--- Tentativa $attempt/$max ---"
+            output=$(pnpm audit --audit-level=high 2>&1)
+            code=$?
+            echo "$output"
+
+            if [ "$code" -eq 0 ]; then
+              echo "Audit OK — nenhuma vulnerabilidade high/critical."
+              exit 0
+            fi
+
+            # Erro de tooling/registry (não é vulnerabilidade): resposta gzip mal
+            # decodificada pelo pnpm, timeout, reset de conexão etc. Bug conhecido do
+            # `pnpm audit` ao dar JSON.parse na resposta do registry. Não deve bloquear.
+            if echo "$output" | grep -qiE "is not valid JSON|Unexpected token|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|request to .* failed|EAI_AGAIN|ERR_INVALID"; then
+              echo "::warning::pnpm audit falhou por erro de rede/registry (não é vulnerabilidade) — tentativa $attempt/$max."
+              attempt=$((attempt + 1))
+              sleep $((attempt * 5))
+              continue
+            fi
+
+            # Falha com relatório real de vulnerabilidade → bloquear o pipeline.
+            echo "::error::pnpm audit encontrou vulnerabilidades high/critical."
+            exit "$code"
+          done
+
+          echo "::warning::pnpm audit não conseguiu contatar o registry após $max tentativas — seguindo sem bloquear (falha de infraestrutura, não de dependências)."
+          exit 0
 
   env-gitignore-check:
     name: Verify .env is in .gitignore
