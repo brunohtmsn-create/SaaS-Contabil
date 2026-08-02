@@ -265,3 +265,7 @@ ponta e fazer o onboarding das ~500 empresas do piloto.
 - [ ] Integração real 2Captcha/AntiCaptcha
 - [ ] Cache da consulta CNPJ (BrasilAPI) para evitar rate limit
 - [ ] Novos adaptadores de prefeitura conforme demanda do piloto
+- [ ] **Segurança (bloqueante p/ produção):** resolver via upgrade as CVEs
+      transitivas ignoradas no `audit` — `next` (SSRF App Router, prioridade),
+      `axios`, `fastify` (`fast-uri`/`find-my-way`), `postcss`, `sharp`, `tar`.
+      Ver lista em `pnpm.auditConfig.ignoreCves`/`ignoreGhsas` e no CHANGELOG.

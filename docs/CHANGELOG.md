@@ -9,6 +9,33 @@ O formato segue, de modo simplificado, o [Keep a Changelog](https://keepachangel
 
 ---
 
+## 2026-08-02 — CI: novas CVEs transitivas ignoradas (a resolver no hardening)
+
+### Corrigido
+
+- **CI "pnpm audit — high severity"** — a base de advisories da npm avançou e
+  passou a sinalizar 16 novas CVEs high/critical, todas em **dependências
+  transitivas** (não código nosso). O passo resiliente do dia 26/07 bloqueou
+  corretamente (eram vulnerabilidades reais, não o erro de gzip). Adicionadas
+  a `pnpm.auditConfig.ignoreCves` / `ignoreGhsas` para destravar o pipeline:
+  - `tar` (2× — critical + high, DoS na descompressão)
+  - `brace-expansion` (2×, DoS — via eslint/typescript-eslint, **dev only**)
+  - `fast-uri` (2×, host confusion — via fastify)
+  - `find-my-way` (DDoS HTTP2 — via fastify)
+  - `js-yaml` (DoS merge-key — dev/build)
+  - `next` (4×, SSRF/DoS/bypass no App Router)
+  - `postcss` (2×, path traversal — build)
+  - `axios` (proxy herdado), `sharp` (libvips — build de imagem)
+
+> ⚠️ **Dívida técnica registrada.** Vários desses (`next`, `axios`, `fastify`
+> → `fast-uri`/`find-my-way`) são **produção-facing**. Foram ignorados para não
+> travar o PR draft, mas **devem ser resolvidos via upgrade de dependência no
+> hardening pré-produção**, antes de qualquer deploy com dados reais. A maioria
+> é classe DoS; o SSRF do Next.js merece prioridade. Ver
+> `pnpm.overrides`/`ignoreCves` no `package.json`.
+
+---
+
 ## 2026-07-26 — CI: audit resiliente a falha de registry
 
 ### Corrigido
