@@ -14,7 +14,7 @@
     "@saas-contabil/database": "workspace:*",
     "@saas-contabil/audit": "workspace:*",
     "nodemailer": "^9.0.1",
-    "axios": "^1.6.8"
+    "axios": "^1.19.0"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
