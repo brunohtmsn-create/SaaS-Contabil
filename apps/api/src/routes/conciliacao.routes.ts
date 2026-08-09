@@ -5,7 +5,10 @@ import { AuditService } from '@saas-contabil/audit'
 import { getPrismaClient } from '@saas-contabil/database'
 import { parsePeriodo } from '@saas-contabil/shared'
 
-const params = z.object({ empresaId: z.string().uuid(), competencia: z.string().regex(/^\d{4}-\d{2}$/) })
+const params = z.object({
+  empresaId: z.string().uuid(),
+  competencia: z.string().regex(/^\d{4}-\d{2}$/),
+})
 
 export async function conciliacaoRoutes(app: FastifyInstance) {
   const db = getPrismaClient()
@@ -40,7 +43,7 @@ export async function conciliacaoRoutes(app: FastifyInstance) {
           pendentes: total - conciliados - pendentesRevisao,
           pendentesRevisao,
         }
-      }),
+      })
     )
 
     return resultado

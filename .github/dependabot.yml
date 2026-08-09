@@ -1,5 +1,8 @@
 version: 2
 
+# Regra global: ignorar bumps de versão major em todos os ecossistemas.
+# Atualizações major têm breaking changes e precisam de migração manual.
+
 updates:
   # Root workspace dependencies
   - package-ecosystem: npm
@@ -14,6 +17,9 @@ updates:
       - dependencies
     commit-message:
       prefix: 'chore(deps)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       typescript-ecosystem:
         patterns:
@@ -41,6 +47,9 @@ updates:
       - 'pkg:shared'
     commit-message:
       prefix: 'chore(deps/shared)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/database
   - package-ecosystem: npm
@@ -56,6 +65,9 @@ updates:
       - 'pkg:database'
     commit-message:
       prefix: 'chore(deps/database)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/credentials
   - package-ecosystem: npm
@@ -71,6 +83,9 @@ updates:
       - 'pkg:credentials'
     commit-message:
       prefix: 'chore(deps/credentials)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/audit
   - package-ecosystem: npm
@@ -86,6 +101,9 @@ updates:
       - 'pkg:audit'
     commit-message:
       prefix: 'chore(deps/audit)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/storage
   - package-ecosystem: npm
@@ -101,6 +119,9 @@ updates:
       - 'pkg:storage'
     commit-message:
       prefix: 'chore(deps/storage)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/scraper
   - package-ecosystem: npm
@@ -116,6 +137,9 @@ updates:
       - 'pkg:scraper'
     commit-message:
       prefix: 'chore(deps/scraper)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/normalizer
   - package-ecosystem: npm
@@ -131,6 +155,9 @@ updates:
       - 'pkg:normalizer'
     commit-message:
       prefix: 'chore(deps/normalizer)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/conciliation
   - package-ecosystem: npm
@@ -146,6 +173,9 @@ updates:
       - 'pkg:conciliation'
     commit-message:
       prefix: 'chore(deps/conciliation)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/fiscal
   - package-ecosystem: npm
@@ -161,6 +191,9 @@ updates:
       - 'pkg:fiscal'
     commit-message:
       prefix: 'chore(deps/fiscal)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/contabil
   - package-ecosystem: npm
@@ -176,6 +209,9 @@ updates:
       - 'pkg:contabil'
     commit-message:
       prefix: 'chore(deps/contabil)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/portals
   - package-ecosystem: npm
@@ -191,6 +227,9 @@ updates:
       - 'pkg:portals'
     commit-message:
       prefix: 'chore(deps/portals)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # packages/notifications
   - package-ecosystem: npm
@@ -206,6 +245,9 @@ updates:
       - 'pkg:notifications'
     commit-message:
       prefix: 'chore(deps/notifications)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # apps/api
   - package-ecosystem: npm
@@ -221,6 +263,9 @@ updates:
       - 'app:api'
     commit-message:
       prefix: 'chore(deps/api)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # apps/dashboard
   - package-ecosystem: npm
@@ -236,6 +281,9 @@ updates:
       - 'app:dashboard'
     commit-message:
       prefix: 'chore(deps/dashboard)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # apps/worker
   - package-ecosystem: npm
@@ -251,6 +299,9 @@ updates:
       - 'app:worker'
     commit-message:
       prefix: 'chore(deps/worker)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # GitHub Actions themselves
   - package-ecosystem: github-actions
@@ -266,3 +317,6 @@ updates:
       - 'ci'
     commit-message:
       prefix: 'chore(ci)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

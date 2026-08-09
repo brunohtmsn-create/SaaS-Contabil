@@ -25,15 +25,39 @@ export class ConciliationService {
   private nfseTomadaReconciler = new NFSeTomadaReconciler()
   private nfseEmitidaReconciler = new NFSeEmitidaReconciler()
 
-  async conciliarNFSeTomadas(tenantId: string, empresaId: string, competencia: string): Promise<ResultadoConciliacao[]> {
-    return this.conciliarNFSe('NFSE_TOMADA', this.nfseTomadaReconciler, tenantId, empresaId, competencia)
+  async conciliarNFSeTomadas(
+    tenantId: string,
+    empresaId: string,
+    competencia: string
+  ): Promise<ResultadoConciliacao[]> {
+    return this.conciliarNFSe(
+      'NFSE_TOMADA',
+      this.nfseTomadaReconciler,
+      tenantId,
+      empresaId,
+      competencia
+    )
   }
 
-  async conciliarNFSeEmitidas(tenantId: string, empresaId: string, competencia: string): Promise<ResultadoConciliacao[]> {
-    return this.conciliarNFSe('NFSE_EMITIDA', this.nfseEmitidaReconciler, tenantId, empresaId, competencia)
+  async conciliarNFSeEmitidas(
+    tenantId: string,
+    empresaId: string,
+    competencia: string
+  ): Promise<ResultadoConciliacao[]> {
+    return this.conciliarNFSe(
+      'NFSE_EMITIDA',
+      this.nfseEmitidaReconciler,
+      tenantId,
+      empresaId,
+      competencia
+    )
   }
 
-  async conciliarNFCe(tenantId: string, empresaId: string, competencia: string): Promise<ResultadoConciliacao[]> {
+  async conciliarNFCe(
+    tenantId: string,
+    empresaId: string,
+    competencia: string
+  ): Promise<ResultadoConciliacao[]> {
     const { inicio, fim } = parsePeriodo(competencia)
 
     const docs = await this.db.documentoFiscal.findMany({
@@ -87,7 +111,7 @@ export class ConciliationService {
     })
 
     const resultados: ResultadoConciliacao[] = []
-    const alertas: Array<{ doc: typeof docs[0]; resultado: ResultadoConciliacao }> = []
+    const alertas: Array<{ doc: (typeof docs)[0]; resultado: ResultadoConciliacao }> = []
 
     for (const doc of docs) {
       const resultado = await reconciler.reconciliar(doc, tenantId)

@@ -1,7 +1,6 @@
-import { getPrismaClient } from '@saas-contabil/database'
+import { getPrismaClient, type Alerta } from '@saas-contabil/database'
 import { AuditService } from '@saas-contabil/audit'
 import { nowBR, addDays } from '@saas-contabil/shared'
-import type { Alerta } from '@prisma/client'
 
 export class AlertasVencimentosService {
   private db = getPrismaClient()

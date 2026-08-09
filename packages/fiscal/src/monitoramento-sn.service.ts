@@ -1,4 +1,4 @@
-import { getPrismaClient } from '@saas-contabil/database'
+import { getPrismaClient, type Obrigacao } from '@saas-contabil/database'
 import { AuditService } from '@saas-contabil/audit'
 import {
   Decimal,
@@ -8,7 +8,6 @@ import {
   addDays,
 } from '@saas-contabil/shared'
 import { getDay, getDaysInMonth } from 'date-fns'
-import type { Obrigacao } from '@prisma/client'
 
 // Dias de vencimento das obrigações Simples Nacional (CLAUDE.md)
 const VENCIMENTOS: Record<string, number> = {

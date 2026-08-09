@@ -51,6 +51,8 @@ export default function CredenciaisPage() {
     refetchInterval: 30000,
   })
 
+  const [erro, setErro] = useState<string | null>(null)
+
   const { data: empresas = [] } = useQuery<{ id: string; razaoSocial: string; cnpj: string }[]>({
     queryKey: ['empresas-lista'],
     queryFn: () => api.get('/empresas').then((r) => r.data),
@@ -59,6 +61,46 @@ export default function CredenciaisPage() {
   const revogar = useMutation({
     mutationFn: (id: string) => api.delete(`/credenciais/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['credenciais'] }),
+  })
+
+  const isCertificado = nova.tipo === 'CERTIFICADO_A1' || nova.tipo === 'CERTIFICADO_A3'
+
+  const salvar = useMutation({
+    mutationFn: async () => {
+      const empresa = empresas.find((e) => e.id === nova.empresaId)
+      if (!empresa) throw new Error('Selecione uma empresa')
+      if (isCertificado && !nova.arquivo) throw new Error('Selecione o arquivo .pfx do certificado')
+      if (!isCertificado && !nova.senha) throw new Error('Informe a senha')
+
+      if (isCertificado) {
+        const form = new FormData()
+        form.append('empresaId', nova.empresaId)
+        form.append('cnpj', empresa.cnpj)
+        form.append('tipo', nova.tipo)
+        if (nova.validade) form.append('validade', nova.validade)
+        form.append('escopos', JSON.stringify([]))
+        form.append('arquivo', nova.arquivo!)
+        return api.post('/credenciais', form, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+      }
+
+      return api.post('/credenciais', {
+        empresaId: nova.empresaId,
+        cnpj: empresa.cnpj,
+        tipo: nova.tipo,
+        senha: nova.senha,
+        validade: nova.validade || undefined,
+        escopos: [],
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['credenciais'] })
+      setShowForm(false)
+      setErro(null)
+      setNova({ empresaId: '', tipo: 'CERTIFICADO_A1', senha: '', validade: '', arquivo: null })
+    },
+    onError: (e: any) => setErro(e.response?.data?.error ?? e.message ?? 'Erro ao salvar'),
   })
 
   const vencendoCount = credenciais.filter((c) => {
@@ -72,7 +114,9 @@ export default function CredenciaisPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Credenciais</h1>
-          <p className="text-slate-500 text-sm mt-1">Certificados digitais, procurações e senhas — AES-256-GCM</p>
+          <p className="text-slate-500 text-sm mt-1">
+            Certificados digitais, procurações e senhas — AES-256-GCM
+          </p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -102,7 +146,9 @@ export default function CredenciaisPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
-              tab === t ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700'
+              tab === t
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             {t === 'todas' ? 'Todas as credenciais' : `Vencendo em breve (${vencendoCount})`}
@@ -123,7 +169,9 @@ export default function CredenciaisPage() {
               >
                 <option value="">Selecionar...</option>
                 {empresas.map((e) => (
-                  <option key={e.id} value={e.id}>{e.razaoSocial} ({e.cnpj})</option>
+                  <option key={e.id} value={e.id}>
+                    {e.razaoSocial} ({e.cnpj})
+                  </option>
                 ))}
               </select>
             </div>
@@ -141,16 +189,33 @@ export default function CredenciaisPage() {
                 <option value="SENHA_SIMPLES">Senha Simples Nacional</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Senha / PIN</label>
-              <input
-                type="password"
-                value={nova.senha}
-                onChange={(e) => setNova((n) => ({ ...n, senha: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="Será criptografada com AES-256-GCM"
-              />
-            </div>
+            {isCertificado ? (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Arquivo .pfx
+                </label>
+                <input
+                  type="file"
+                  accept=".pfx,.p12"
+                  onChange={(e) => setNova((n) => ({ ...n, arquivo: e.target.files?.[0] ?? null }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Criptografado com AES-256-GCM no servidor
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Senha / PIN</label>
+                <input
+                  type="password"
+                  value={nova.senha}
+                  onChange={(e) => setNova((n) => ({ ...n, senha: e.target.value }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Será criptografada com AES-256-GCM"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">Validade</label>
               <input
@@ -161,16 +226,24 @@ export default function CredenciaisPage() {
               />
             </div>
           </div>
+          {erro && <p className="text-xs text-red-600 mt-3 font-medium">{erro}</p>}
           <div className="flex gap-2 mt-4">
             <button
-              onClick={() => setShowForm(false)}
+              onClick={() => salvar.mutate()}
+              disabled={salvar.isPending}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {salvar.isPending ? 'Salvando...' : 'Salvar Credencial'}
+            </button>
+            <button
+              onClick={() => {
+                setShowForm(false)
+                setErro(null)
+              }}
               className="border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-50"
             >
               Cancelar
             </button>
-            <p className="text-xs text-slate-400 self-center ml-2">
-              ⚠️ Upload de certificados deve ser feito via API segura — use a CLI ou integração direta.
-            </p>
           </div>
         </div>
       )}
@@ -179,18 +252,26 @@ export default function CredenciaisPage() {
         {isLoading ? (
           <div className="p-12 text-center text-slate-400">Carregando credenciais...</div>
         ) : credenciais.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            Nenhuma credencial cadastrada.
-          </div>
+          <div className="p-12 text-center text-slate-400">Nenhuma credencial cadastrada.</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Empresa</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Validade</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Cadastrado em</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Tipo
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Empresa
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Validade
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Cadastrado em
+                </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -199,29 +280,41 @@ export default function CredenciaisPage() {
                 const diasParaVencer = cred.validade
                   ? Math.ceil((new Date(cred.validade).getTime() - Date.now()) / 86400000)
                   : null
-                const vencendo = diasParaVencer !== null && diasParaVencer <= 30 && diasParaVencer >= 0
+                const vencendo =
+                  diasParaVencer !== null && diasParaVencer <= 30 && diasParaVencer >= 0
 
                 return (
-                  <tr key={cred.id} className={`hover:bg-slate-50 ${vencendo ? 'bg-orange-50' : ''}`}>
+                  <tr
+                    key={cred.id}
+                    className={`hover:bg-slate-50 ${vencendo ? 'bg-orange-50' : ''}`}
+                  >
                     <td className="px-4 py-3">
                       <span className="flex items-center gap-2 text-sm">
                         <span>{TIPO_ICONS[cred.tipo] ?? '🔒'}</span>
-                        <span className="font-medium text-slate-700">{cred.tipo.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-slate-700">
+                          {cred.tipo.replace(/_/g, ' ')}
+                        </span>
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       {cred.empresa ? (
                         <>
-                          <p className="font-medium text-slate-900 text-xs">{cred.empresa.razaoSocial}</p>
+                          <p className="font-medium text-slate-900 text-xs">
+                            {cred.empresa.razaoSocial}
+                          </p>
                           <p className="font-mono text-xs text-slate-400">{cred.empresa.cnpj}</p>
                         </>
                       ) : (
-                        <span className="text-slate-400 text-xs font-mono">{cred.empresaId.slice(0, 8)}...</span>
+                        <span className="text-slate-400 text-xs font-mono">
+                          {cred.empresaId.slice(0, 8)}...
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs">
                       {cred.validade ? (
-                        <span className={vencendo ? 'text-orange-600 font-semibold' : 'text-slate-500'}>
+                        <span
+                          className={vencendo ? 'text-orange-600 font-semibold' : 'text-slate-500'}
+                        >
                           {new Date(cred.validade).toLocaleDateString('pt-BR')}
                           {vencendo && ` (${diasParaVencer}d)`}
                         </span>
@@ -230,7 +323,9 @@ export default function CredenciaisPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COR[cred.status] ?? 'bg-slate-100 text-slate-500'}`}>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COR[cred.status] ?? 'bg-slate-100 text-slate-500'}`}
+                      >
                         {cred.status}
                       </span>
                     </td>
@@ -260,8 +355,8 @@ export default function CredenciaisPage() {
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
         <p className="text-xs text-slate-500 font-medium">🔒 Segurança das credenciais</p>
         <p className="text-xs text-slate-400 mt-1">
-          Todas as credenciais são criptografadas com AES-256-GCM usando chave derivada por tenant (PBKDF2/HKDF).
-          As chaves nunca são logadas, serializadas ou transmitidas sem criptografia.
+          Todas as credenciais são criptografadas com AES-256-GCM usando chave derivada por tenant
+          (PBKDF2/HKDF). As chaves nunca são logadas, serializadas ou transmitidas sem criptografia.
           Certificados A1 são zerados da memória após uso.
         </p>
       </div>

@@ -15,16 +15,30 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { Decimal } from '../utils/decimal.js'
+import {
+  Decimal,
+  toDecimal,
+  decimalSum,
+  decimalMin,
+  decimalMax,
+  isZero,
+  formatBRL,
+} from '../utils/decimal.js'
 import {
   parsePeriodo,
   formatCompetencia,
   nowBR,
   addDays,
+  addMeses,
+  subMeses,
+  competencias12Meses,
   differenceInCalendarDays,
+  formatDate,
+  competenciaToDate,
 } from '../utils/date.js'
 import { sha256 } from '../utils/crypto.js'
 import { MAPA_CFOP_CONTA } from '../constants/cfop.js'
+import { validarCNPJ, formatarCNPJ, limparCNPJ, limparCPF } from '../utils/cnpj.js'
 
 // ---------------------------------------------------------------------------
 // parsePeriodo
@@ -38,14 +52,14 @@ describe('parsePeriodo()', () => {
 
     // date-fns startOfMonth/endOfMonth trabalham com o valor local da data
     expect(inicio.getFullYear()).toBe(2024)
-    expect(inicio.getMonth()).toBe(2)   // 0-indexed → março
+    expect(inicio.getMonth()).toBe(2) // 0-indexed → março
     expect(inicio.getDate()).toBe(1)
     expect(inicio.getHours()).toBe(0)
     expect(inicio.getMinutes()).toBe(0)
     expect(inicio.getSeconds()).toBe(0)
 
     expect(fim.getFullYear()).toBe(2024)
-    expect(fim.getMonth()).toBe(2)      // 0-indexed → março
+    expect(fim.getMonth()).toBe(2) // 0-indexed → março
     expect(fim.getDate()).toBe(31)
     expect(fim.getHours()).toBe(23)
     expect(fim.getMinutes()).toBe(59)
@@ -55,7 +69,7 @@ describe('parsePeriodo()', () => {
   it("fim de fevereiro em ano bissexto: '2024-02' termina no dia 29", () => {
     const { fim } = parsePeriodo('2024-02')
     expect(fim.getDate()).toBe(29)
-    expect(fim.getMonth()).toBe(1)      // 0-indexed → fevereiro
+    expect(fim.getMonth()).toBe(1) // 0-indexed → fevereiro
   })
 
   it("fim de fevereiro em ano não bissexto: '2023-02' termina no dia 28", () => {
@@ -65,7 +79,7 @@ describe('parsePeriodo()', () => {
 
   it("'2024-12': início dia 1, fim dia 31 de dezembro", () => {
     const { inicio, fim } = parsePeriodo('2024-12')
-    expect(inicio.getMonth()).toBe(11)  // 0-indexed → dezembro
+    expect(inicio.getMonth()).toBe(11) // 0-indexed → dezembro
     expect(inicio.getDate()).toBe(1)
     expect(fim.getMonth()).toBe(11)
     expect(fim.getDate()).toBe(31)
@@ -170,11 +184,9 @@ describe('nowBR()', () => {
     const before = Date.now()
     const d = nowBR()
     const after = Date.now()
-    // nowBR() = fromZonedTime(new Date(), 'America/Sao_Paulo')
-    // o timestamp em ms será deslocado do UTC pelo offset de Sao Paulo (-3h ou -2h)
-    // mas deve permanecer dentro de um intervalo razoável em relação ao now
-    expect(d.getTime()).toBeGreaterThan(before - 5 * 60 * 60 * 1000)
-    expect(d.getTime()).toBeLessThan(after  + 5 * 60 * 60 * 1000)
+    // nowBR() = new Date() — instante UTC correto para armazenamento em Prisma DateTime
+    expect(d.getTime()).toBeGreaterThanOrEqual(before)
+    expect(d.getTime()).toBeLessThanOrEqual(after)
   })
 })
 
@@ -263,7 +275,7 @@ describe('addDays()', () => {
     const base = new Date('2024-03-01T12:00:00.000Z')
     const result = addDays(base, 7)
     expect(result.getUTCFullYear()).toBe(2024)
-    expect(result.getUTCMonth()).toBe(2)    // 0-indexed → março
+    expect(result.getUTCMonth()).toBe(2) // 0-indexed → março
     expect(result.getUTCDate()).toBe(8)
   })
 
@@ -276,7 +288,7 @@ describe('addDays()', () => {
   it('adicionar dias atravessa meses corretamente (31 mar + 1 = 1 abr)', () => {
     const base = new Date('2024-03-31T12:00:00.000Z')
     const result = addDays(base, 1)
-    expect(result.getUTCMonth()).toBe(3)    // 0-indexed → abril
+    expect(result.getUTCMonth()).toBe(3) // 0-indexed → abril
     expect(result.getUTCDate()).toBe(1)
   })
 
@@ -311,7 +323,324 @@ describe('differenceInCalendarDays()', () => {
 
   it('diferença entre 2024-01-01 e 2024-12-31 = 365 (ano bissexto)', () => {
     const start = new Date('2024-01-01T12:00:00.000Z')
-    const end   = new Date('2024-12-31T12:00:00.000Z')
+    const end = new Date('2024-12-31T12:00:00.000Z')
     expect(differenceInCalendarDays(end, start)).toBe(365)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// addMeses
+// ---------------------------------------------------------------------------
+
+describe('addMeses()', () => {
+  it('adiciona 1 mês corretamente', () => {
+    const base = new Date(2025, 0, 15) // jan 2025
+    const result = addMeses(base, 1)
+    expect(result.getMonth()).toBe(1) // fev
+    expect(result.getFullYear()).toBe(2025)
+  })
+
+  it('adiciona meses cruzando ano', () => {
+    const base = new Date(2025, 11, 15) // dez 2025
+    const result = addMeses(base, 1)
+    expect(result.getMonth()).toBe(0) // jan
+    expect(result.getFullYear()).toBe(2026)
+  })
+
+  it('adiciona 12 meses = mesmo mês do ano seguinte', () => {
+    const base = new Date(2025, 4, 1) // mai 2025
+    const result = addMeses(base, 12)
+    expect(result.getMonth()).toBe(4)
+    expect(result.getFullYear()).toBe(2026)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// competencias12Meses
+// ---------------------------------------------------------------------------
+
+describe('competencias12Meses()', () => {
+  it('retorna 12 competências', () => {
+    const result = competencias12Meses('2025-05')
+    expect(result).toHaveLength(12)
+  })
+
+  it('todas as entradas têm formato YYYY-MM', () => {
+    const result = competencias12Meses('2025-12')
+    result.forEach((c) => {
+      expect(c).toMatch(/^\d{4}-\d{2}$/)
+    })
+  })
+
+  it('resultado tem 12 entradas ordenadas crescentemente', () => {
+    const result = competencias12Meses('2025-06')
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i]! > result[i - 1]!).toBe(true)
+    }
+  })
+
+  it('intervalo entre primeiro e último é de 11 meses', () => {
+    const result = competencias12Meses('2025-06')
+    const first = result[0]!
+    const last = result[11]!
+    const [fy, fm] = first.split('-').map(Number) as [number, number]
+    const [ly, lm] = last.split('-').map(Number) as [number, number]
+    const diffMonths = (ly - fy) * 12 + (lm - fm)
+    expect(diffMonths).toBe(11)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// validarCNPJ
+// ---------------------------------------------------------------------------
+
+describe('validarCNPJ()', () => {
+  it('CNPJ válido formatado retorna true', () => {
+    expect(validarCNPJ('11.222.333/0001-81')).toBe(true)
+  })
+
+  it('CNPJ válido sem formatação retorna true', () => {
+    expect(validarCNPJ('11222333000181')).toBe(true)
+  })
+
+  it('CNPJ com dígitos verificadores errados retorna false', () => {
+    expect(validarCNPJ('11222333000100')).toBe(false)
+  })
+
+  it('CNPJ com todos dígitos iguais retorna false', () => {
+    expect(validarCNPJ('11111111111111')).toBe(false)
+    expect(validarCNPJ('00000000000000')).toBe(false)
+  })
+
+  it('CNPJ com menos de 14 dígitos retorna false', () => {
+    expect(validarCNPJ('1122233300018')).toBe(false)
+  })
+
+  it('string vazia retorna false', () => {
+    expect(validarCNPJ('')).toBe(false)
+  })
+
+  it('outro CNPJ válido conhecido', () => {
+    // 00.000.000/0001-91 é válido (Banco do Brasil)
+    expect(validarCNPJ('00000000000191')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatarCNPJ
+// ---------------------------------------------------------------------------
+
+describe('formatarCNPJ()', () => {
+  it('formata 14 dígitos no padrão XX.XXX.XXX/XXXX-XX', () => {
+    expect(formatarCNPJ('11222333000181')).toBe('11.222.333/0001-81')
+  })
+
+  it('aceita CNPJ já formatado como entrada', () => {
+    expect(formatarCNPJ('11.222.333/0001-81')).toBe('11.222.333/0001-81')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// limparCNPJ
+// ---------------------------------------------------------------------------
+
+describe('limparCNPJ()', () => {
+  it('remove pontuação e retorna apenas dígitos', () => {
+    expect(limparCNPJ('11.222.333/0001-81')).toBe('11222333000181')
+  })
+
+  it('CNPJ sem pontuação permanece igual', () => {
+    expect(limparCNPJ('11222333000181')).toBe('11222333000181')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// limparCPF
+// ---------------------------------------------------------------------------
+
+describe('limparCPF()', () => {
+  it('remove pontuação e retorna apenas dígitos', () => {
+    expect(limparCPF('123.456.789-09')).toBe('12345678909')
+  })
+
+  it('CPF sem pontuação permanece igual', () => {
+    expect(limparCPF('12345678909')).toBe('12345678909')
+  })
+
+  it('remove todos os caracteres não numéricos', () => {
+    expect(limparCPF('xxx123yyy456zzz789ab09')).toBe('12345678909')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatDate
+// ---------------------------------------------------------------------------
+
+describe('formatDate()', () => {
+  it('formato padrão yyyy-MM-dd', () => {
+    const date = new Date('2025-05-15T12:00:00.000Z')
+    expect(formatDate(date)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('formato personalizado dd/MM/yyyy', () => {
+    const date = new Date('2025-01-20T12:00:00.000Z')
+    expect(formatDate(date, 'dd/MM/yyyy')).toMatch(/^\d{2}\/\d{2}\/\d{4}$/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// competenciaToDate
+// ---------------------------------------------------------------------------
+
+describe('competenciaToDate()', () => {
+  it("'2025-05' retorna Date com ano 2025 e mês 5 (maio)", () => {
+    const d = competenciaToDate('2025-05')
+    expect(d.getUTCFullYear()).toBe(2025)
+    expect(d.getUTCMonth() + 1).toBe(5)
+    expect(d.getUTCDate()).toBe(1)
+  })
+
+  it("'2024-12' retorna o primeiro dia de dezembro de 2024", () => {
+    const d = competenciaToDate('2024-12')
+    expect(d.getUTCMonth() + 1).toBe(12)
+    expect(d.getUTCDate()).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// subMeses
+// ---------------------------------------------------------------------------
+
+describe('subMeses()', () => {
+  it('subtrai 1 mês corretamente', () => {
+    const result = subMeses(new Date('2025-05-01'), 1)
+    expect(result.getUTCMonth() + 1).toBe(4) // abril
+    expect(result.getUTCFullYear()).toBe(2025)
+  })
+
+  it('subtrai meses cruzando ano', () => {
+    const result = subMeses(new Date('2025-01-01'), 1)
+    expect(result.getUTCMonth() + 1).toBe(12) // dezembro
+    expect(result.getUTCFullYear()).toBe(2024)
+  })
+
+  it('subtrai 12 meses = mesmo mês do ano anterior', () => {
+    const result = subMeses(new Date('2025-05-01'), 12)
+    expect(result.getUTCMonth() + 1).toBe(5)
+    expect(result.getUTCFullYear()).toBe(2024)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// toDecimal
+// ---------------------------------------------------------------------------
+
+describe('toDecimal()', () => {
+  it('null → retorna 0', () => {
+    expect(toDecimal(null).toFixed(2)).toBe('0.00')
+  })
+
+  it('undefined → retorna 0', () => {
+    expect(toDecimal(undefined).toFixed(2)).toBe('0.00')
+  })
+
+  it('string numérica → converte corretamente', () => {
+    expect(toDecimal('1234.56').toFixed(2)).toBe('1234.56')
+  })
+
+  it('number → converte corretamente', () => {
+    expect(toDecimal(42.5).toFixed(2)).toBe('42.50')
+  })
+
+  it('Decimal existente → passa sem transformação', () => {
+    const d = new Decimal('999.99')
+    expect(toDecimal(d).toFixed(2)).toBe('999.99')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// decimalSum
+// ---------------------------------------------------------------------------
+
+describe('decimalSum()', () => {
+  it('soma valores positivos', () => {
+    expect(decimalSum(new Decimal('100'), new Decimal('200')).toFixed(2)).toBe('300.00')
+  })
+
+  it('null e undefined são tratados como 0', () => {
+    expect(decimalSum(new Decimal('100'), null, undefined).toFixed(2)).toBe('100.00')
+  })
+
+  it('sem argumentos → retorna 0', () => {
+    expect(decimalSum().toFixed(2)).toBe('0.00')
+  })
+
+  it('soma frações sem erro de ponto flutuante', () => {
+    const result = decimalSum(new Decimal('0.1'), new Decimal('0.2'))
+    expect(result.toFixed(1)).toBe('0.3')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// decimalMin / decimalMax
+// ---------------------------------------------------------------------------
+
+describe('decimalMin()', () => {
+  it('retorna o menor dos dois valores', () => {
+    expect(decimalMin(new Decimal('100'), new Decimal('200')).toFixed(2)).toBe('100.00')
+  })
+
+  it('retorna o primeiro quando iguais', () => {
+    expect(decimalMin(new Decimal('50'), new Decimal('50')).toFixed(2)).toBe('50.00')
+  })
+})
+
+describe('decimalMax()', () => {
+  it('retorna o maior dos dois valores', () => {
+    expect(decimalMax(new Decimal('100'), new Decimal('200')).toFixed(2)).toBe('200.00')
+  })
+
+  it('retorna o primeiro quando iguais', () => {
+    expect(decimalMax(new Decimal('75'), new Decimal('75')).toFixed(2)).toBe('75.00')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isZero
+// ---------------------------------------------------------------------------
+
+describe('isZero()', () => {
+  it('retorna true para valor zero', () => {
+    expect(isZero(new Decimal('0'))).toBe(true)
+  })
+
+  it('retorna false para valor positivo', () => {
+    expect(isZero(new Decimal('0.01'))).toBe(false)
+  })
+
+  it('retorna false para valor negativo', () => {
+    expect(isZero(new Decimal('-0.01'))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatBRL
+// ---------------------------------------------------------------------------
+
+describe('formatBRL()', () => {
+  it('formata valor inteiro com dois decimais', () => {
+    expect(formatBRL(new Decimal('1000'))).toBe('1.000,00')
+  })
+
+  it('formata valor com centavos', () => {
+    expect(formatBRL(new Decimal('1234.56'))).toBe('1.234,56')
+  })
+
+  it('formata valor abaixo de 1000 sem separador de milhar', () => {
+    expect(formatBRL(new Decimal('999.99'))).toBe('999,99')
+  })
+
+  it('formata valor acima de 1 milhão com dois separadores', () => {
+    expect(formatBRL(new Decimal('1234567.89'))).toBe('1.234.567,89')
   })
 })

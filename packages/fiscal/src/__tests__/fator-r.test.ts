@@ -5,13 +5,8 @@
  *  - Fórmula: Fator R = folha_12m / receita_bruta_12m × 100
  *  - Threshold: Fator R ≥ 28% → Anexo III; < 28% → Anexo V
  *  - Edge cases: receita = 0, folha = 0, exatamente no limite
- *  - Valores representativos: folha R$280k / RB R$1M = 28% → Anexo III
- *                              folha R$270k / RB R$1M = 27% → Anexo V
- *
- * O PrismaClient é mockado via singleton. O FatorRService depende de DB
- * apenas para buscar a receita bruta dos 12 meses; a folha de pagamento
- * está com valor fixo 0 na implementação atual (campo futuro). Os testes
- * exercitam a fórmula e a lógica de decisão via mock e lógica pura.
+ *  - Alíquotas efetivas por faixa de RBT12 (Anexo III e V)
+ *  - Recomendação de planejamento tributário
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -21,7 +16,17 @@ import { Decimal } from 'decimal.js'
 // Singleton de mock do DB — sempre retorna o mesmo objeto
 // ---------------------------------------------------------------------------
 
+const mockEmpresa = {
+  id: 'emp-1',
+  cnpj: '12345678000195',
+  razaoSocial: 'Empresa Teste Ltda',
+  regime: 'SIMPLES_NACIONAL',
+}
+
 const mockDb = {
+  empresaCliente: {
+    findFirst: vi.fn().mockResolvedValue(mockEmpresa),
+  },
   documentoFiscal: {
     aggregate: vi.fn(),
   },
@@ -42,19 +47,20 @@ import { FatorRService } from '../fator-r.service.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockDb.empresaCliente.findFirst.mockResolvedValue(mockEmpresa)
   mockDb.documentoFiscal.aggregate.mockResolvedValue({ _sum: { valorTotal: null } })
   mockDb.lancamentoContabil.findMany.mockResolvedValue([])
 })
 
 // ---------------------------------------------------------------------------
 // Helper: calcula o Fator R de forma pura (sem DB)
-// Replica a fórmula implementada em fator-r.service.ts
 // ---------------------------------------------------------------------------
 
-function calcularFatorRPuro(folha12m: Decimal, receitaBruta12m: Decimal): { fatorR: Decimal; anexo: 'III' | 'V' } {
-  const fatorR = receitaBruta12m.gt(0)
-    ? folha12m.div(receitaBruta12m).times(100)
-    : new Decimal(0)
+function calcularFatorRPuro(
+  folha12m: Decimal,
+  receitaBruta12m: Decimal
+): { fatorR: Decimal; anexo: 'III' | 'V' } {
+  const fatorR = receitaBruta12m.gt(0) ? folha12m.div(receitaBruta12m).times(100) : new Decimal(0)
   const anexo: 'III' | 'V' = fatorR.gte(28) ? 'III' : 'V'
   return { fatorR, anexo }
 }
@@ -132,7 +138,6 @@ describe('FatorR — fórmula pura (folha / receita_bruta × 100)', () => {
     const folha = new Decimal('123456.78')
     const rb = new Decimal('500000')
     const { fatorR, anexo } = calcularFatorRPuro(folha, rb)
-    // 123456.78 / 500000 * 100 = 24.69156
     expect(fatorR.toDecimalPlaces(2).toFixed(2)).toBe('24.69')
     expect(anexo).toBe('V')
   })
@@ -147,12 +152,11 @@ describe('FatorRService — calcular() com mock do DB', () => {
     mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
       _sum: { valorTotal: '1000000' },
     })
-    // lancamentoContabil.findMany retorna [] por padrão no beforeEach
 
     const service = new FatorRService()
     const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
 
-    expect(resultado.fatorR.toFixed(2)).toBe('0.00')
+    expect(resultado.fatorR).toBe('0.00')
     expect(resultado.anexo).toBe('V')
   })
 
@@ -167,7 +171,7 @@ describe('FatorRService — calcular() com mock do DB', () => {
     const service = new FatorRService()
     const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
 
-    expect(resultado.fatorR.toFixed(2)).toBe('28.00')
+    expect(resultado.fatorR).toBe('28.00')
     expect(resultado.anexo).toBe('III')
   })
 
@@ -179,8 +183,71 @@ describe('FatorRService — calcular() com mock do DB', () => {
     const service = new FatorRService()
     const resultado = await service.calcular('tenant-1', 'emp-2', '2025-01')
 
-    expect(resultado.fatorR.toFixed(2)).toBe('0.00')
+    expect(resultado.fatorR).toBe('0.00')
     expect(resultado.anexo).toBe('V')
+  })
+
+  it('calcular() retorna cnpj e razaoSocial da empresa', async () => {
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
+      _sum: { valorTotal: '500000' },
+    })
+
+    const service = new FatorRService()
+    const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
+
+    expect(resultado.cnpj).toBe('12345678000195')
+    expect(resultado.razaoSocial).toBe('Empresa Teste Ltda')
+  })
+
+  it('calcular() retorna folha12meses e receita12meses como strings', async () => {
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
+      _sum: { valorTotal: '1000000' },
+    })
+    mockDb.lancamentoContabil.findMany.mockResolvedValueOnce([
+      { partidas: [{ conta: '6.1.1', valor: '280000', tipo: 'DEBITO' }] },
+    ])
+
+    const service = new FatorRService()
+    const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
+
+    expect(resultado.receita12meses).toBe('1000000.00')
+    expect(resultado.folha12meses).toBe('280000.00')
+  })
+
+  it('calcular() retorna aliquotaAnexoIII e aliquotaAnexoV não-zero para RBT12 > 0', async () => {
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
+      _sum: { valorTotal: '500000' },
+    })
+
+    const service = new FatorRService()
+    const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
+
+    expect(parseFloat(resultado.aliquotaAnexoIII)).toBeGreaterThan(0)
+    expect(parseFloat(resultado.aliquotaAnexoV)).toBeGreaterThan(0)
+    // Anexo III sempre menor ou igual ao Anexo V
+    expect(parseFloat(resultado.aliquotaAnexoIII)).toBeLessThanOrEqual(
+      parseFloat(resultado.aliquotaAnexoV)
+    )
+  })
+
+  it('calcular() retorna recomendacao não vazia', async () => {
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
+      _sum: { valorTotal: '500000' },
+    })
+
+    const service = new FatorRService()
+    const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
+
+    expect(resultado.recomendacao.length).toBeGreaterThan(10)
+  })
+
+  it('empresa não encontrada → lança erro', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const service = new FatorRService()
+    await expect(service.calcular('tenant-1', 'emp-inexistente', '2025-01')).rejects.toThrow(
+      'Empresa não encontrada'
+    )
   })
 
   it('calcular() chama aggregate uma vez e agrega valorTotal', async () => {
@@ -241,16 +308,15 @@ describe('FatorRService — calcular() com mock do DB', () => {
 
 describe('FatorR — casos de negócio', () => {
   it('Empresa de serviços com folha alta migra para Anexo III (tributação menor)', () => {
-    // Simula escritório com folha de pessoal representativa
-    const folha = new Decimal(300000)   // R$300k/ano de folha
-    const rb = new Decimal(1000000)     // R$1M de receita
+    const folha = new Decimal(300000)
+    const rb = new Decimal(1000000)
     const { fatorR, anexo } = calcularFatorRPuro(folha, rb)
     expect(fatorR.gte(28)).toBe(true)
     expect(anexo).toBe('III')
   })
 
   it('Empresa de serviços com folha baixa fica no Anexo V (tributação maior)', () => {
-    const folha = new Decimal(200000)   // R$200k/ano = 20%
+    const folha = new Decimal(200000)
     const rb = new Decimal(1000000)
     const { fatorR, anexo } = calcularFatorRPuro(folha, rb)
     expect(fatorR.lt(28)).toBe(true)
@@ -258,7 +324,6 @@ describe('FatorR — casos de negócio', () => {
   })
 
   it('Fator R é calculado sobre janela de 12 meses de receita bruta', async () => {
-    // Documenta que o aggregate cobre o intervalo de datas dos 12 meses anteriores.
     mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({
       _sum: { valorTotal: '1200000' },
     })
@@ -267,16 +332,39 @@ describe('FatorR — casos de negócio', () => {
     await service.calcular('tenant-1', 'emp-6', '2025-01')
 
     const callArgs = mockDb.documentoFiscal.aggregate.mock.calls[0][0]
-    // Verifica que há filtro de dataCompetencia com gte (início) e lte (fim)
     expect(callArgs.where.dataCompetencia).toBeDefined()
     expect(callArgs.where.dataCompetencia.gte).toBeInstanceOf(Date)
     expect(callArgs.where.dataCompetencia.lte).toBeInstanceOf(Date)
-    // Janela: 12 meses → diferença de ~365 dias
     const diasDiferenca = Math.floor(
-      (callArgs.where.dataCompetencia.lte.getTime() - callArgs.where.dataCompetencia.gte.getTime())
-      / (1000 * 60 * 60 * 24)
+      (callArgs.where.dataCompetencia.lte.getTime() -
+        callArgs.where.dataCompetencia.gte.getTime()) /
+        (1000 * 60 * 60 * 24)
     )
     expect(diasDiferenca).toBeGreaterThan(300)
     expect(diasDiferenca).toBeLessThan(400)
+  })
+
+  it('Anexo III alíquota menor que Anexo V nas faixas de menor receita (até R$3M)', async () => {
+    // Nas primeiras 5 faixas de RBT12, o Anexo III é menos oneroso que o V
+    for (const receita of ['120000', '300000', '600000', '1500000', '3000000']) {
+      mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({ _sum: { valorTotal: receita } })
+      const service = new FatorRService()
+      const r = await service.calcular('tenant-1', 'emp-1', '2025-01')
+      expect(parseFloat(r.aliquotaAnexoIII)).toBeLessThanOrEqual(parseFloat(r.aliquotaAnexoV))
+    }
+  })
+
+  it('razaoSocial ausente na empresa → resultado.razaoSocial = "" (operador ??)', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: 'emp-1',
+      cnpj: '12345678000195',
+      // razaoSocial propositalmente ausente
+    })
+    mockDb.documentoFiscal.aggregate.mockResolvedValueOnce({ _sum: { valorTotal: '500000' } })
+
+    const service = new FatorRService()
+    const resultado = await service.calcular('tenant-1', 'emp-1', '2025-01')
+
+    expect(resultado.razaoSocial).toBe('')
   })
 })

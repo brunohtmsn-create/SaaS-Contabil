@@ -13,8 +13,33 @@ const REGIMES = [
 ]
 
 const UFS = [
-  'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT',
-  'PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO',
+  'AC',
+  'AL',
+  'AM',
+  'AP',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MG',
+  'MS',
+  'MT',
+  'PA',
+  'PB',
+  'PE',
+  'PI',
+  'PR',
+  'RJ',
+  'RN',
+  'RO',
+  'RR',
+  'RS',
+  'SC',
+  'SE',
+  'SP',
+  'TO',
 ]
 
 export default function NovaEmpresaPage() {
@@ -33,10 +58,13 @@ export default function NovaEmpresaPage() {
   const [erros, setErros] = useState<Record<string, string>>({})
 
   const criar = useMutation({
-    mutationFn: (data: typeof form) => api.post('/empresas', {
-      ...data,
-      cnpj: data.cnpj.replace(/\D/g, ''),
-    }).then((r) => r.data),
+    mutationFn: (data: typeof form) =>
+      api
+        .post('/empresas', {
+          ...data,
+          cnpj: data.cnpj.replace(/\D/g, ''),
+        })
+        .then((r) => r.data),
     onSuccess: (empresa) => router.push(`/empresas/${empresa.id}`),
     onError: (err: any) => {
       const msg = err?.response?.data?.error ?? 'Erro ao cadastrar empresa'
@@ -47,6 +75,40 @@ export default function NovaEmpresaPage() {
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }))
     setErros((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const [situacaoCadastral, setSituacaoCadastral] = useState('')
+
+  const consultarCNPJ = useMutation({
+    mutationFn: (cnpj: string) => api.get(`/empresas/consultar-cnpj/${cnpj}`).then((r) => r.data),
+    onSuccess: (dados) => {
+      setForm((prev) => ({
+        ...prev,
+        razaoSocial: dados.razaoSocial || prev.razaoSocial,
+        nomeFantasia: dados.nomeFantasia || prev.nomeFantasia,
+        cnae: dados.cnae || prev.cnae,
+        uf: dados.uf || prev.uf,
+        municipio: dados.municipio || prev.municipio,
+        ibge: dados.ibge || prev.ibge,
+        dataAbertura: dados.dataAbertura || prev.dataAbertura,
+        regime: dados.regimeSugerido ?? prev.regime,
+      }))
+      setSituacaoCadastral(dados.situacaoCadastral ?? '')
+      setErros({})
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error ?? 'Falha ao consultar CNPJ'
+      setErros((prev) => ({ ...prev, cnpj: msg }))
+    },
+  })
+
+  function handleConsultarCNPJ() {
+    const digits = form.cnpj.replace(/\D/g, '')
+    if (digits.length !== 14) {
+      setErros((prev) => ({ ...prev, cnpj: 'Informe os 14 dígitos do CNPJ para consultar' }))
+      return
+    }
+    consultarCNPJ.mutate(digits)
   }
 
   const formatCNPJ = (v: string) => {
@@ -61,7 +123,8 @@ export default function NovaEmpresaPage() {
     if (!form.razaoSocial.trim()) novosErros.razaoSocial = 'Razão social é obrigatória'
     if (!form.cnae.trim()) novosErros.cnae = 'CNAE é obrigatório'
     if (!form.municipio.trim()) novosErros.municipio = 'Município é obrigatório'
-    if (form.ibge.replace(/\D/g, '').length !== 7) novosErros.ibge = 'Código IBGE deve ter 7 dígitos'
+    if (form.ibge.replace(/\D/g, '').length !== 7)
+      novosErros.ibge = 'Código IBGE deve ter 7 dígitos'
     if (!form.dataAbertura) novosErros.dataAbertura = 'Data de abertura é obrigatória'
     setErros(novosErros)
     return Object.keys(novosErros).length === 0
@@ -75,13 +138,19 @@ export default function NovaEmpresaPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 text-sm">
+        <button
+          onClick={() => router.back()}
+          className="text-slate-400 hover:text-slate-600 text-sm"
+        >
           ← Voltar
         </button>
         <h1 className="text-2xl font-bold text-slate-900">Nova Empresa</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-xl border border-slate-200 p-6 space-y-5"
+      >
         {erros.geral && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
             {erros.geral}
@@ -91,14 +160,31 @@ export default function NovaEmpresaPage() {
         {/* CNPJ */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ *</label>
-          <input
-            type="text"
-            value={form.cnpj}
-            onChange={(e) => setForm((prev) => ({ ...prev, cnpj: formatCNPJ(e.target.value) }))}
-            placeholder="00.000.000/0000-00"
-            className={`w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${erros.cnpj ? 'border-red-400' : 'border-slate-200'}`}
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={form.cnpj}
+              onChange={(e) => setForm((prev) => ({ ...prev, cnpj: formatCNPJ(e.target.value) }))}
+              placeholder="00.000.000/0000-00"
+              className={`flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${erros.cnpj ? 'border-red-400' : 'border-slate-200'}`}
+            />
+            <button
+              type="button"
+              onClick={handleConsultarCNPJ}
+              disabled={consultarCNPJ.isPending}
+              className="px-4 py-2 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              {consultarCNPJ.isPending ? 'Consultando...' : 'Buscar na Receita'}
+            </button>
+          </div>
           {erros.cnpj && <p className="text-xs text-red-600 mt-1">{erros.cnpj}</p>}
+          {situacaoCadastral && (
+            <p
+              className={`text-xs mt-1 font-medium ${situacaoCadastral === 'ATIVA' ? 'text-green-600' : 'text-orange-600'}`}
+            >
+              Situação cadastral na Receita: {situacaoCadastral}
+            </p>
+          )}
         </div>
 
         {/* Razão Social */}
@@ -126,14 +212,18 @@ export default function NovaEmpresaPage() {
 
         {/* Regime Tributário */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Regime Tributário *</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Regime Tributário *
+          </label>
           <select
             value={form.regime}
             onChange={set('regime')}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {REGIMES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
             ))}
           </select>
         </div>
@@ -141,7 +231,9 @@ export default function NovaEmpresaPage() {
         {/* CNAE + Data Abertura */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">CNAE Principal *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              CNAE Principal *
+            </label>
             <input
               type="text"
               value={form.cnae}
@@ -152,14 +244,18 @@ export default function NovaEmpresaPage() {
             {erros.cnae && <p className="text-xs text-red-600 mt-1">{erros.cnae}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Data de Abertura *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Data de Abertura *
+            </label>
             <input
               type="date"
               value={form.dataAbertura}
               onChange={set('dataAbertura')}
               className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${erros.dataAbertura ? 'border-red-400' : 'border-slate-200'}`}
             />
-            {erros.dataAbertura && <p className="text-xs text-red-600 mt-1">{erros.dataAbertura}</p>}
+            {erros.dataAbertura && (
+              <p className="text-xs text-red-600 mt-1">{erros.dataAbertura}</p>
+            )}
           </div>
         </div>
 
@@ -172,7 +268,11 @@ export default function NovaEmpresaPage() {
               onChange={set('uf')}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+              {UFS.map((uf) => (
+                <option key={uf} value={uf}>
+                  {uf}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -190,7 +290,12 @@ export default function NovaEmpresaPage() {
             <input
               type="text"
               value={form.ibge}
-              onChange={(e) => setForm((prev) => ({ ...prev, ibge: e.target.value.replace(/\D/g, '').slice(0, 7) }))}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  ibge: e.target.value.replace(/\D/g, '').slice(0, 7),
+                }))
+              }
               placeholder="0000000"
               className={`w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${erros.ibge ? 'border-red-400' : 'border-slate-200'}`}
             />

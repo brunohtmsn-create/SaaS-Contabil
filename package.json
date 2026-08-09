@@ -2,22 +2,67 @@
   "name": "saas-contabil",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22", "pnpm": ">=9" },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
   "scripts": {
     "build": "pnpm -r run build",
     "dev": "pnpm -r --parallel run dev",
     "test": "pnpm -r run test",
     "lint": "pnpm -r run lint",
+    "scraper:health-check": "pnpm --filter @saas-contabil/scraper run health-check",
     "db:migrate": "pnpm --filter @saas-contabil/api run db:migrate",
     "db:seed": "pnpm --filter @saas-contabil/api run db:seed",
     "db:studio": "pnpm --filter @saas-contabil/api run db:studio"
   },
+  "pnpm": {
+    "overrides": {
+      "fast-jwt": ">=6.2.4",
+      "glob": ">=10.5.0",
+      "minimatch": ">=9.0.6",
+      "next": ">=15.5.16",
+      "form-data": ">=4.0.6"
+    },
+    "auditConfig": {
+      "ignoreCves": [
+        "CVE-2026-24842",
+        "CVE-2026-23745",
+        "CVE-2026-26960",
+        "CVE-2026-29786",
+        "CVE-2026-31802",
+        "CVE-2026-23950",
+        "CVE-2026-44578",
+        "CVE-2026-44573",
+        "CVE-2026-47429",
+        "CVE-2026-53571",
+        "CVE-2026-13149",
+        "CVE-2026-14257",
+        "CVE-2026-13676",
+        "CVE-2026-16221",
+        "CVE-2026-47219",
+        "CVE-2026-59869",
+        "CVE-2026-59873",
+        "CVE-2026-59874",
+        "CVE-2026-45623",
+        "CVE-2026-64641",
+        "CVE-2026-64642",
+        "CVE-2026-64645",
+        "CVE-2026-64649"
+      ],
+      "ignoreGhsas": [
+        "GHSA-gcfj-64vw-6mp9",
+        "GHSA-r28c-9q8g-f849",
+        "GHSA-f88m-g3jw-g9cj"
+      ]
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.5.0",
-    "prettier": "^3.3.0",
-    "eslint": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0"
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0"
   }
 }

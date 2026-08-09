@@ -249,11 +249,27 @@ describe('ESocialService — gerarS1200() / XML S-1200', () => {
     expect(xml).toContain(`<perApur>${COMPETENCIA}</perApur>`)
   })
 
+  it('XML contém FGTS mensal correto em <vrFGTSMensal> (8% do salário)', async () => {
+    // Salário 2000 → FGTS = 2000 × 8% = 160.00
+    mockDb.transacaoBancaria.findMany.mockResolvedValue([
+      {
+        id: 'trx-fgts',
+        descricao: 'FOLHA Teste',
+        valor: new Decimal('2000.00'),
+        data: new Date('2025-01-31'),
+      },
+    ])
+
+    const xml = await service.gerarS1200(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(xml).toContain('<vrFGTSMensal>160.00</vrFGTSMensal>')
+  })
+
   it('Lança erro se empresa não encontrada', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValue(null)
 
     await expect(service.gerarS1200(TENANT_ID, EMPRESA_ID, COMPETENCIA)).rejects.toThrow(
-      'Empresa não encontrada',
+      'Empresa não encontrada'
     )
   })
 
@@ -272,7 +288,7 @@ describe('ESocialService — gerarS1200() / XML S-1200', () => {
         tenantId: TENANT_ID,
         evento: 'ESOCIAL_TRANSMITIDO',
         estadoNovo: expect.objectContaining({ evento: 'S-1200', competencia: COMPETENCIA }),
-      }),
+      })
     )
   })
 })
@@ -393,8 +409,18 @@ describe('ESocialService — gerarS1299() / fechamento + banco', () => {
 
   it('XML contém total de trabalhadores correto em <qtdTrab>', async () => {
     mockDb.transacaoBancaria.findMany.mockResolvedValue([
-      { id: 'trx-1', descricao: 'FOLHA A', valor: new Decimal('2000.00'), data: new Date('2025-01-31') },
-      { id: 'trx-2', descricao: 'FOLHA B', valor: new Decimal('3000.00'), data: new Date('2025-01-31') },
+      {
+        id: 'trx-1',
+        descricao: 'FOLHA A',
+        valor: new Decimal('2000.00'),
+        data: new Date('2025-01-31'),
+      },
+      {
+        id: 'trx-2',
+        descricao: 'FOLHA B',
+        valor: new Decimal('3000.00'),
+        data: new Date('2025-01-31'),
+      },
     ])
 
     const xml = await service.gerarS1299(TENANT_ID, EMPRESA_ID, COMPETENCIA)
@@ -407,13 +433,45 @@ describe('ESocialService — gerarS1299() / fechamento + banco', () => {
     // Emp B: 1412 → INSS 105.90
     // Total = 264.72
     mockDb.transacaoBancaria.findMany.mockResolvedValue([
-      { id: 'trx-1', descricao: 'FOLHA A', valor: new Decimal('2000.00'), data: new Date('2025-01-31') },
-      { id: 'trx-2', descricao: 'FOLHA B', valor: new Decimal('1412.00'), data: new Date('2025-01-31') },
+      {
+        id: 'trx-1',
+        descricao: 'FOLHA A',
+        valor: new Decimal('2000.00'),
+        data: new Date('2025-01-31'),
+      },
+      {
+        id: 'trx-2',
+        descricao: 'FOLHA B',
+        valor: new Decimal('1412.00'),
+        data: new Date('2025-01-31'),
+      },
     ])
 
     const xml = await service.gerarS1299(TENANT_ID, EMPRESA_ID, COMPETENCIA)
 
     expect(xml).toContain('<vrTotalINSS>264.72</vrTotalINSS>')
+  })
+
+  it('XML contém vrTotalFGTS = soma de 8% de todos os salários', async () => {
+    // Emp A: 2000 → FGTS 160.00; Emp B: 1412 → FGTS 112.96; Total = 272.96
+    mockDb.transacaoBancaria.findMany.mockResolvedValue([
+      {
+        id: 'trx-fgts-a',
+        descricao: 'FOLHA A',
+        valor: new Decimal('2000.00'),
+        data: new Date('2025-01-31'),
+      },
+      {
+        id: 'trx-fgts-b',
+        descricao: 'FOLHA B',
+        valor: new Decimal('1412.00'),
+        data: new Date('2025-01-31'),
+      },
+    ])
+
+    const xml = await service.gerarS1299(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(xml).toContain('<vrTotalFGTS>272.96</vrTotalFGTS>')
   })
 
   it('gerarS1299 persiste ApuracaoFiscal tipo EFD_REINF com status CALCULADO', async () => {
@@ -433,7 +491,7 @@ describe('ESocialService — gerarS1299() / fechamento + banco', () => {
         }),
         update: expect.objectContaining({ status: 'CALCULADO' }),
         create: expect.objectContaining({ status: 'CALCULADO', tipo: 'EFD_REINF' }),
-      }),
+      })
     )
   })
 
@@ -453,7 +511,7 @@ describe('ESocialService — gerarS1299() / fechamento + banco', () => {
         tenantId: TENANT_ID,
         evento: 'ESOCIAL_TRANSMITIDO',
         estadoNovo: expect.objectContaining({ evento: 'S-1299' }),
-      }),
+      })
     )
   })
 })
@@ -505,7 +563,7 @@ describe('ESocialService — processar()', () => {
     mockDb.empresaCliente.findUnique.mockResolvedValue(null)
 
     await expect(service.processar(TENANT_ID, EMPRESA_ID, COMPETENCIA)).rejects.toThrow(
-      'Empresa não encontrada',
+      'Empresa não encontrada'
     )
   })
 })

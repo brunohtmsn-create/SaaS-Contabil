@@ -49,9 +49,18 @@ export class GNREService {
       })
 
       await this.db.apuracaoFiscal.upsert({
-        where: { tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia, tipo: 'GNRE' } },
+        where: {
+          tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia, tipo: 'GNRE' },
+        },
         update: { dados: { gnres: resultados } as any, status: 'CALCULADO' },
-        create: { tenantId, empresaId, competencia, tipo: 'GNRE', dados: { gnres: resultados } as any, status: 'CALCULADO' },
+        create: {
+          tenantId,
+          empresaId,
+          competencia,
+          tipo: 'GNRE',
+          dados: { gnres: resultados } as any,
+          status: 'CALCULADO',
+        },
       })
 
       await this.audit.registrar({

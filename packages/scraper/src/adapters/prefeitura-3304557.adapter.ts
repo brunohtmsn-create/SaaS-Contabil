@@ -39,7 +39,8 @@ const SEL = {
   BTN_CONSULTAR: '#btnConsultar, button[id*="Consultar"], input[value="Consultar"]',
 
   // Tabela de resultados
-  GRID_ROWS: 'table.gridNFSe tbody tr, table[id*="gridNotas"] tr.gridRow, table[id*="Grid"] tbody tr',
+  GRID_ROWS:
+    'table.gridNFSe tbody tr, table[id*="gridNotas"] tr.gridRow, table[id*="Grid"] tbody tr',
   BTN_XML: 'a[title*="XML"], a[href*="xml"], a[onclick*="xml"]',
   BTN_PDF: 'a[title*="PDF"], a[href*="pdf"], a[href*="danfse"], a[title*="Imprimir"]',
 
@@ -50,17 +51,13 @@ const SEL = {
   CAPTCHA_FRAME: 'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
 } as const
 
-export class Prefeitura3304557Adapter
-  extends BasePLaywrightAdapter
-  implements PrefeituraAdapter
-{
+export class Prefeitura3304557Adapter extends BasePLaywrightAdapter implements PrefeituraAdapter {
   tipo = 'NFSE_EMITIDA'
   fonte = 'PREFEITURA_RJ'
   municipio = 'Rio de Janeiro'
   ibge = '3304557'
 
   private session: Session | null = null
-  private storage = new StorageService()
 
   // ─────────────────────────────────────────────────────────────────────────
   // Autenticação
@@ -100,7 +97,7 @@ export class Prefeitura3304557Adapter
         const loginError = await page.isVisible(SEL.MSG_ERRO_LOGIN)
         if (loginError) {
           const msg = await page.textContent(SEL.MSG_ERRO_LOGIN)
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             credData.login,
             'rj-prefeitura-login',
@@ -111,7 +108,7 @@ export class Prefeitura3304557Adapter
         // Verificar se ainda está na página de login (outra forma de detectar falha)
         const stillOnLogin = page.url().includes('login')
         if (stillOnLogin) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             credData.login,
             'rj-prefeitura-login-redirect',
@@ -121,9 +118,7 @@ export class Prefeitura3304557Adapter
 
         // Coletar cookies da sessão
         const cookies = await page.context().cookies()
-        const cookieStr = cookies
-          .map((c) => `${c.name}=${c.value}`)
-          .join('; ')
+        const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
         return {
           cookies: cookieStr,
@@ -161,10 +156,10 @@ export class Prefeitura3304557Adapter
       this.withPage(async (page) => {
         await this.garantirSessao(page, cnpj, 'emitidas')
 
-        await page.goto(
-          `${BASE_URL}/cgife/nfse/prestador/consultarnfse.aspx`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/cgife/nfse/prestador/consultarnfse.aspx`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroConsulta(page, cnpj, periodo, 'rj-emitidas')
 
@@ -182,10 +177,10 @@ export class Prefeitura3304557Adapter
       this.withPage(async (page) => {
         await this.garantirSessao(page, cnpj, 'tomadas')
 
-        await page.goto(
-          `${BASE_URL}/cgife/nfse/tomador/consultarnfse.aspx`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/cgife/nfse/tomador/consultarnfse.aspx`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroConsulta(page, cnpj, periodo, 'rj-tomadas')
 
@@ -224,7 +219,7 @@ export class Prefeitura3304557Adapter
 
           return Buffer.concat(chunks).toString('utf8')
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `rj-xml-${doc.numero}`,
@@ -264,7 +259,7 @@ export class Prefeitura3304557Adapter
 
           return Buffer.concat(chunks)
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `rj-pdf-${doc.numero}`,
@@ -303,7 +298,7 @@ export class Prefeitura3304557Adapter
    */
   private async garantirSessao(page: Page, cnpj: string, contexto: string): Promise<void> {
     if (!this.session) {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `rj-sem-sessao-${contexto}`,
@@ -311,7 +306,7 @@ export class Prefeitura3304557Adapter
       )
     }
     if (this.session!.expiresAt < nowBR()) {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `rj-sessao-expirada-${contexto}`,
@@ -333,7 +328,7 @@ export class Prefeitura3304557Adapter
     try {
       await page.waitForSelector(SEL.DATA_INICIO, { timeout: 15_000 })
     } catch {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `rj-filtro-${contexto}`,
@@ -459,19 +454,4 @@ export class Prefeitura3304557Adapter
    * Tira screenshot, faz upload ao S3 e lança erro.
    * Garante regra: screenshot obrigatório antes de throw.
    */
-  private async captureAndThrow(
-    page: Page,
-    cnpj: string,
-    jobId: string,
-    mensagem: string
-  ): Promise<never> {
-    try {
-      const screenshot = await page.screenshot({ fullPage: true })
-      const s3Key = S3KeyBuilder.erroScreenshot(cnpj, jobId)
-      await this.storage.upload(s3Key, screenshot, 'image/png')
-    } catch {
-      // não mascarar o erro original
-    }
-    throw new Error(mensagem)
-  }
 }

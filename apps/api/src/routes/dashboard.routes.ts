@@ -64,14 +64,22 @@ export async function dashboardRoutes(app: FastifyInstance) {
     const resultado = await Promise.all(
       meses.map(async ({ label, inicio, fim }) => {
         const [nfe, nfce, nfse] = await Promise.all([
-          db.documentoFiscal.count({ where: { tenantId, tipo: 'NFE', dataCompetencia: { gte: inicio, lte: fim } } }),
-          db.documentoFiscal.count({ where: { tenantId, tipo: 'NFCE', dataCompetencia: { gte: inicio, lte: fim } } }),
           db.documentoFiscal.count({
-            where: { tenantId, tipo: { in: ['NFSE_EMITIDA', 'NFSE_TOMADA'] }, dataCompetencia: { gte: inicio, lte: fim } },
+            where: { tenantId, tipo: 'NFE', dataCompetencia: { gte: inicio, lte: fim } },
+          }),
+          db.documentoFiscal.count({
+            where: { tenantId, tipo: 'NFCE', dataCompetencia: { gte: inicio, lte: fim } },
+          }),
+          db.documentoFiscal.count({
+            where: {
+              tenantId,
+              tipo: { in: ['NFSE_EMITIDA', 'NFSE_TOMADA'] },
+              dataCompetencia: { gte: inicio, lte: fim },
+            },
           }),
         ])
         return { mes: label, nfe, nfce, nfse }
-      }),
+      })
     )
 
     return resultado
@@ -79,12 +87,25 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
   app.get('/alertas', async (request) => {
     const { tenantId } = request.user as any
+    const { lido, tipo, empresaId, limite } = request.query as {
+      lido?: string
+      tipo?: string
+      empresaId?: string
+      limite?: string
+    }
+
+    const where: any = { tenantId }
+    if (lido === 'true') where.lido = true
+    else if (lido === 'false') where.lido = false
+    else if (lido !== 'todos') where.lido = false
+    if (tipo) where.tipo = tipo
+    if (empresaId) where.empresaId = empresaId
 
     return db.alerta.findMany({
-      where: { tenantId, lido: false },
+      where,
       include: { empresa: { select: { cnpj: true, razaoSocial: true } } },
       orderBy: { criadoEm: 'desc' },
-      take: 50,
+      take: limite ? Math.min(Number(limite), 200) : 100,
     })
   })
 
@@ -93,5 +114,14 @@ export async function dashboardRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     await db.alerta.updateMany({ where: { id, tenantId }, data: { lido: true } })
     return { success: true }
+  })
+
+  app.patch('/alertas/ler-todos', async (request) => {
+    const { tenantId } = request.user as any
+    const { tipo } = request.query as { tipo?: string }
+    const where: any = { tenantId, lido: false }
+    if (tipo) where.tipo = tipo
+    const { count } = await db.alerta.updateMany({ where, data: { lido: true } })
+    return { success: true, count }
   })
 }

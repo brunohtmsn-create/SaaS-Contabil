@@ -19,14 +19,14 @@ export class StorageService {
 
   constructor() {
     this.bucket = process.env['AWS_S3_BUCKET'] ?? 'saas-contabil-dev'
+    const endpoint = process.env['AWS_S3_ENDPOINT']
     this.s3 = new S3Client({
       region: process.env['AWS_REGION'] ?? 'sa-east-1',
-      endpoint: process.env['AWS_S3_ENDPOINT'],
       credentials: {
         accessKeyId: process.env['AWS_ACCESS_KEY_ID'] ?? '',
         secretAccessKey: process.env['AWS_SECRET_ACCESS_KEY'] ?? '',
       },
-      forcePathStyle: !!process.env['AWS_S3_ENDPOINT'],
+      ...(endpoint && { endpoint, forcePathStyle: true }),
     })
   }
 
@@ -59,9 +59,7 @@ export class StorageService {
   }
 
   async download(s3Key: string): Promise<DownloadResult> {
-    const result = await this.s3.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: s3Key })
-    )
+    const result = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: s3Key }))
 
     const chunks: Uint8Array[] = []
     for await (const chunk of result.Body as AsyncIterable<Uint8Array>) {

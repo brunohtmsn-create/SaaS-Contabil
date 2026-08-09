@@ -1,7 +1,16 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts'
 import { api } from '@/lib/api'
 
 type VolumeMes = { mes: string; nfe: number; nfce: number; nfse: number }
@@ -21,13 +30,16 @@ export function RevenueChart() {
         <h3 className="font-semibold text-slate-900">Volume de Documentos — 6 meses</h3>
         {!isLoading && (
           <span className="text-sm text-slate-500">
-            Total: <span className="font-semibold text-slate-900">{total.toLocaleString('pt-BR')}</span>
+            Total:{' '}
+            <span className="font-semibold text-slate-900">{total.toLocaleString('pt-BR')}</span>
           </span>
         )}
       </div>
 
       {isLoading ? (
-        <div className="h-[280px] flex items-center justify-center text-slate-400">Carregando...</div>
+        <div className="h-[280px] flex items-center justify-center text-slate-400">
+          Carregando...
+        </div>
       ) : total === 0 ? (
         <div className="h-[280px] flex items-center justify-center text-slate-400">
           Nenhum documento nos últimos 6 meses.

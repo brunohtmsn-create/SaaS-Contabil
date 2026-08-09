@@ -16,7 +16,8 @@ const statusColor: Record<string, string> = {
 export function DocumentosPanel({ empresaId, competencia }: Props) {
   const { data, isLoading } = useQuery({
     queryKey: ['documentos', empresaId, competencia],
-    queryFn: () => api.get('/documentos', { params: { empresaId, competencia } }).then((r) => r.data),
+    queryFn: () =>
+      api.get('/documentos', { params: { empresaId, competencia } }).then((r) => r.data),
   })
 
   const { data: stats } = useQuery({
@@ -35,7 +36,10 @@ export function DocumentosPanel({ empresaId, competencia }: Props) {
               <div className="text-sm text-slate-500">{item.tipo}</div>
               <div className="text-2xl font-bold text-slate-900 mt-1">{item._count}</div>
               <div className="text-xs text-slate-400 mt-1">
-                R$ {Number(item._sum?.valorTotal ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R${' '}
+                {Number(item._sum?.valorTotal ?? 0).toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                })}
               </div>
             </div>
           ))}
@@ -46,11 +50,21 @@ export function DocumentosPanel({ empresaId, competencia }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Número</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Emitente</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Valor</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                Tipo
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                Número
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                Emitente
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                Valor
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                Status
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -63,7 +77,9 @@ export function DocumentosPanel({ empresaId, competencia }: Props) {
                   R$ {Number(doc.valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor[doc.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor[doc.status] ?? 'bg-slate-100 text-slate-600'}`}
+                  >
                     {doc.status}
                   </span>
                 </td>

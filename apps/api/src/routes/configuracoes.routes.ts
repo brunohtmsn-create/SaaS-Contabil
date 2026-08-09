@@ -1,0 +1,244 @@
+import { FastifyInstance } from 'fastify'
+import { z } from 'zod'
+import bcrypt from 'bcrypt'
+import { getPrismaClient } from '@saas-contabil/database'
+
+export async function configuracoesRoutes(app: FastifyInstance) {
+  const db = getPrismaClient()
+
+  // GET /configuracoes/perfil — dados do tenant + usuário logado
+  app.get('/perfil', async (request, reply) => {
+    const { tenantId, sub: userId } = request.user as any
+
+    const [tenant, usuario] = await Promise.all([
+      db.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          id: true,
+          nome: true,
+          cnpj: true,
+          subdominio: true,
+          plano: true,
+          ativo: true,
+          criadoEm: true,
+        },
+      }),
+      db.usuario.findUnique({
+        where: { id: userId },
+        select: { id: true, nome: true, email: true, perfil: true, telefone: true, criadoEm: true },
+      }),
+    ])
+
+    if (!tenant) return reply.code(404).send({ error: 'Tenant não encontrado' })
+
+    const [totalEmpresas, totalUsuarios] = await Promise.all([
+      db.empresaCliente.count({ where: { tenantId } }),
+      db.usuario.count({ where: { tenantId, ativo: true } }),
+    ])
+
+    return { tenant, usuario, stats: { totalEmpresas, totalUsuarios } }
+  })
+
+  // PUT /configuracoes/perfil — atualiza nome e telefone do usuário logado
+  app.put('/perfil', async (request, reply) => {
+    const { sub: userId } = request.user as any
+    const { nome, telefone } = z
+      .object({
+        nome: z.string().min(2).max(100),
+        telefone: z.string().max(20).optional().nullable(),
+      })
+      .parse(request.body)
+
+    const updated = await db.usuario.update({
+      where: { id: userId },
+      data: { nome, ...(telefone !== undefined ? { telefone: telefone ?? null } : {}) },
+      select: { id: true, nome: true, email: true, perfil: true, telefone: true },
+    })
+
+    return updated
+  })
+
+  // PUT /configuracoes/senha — troca senha do usuário logado
+  app.put('/senha', async (request, reply) => {
+    const { sub: userId } = request.user as any
+    const { senhaAtual, novaSenha } = z
+      .object({
+        senhaAtual: z.string().min(1),
+        novaSenha: z.string().min(8, 'Nova senha deve ter pelo menos 8 caracteres'),
+      })
+      .parse(request.body)
+
+    const usuario = await db.usuario.findUnique({ where: { id: userId } })
+    if (!usuario) return reply.code(404).send({ error: 'Usuário não encontrado' })
+
+    const valida = await bcrypt.compare(senhaAtual, usuario.senhaHash)
+    if (!valida) return reply.code(400).send({ error: 'Senha atual incorreta' })
+
+    const hash = await bcrypt.hash(novaSenha, 12)
+    await db.usuario.update({ where: { id: userId }, data: { senhaHash: hash } })
+
+    return { success: true }
+  })
+
+  // GET /configuracoes/usuarios — lista usuários do tenant (admin only)
+  app.get('/usuarios', async (request, reply) => {
+    const { tenantId, perfil } = request.user as any
+    if (perfil !== 'ADMIN')
+      return reply.code(403).send({ error: 'Acesso restrito a administradores' })
+
+    return db.usuario.findMany({
+      where: { tenantId },
+      select: { id: true, nome: true, email: true, perfil: true, ativo: true, criadoEm: true },
+      orderBy: { nome: 'asc' },
+    })
+  })
+
+  // POST /configuracoes/usuarios — cria novo usuário no tenant (admin only)
+  app.post('/usuarios', async (request, reply) => {
+    const { tenantId, perfil } = request.user as any
+    if (perfil !== 'ADMIN')
+      return reply.code(403).send({ error: 'Acesso restrito a administradores' })
+
+    const { nome, email, senha, perfilNovo } = z
+      .object({
+        nome: z.string().min(2).max(100),
+        email: z.string().email(),
+        senha: z.string().min(8),
+        perfilNovo: z.enum(['ADMIN', 'CONTADOR', 'AUXILIAR', 'CLIENTE']).default('AUXILIAR'),
+      })
+      .parse(request.body)
+
+    const existente = await db.usuario.findFirst({ where: { email } })
+    if (existente) return reply.code(409).send({ error: 'E-mail já cadastrado' })
+
+    const senhaHash = await bcrypt.hash(senha, 12)
+    const usuario = await db.usuario.create({
+      data: { tenantId, nome, email, senhaHash, perfil: perfilNovo },
+      select: { id: true, nome: true, email: true, perfil: true, ativo: true, criadoEm: true },
+    })
+
+    return reply.code(201).send(usuario)
+  })
+
+  // PATCH /configuracoes/usuarios/:id — altera perfil ou status do usuário (admin only)
+  app.patch('/usuarios/:id', async (request, reply) => {
+    const { tenantId, perfil, sub: adminId } = request.user as any
+    if (perfil !== 'ADMIN')
+      return reply.code(403).send({ error: 'Acesso restrito a administradores' })
+
+    const { id } = request.params as { id: string }
+    const body = z
+      .object({
+        perfilNovo: z.enum(['ADMIN', 'CONTADOR', 'AUXILIAR', 'CLIENTE']).optional(),
+        ativo: z.boolean().optional(),
+      })
+      .parse(request.body)
+
+    const usuario = await db.usuario.findFirst({ where: { id, tenantId } })
+    if (!usuario) return reply.code(404).send({ error: 'Usuário não encontrado' })
+
+    if (id === adminId && body.ativo === false)
+      return reply.code(400).send({ error: 'Não é possível desativar a própria conta' })
+
+    const data: Record<string, unknown> = {}
+    if (body.perfilNovo !== undefined) data['perfil'] = body.perfilNovo
+    if (body.ativo !== undefined) data['ativo'] = body.ativo
+
+    const updated = await db.usuario.update({
+      where: { id },
+      data: data as any,
+      select: { id: true, nome: true, email: true, perfil: true, ativo: true },
+    })
+
+    return updated
+  })
+
+  // GET /configuracoes/iss — lista alíquotas de ISS configuradas para o tenant
+  app.get('/iss', async (request) => {
+    const { tenantId } = request.user as any
+
+    const configs = await db.alerta.findMany({
+      where: { tenantId, tipo: 'CONFIGURACAO_ISS' },
+      orderBy: { criadoEm: 'desc' },
+    })
+
+    return configs.map((c) => {
+      const dados = c.dados as Record<string, unknown>
+      return {
+        id: c.id,
+        municipioIBGE: dados['municipioIBGE'],
+        municipioNome: dados['municipioNome'],
+        aliquota: dados['aliquota'],
+        criadoEm: c.criadoEm,
+      }
+    })
+  })
+
+  // POST /configuracoes/iss — cria ou atualiza alíquota de ISS para um município
+  app.post('/iss', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const body = z
+      .object({
+        municipioIBGE: z
+          .string()
+          .length(7)
+          .regex(/^\d{7}$/),
+        municipioNome: z.string().min(2),
+        aliquota: z.number().min(0).max(0.1),
+      })
+      .parse(request.body)
+
+    const existente = await db.alerta.findFirst({
+      where: {
+        tenantId,
+        tipo: 'CONFIGURACAO_ISS',
+        dados: { path: ['municipioIBGE'], equals: body.municipioIBGE },
+      },
+    })
+
+    if (existente) {
+      const updated = await db.alerta.update({
+        where: { id: existente.id, tenantId },
+        data: {
+          dados: {
+            municipioIBGE: body.municipioIBGE,
+            municipioNome: body.municipioNome,
+            aliquota: String(body.aliquota),
+          },
+        },
+      })
+      return updated
+    }
+
+    const config = await db.alerta.create({
+      data: {
+        tenantId,
+        empresaId: null as any,
+        tipo: 'CONFIGURACAO_ISS',
+        mensagem: `Alíquota ISS — ${body.municipioNome} (${body.municipioIBGE}): ${(body.aliquota * 100).toFixed(2)}%`,
+        dados: {
+          municipioIBGE: body.municipioIBGE,
+          municipioNome: body.municipioNome,
+          aliquota: String(body.aliquota),
+        },
+        lido: true,
+      },
+    })
+
+    return reply.code(201).send(config)
+  })
+
+  // DELETE /configuracoes/iss/:id — remove configuração de alíquota ISS
+  app.delete('/iss/:id', async (request, reply) => {
+    const { tenantId } = request.user as any
+    const { id } = request.params as { id: string }
+
+    const config = await db.alerta.findFirst({
+      where: { id, tenantId, tipo: 'CONFIGURACAO_ISS' },
+    })
+    if (!config) return reply.code(404).send({ error: 'Configuração não encontrada' })
+
+    await db.alerta.delete({ where: { id } })
+    return { success: true }
+  })
+}

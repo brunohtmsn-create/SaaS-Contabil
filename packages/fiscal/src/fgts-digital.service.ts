@@ -81,9 +81,8 @@ export class FGTSDigitalService {
 
     // Se CPFs foram informados nas partidas usa contagem precisa; caso contrário
     // usa a quantidade de lançamentos de folha encontrados como proxy
-    totalEmpregados = empregadosContados.size > 0
-      ? empregadosContados.size
-      : lancamentosFolha.length
+    totalEmpregados =
+      empregadosContados.size > 0 ? empregadosContados.size : lancamentosFolha.length
 
     const aliquota = ALIQUOTA_FGTS
     const valorFGTS = baseCalculo.times(aliquota).toDecimalPlaces(2)
@@ -124,14 +123,7 @@ export class FGTSDigitalService {
     // Cria/atualiza obrigação de FGTS com vencimento no dia 20 do mês seguinte
     const { inicio: inicioMes } = parsePeriodo(competencia)
     const proximoMes = addMeses(inicioMes, 1)
-    const vencimento = new Date(
-      proximoMes.getFullYear(),
-      proximoMes.getMonth(),
-      20,
-      23,
-      59,
-      59,
-    )
+    const vencimento = new Date(proximoMes.getFullYear(), proximoMes.getMonth(), 20, 23, 59, 59)
 
     await this.db.obrigacao.upsert({
       where: {
@@ -180,7 +172,11 @@ export class FGTSDigitalService {
    * O saldo FGTS é obtido somando os valorFGTS de todas as apurações mensais já realizadas.
    * Em produção este valor deve ser confirmado pelo sistema do FGTS Digital (gov.br).
    */
-  async gerarGRRF(tenantId: string, empresaId: string, competencia: string): Promise<ResultadoGRRF> {
+  async gerarGRRF(
+    tenantId: string,
+    empresaId: string,
+    competencia: string
+  ): Promise<ResultadoGRRF> {
     const empresa = await this.db.empresaCliente.findUnique({ where: { id: empresaId } })
     if (!empresa) throw new Error('Empresa não encontrada')
 
@@ -254,7 +250,7 @@ export class FGTSDigitalService {
   private async buscarOuGerarIdObrigacao(
     tenantId: string,
     empresaId: string,
-    competencia: string,
+    competencia: string
   ): Promise<string> {
     const existente = await this.db.obrigacao.findFirst({
       where: {

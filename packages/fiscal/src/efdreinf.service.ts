@@ -74,17 +74,34 @@ export class EFDReinfService {
     }
 
     await this.db.apuracaoFiscal.upsert({
-      where: { tenantId_empresaId_competencia_tipo: { tenantId, empresaId, competencia, tipo: 'EFD_REINF' } },
+      where: {
+        tenantId_empresaId_competencia_tipo: {
+          tenantId,
+          empresaId,
+          competencia,
+          tipo: 'EFD_REINF',
+        },
+      },
       update: { dados: { r2010, r4020, r4080 } as any, status: 'CALCULADO' },
-      create: { tenantId, empresaId, competencia, tipo: 'EFD_REINF', dados: { r2010, r4020, r4080 } as any, status: 'CALCULADO' },
+      create: {
+        tenantId,
+        empresaId,
+        competencia,
+        tipo: 'EFD_REINF',
+        dados: { r2010, r4020, r4080 } as any,
+        status: 'CALCULADO',
+      },
     })
 
     await this.audit.registrar({
-      tenantId, cnpj: empresa.cnpj,
-      entidadeTipo: 'APURACAO_FISCAL', entidadeId: empresaId,
+      tenantId,
+      cnpj: empresa.cnpj,
+      entidadeTipo: 'APURACAO_FISCAL',
+      entidadeId: empresaId,
       evento: 'EFDREINF_TRANSMITIDA',
       estadoNovo: { r2010Count: r2010.length, r4020Count: r4020.length, r4080Count: r4080.length },
-      responsavel: 'sistema', responsavelTipo: 'SISTEMA',
+      responsavel: 'sistema',
+      responsavelTipo: 'SISTEMA',
     })
   }
 }

@@ -25,7 +25,9 @@ export class WhatsAppService {
    */
   async enviar(para: string, mensagem: string): Promise<void> {
     if (!WHATSAPP_API_URL || !WHATSAPP_API_TOKEN) {
-      console.warn('[WhatsApp] WHATSAPP_API_URL ou WHATSAPP_API_TOKEN não configurados — mensagem descartada')
+      console.warn(
+        '[WhatsApp] WHATSAPP_API_URL ou WHATSAPP_API_TOKEN não configurados — mensagem descartada'
+      )
       return
     }
 
@@ -43,7 +45,9 @@ export class WhatsAppService {
    */
   async enviarTemplate(para: string, template: string, variaveis: string[]): Promise<void> {
     if (!WHATSAPP_API_URL || !WHATSAPP_API_TOKEN) {
-      console.warn('[WhatsApp] WHATSAPP_API_URL ou WHATSAPP_API_TOKEN não configurados — template descartado')
+      console.warn(
+        '[WhatsApp] WHATSAPP_API_URL ou WHATSAPP_API_TOKEN não configurados — template descartado'
+      )
       return
     }
 

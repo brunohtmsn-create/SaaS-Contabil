@@ -14,7 +14,7 @@ export class DCTFWebService {
   private async verificarPreRequisitos(
     tenantId: string,
     empresaId: string,
-    competencia: string,
+    competencia: string
   ): Promise<void> {
     const efdReinf = await this.db.apuracaoFiscal.findUnique({
       where: {
@@ -39,7 +39,7 @@ export class DCTFWebService {
   private async consolidarDebitos(
     tenantId: string,
     empresaId: string,
-    competencia: string,
+    competencia: string
   ): Promise<DebitosDCTF> {
     const efdReinf = await this.db.apuracaoFiscal.findUnique({
       where: {
@@ -121,11 +121,7 @@ export class DCTFWebService {
    * Gera a DCTFWeb após EFD-Reinf e eSocial fechados para o período.
    * Consolida INSS + IRRF + CSRF e persiste a apuração no banco.
    */
-  async gerar(
-    tenantId: string,
-    empresaId: string,
-    competencia: string,
-  ): Promise<ResultadoDCTFWeb> {
+  async gerar(tenantId: string, empresaId: string, competencia: string): Promise<ResultadoDCTFWeb> {
     const empresa = await this.db.empresaCliente.findUnique({ where: { id: empresaId } })
     if (!empresa) throw new Error('Empresa não encontrada')
 
@@ -181,35 +177,45 @@ export class DCTFWebService {
     })
 
     // Registra obrigação para controle de vencimento (dia 20)
-    const [ano, mes] = competencia.split('-').map(Number)
+    const [ano, mes] = competencia.split('-').map(Number) as [number, number]
     const vencimento = new Date(ano, mes, 20) // dia 20 do mês seguinte
-    await this.db.obrigacao.upsert({
-      where: {
-        // não há índice único em obrigacoes, usa findFirst + create/update manual
-        // workaround: checar existência antes
-        id: 'dummy-never-matches',
-      },
-      update: {},
-      create: {
-        tenantId,
-        empresaId,
-        tipo: 'DCTFWEB',
-        competencia,
-        vencimento,
-        status: 'PENDENTE',
-        valor: debitos.total,
-      },
-    }).catch(async () => {
-      // upsert por id não funciona com uuid aleatório; usa findFirst + createIfAbsent
-      const existing = await this.db.obrigacao.findFirst({
-        where: { tenantId, empresaId, tipo: 'DCTFWEB', competencia },
+    await this.db.obrigacao
+      .upsert({
+        where: {
+          // não há índice único em obrigacoes, usa findFirst + create/update manual
+          // workaround: checar existência antes
+          id: 'dummy-never-matches',
+        },
+        update: {},
+        create: {
+          tenantId,
+          empresaId,
+          tipo: 'DCTFWEB',
+          competencia,
+          vencimento,
+          status: 'PENDENTE',
+          valor: debitos.total,
+        },
       })
-      if (!existing) {
-        await this.db.obrigacao.create({
-          data: { tenantId, empresaId, tipo: 'DCTFWEB', competencia, vencimento, status: 'PENDENTE', valor: debitos.total },
+      .catch(async () => {
+        // upsert por id não funciona com uuid aleatório; usa findFirst + createIfAbsent
+        const existing = await this.db.obrigacao.findFirst({
+          where: { tenantId, empresaId, tipo: 'DCTFWEB', competencia },
         })
-      }
-    })
+        if (!existing) {
+          await this.db.obrigacao.create({
+            data: {
+              tenantId,
+              empresaId,
+              tipo: 'DCTFWEB',
+              competencia,
+              vencimento,
+              status: 'PENDENTE',
+              valor: debitos.total,
+            },
+          })
+        }
+      })
 
     await this.audit.registrar({
       tenantId,

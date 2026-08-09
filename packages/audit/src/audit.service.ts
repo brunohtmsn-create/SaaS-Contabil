@@ -1,4 +1,11 @@
-import { getPrismaClient, AuditEvent, TipoEventoAudit, EntidadeAuditavel, TipoResponsavel } from '@saas-contabil/database'
+import {
+  getPrismaClient,
+  AuditEvent,
+  TipoEventoAudit,
+  EntidadeAuditavel,
+  TipoResponsavel,
+  Prisma,
+} from '@saas-contabil/database'
 import { sha256, nowBR } from '@saas-contabil/shared'
 
 type RegistrarEventoInput = {
@@ -38,8 +45,14 @@ export class AuditService {
       entidadeTipo: input.entidadeTipo,
       entidadeId: input.entidadeId,
       evento: input.evento,
-      estadoAnterior: input.estadoAnterior ?? null,
-      estadoNovo: input.estadoNovo ?? null,
+      estadoAnterior:
+        input.estadoAnterior !== undefined
+          ? (input.estadoAnterior as Prisma.InputJsonValue)
+          : Prisma.DbNull,
+      estadoNovo:
+        input.estadoNovo !== undefined
+          ? (input.estadoNovo as Prisma.InputJsonValue)
+          : Prisma.DbNull,
       responsavel: input.responsavel,
       responsavelTipo: input.responsavelTipo,
       evidencias: input.evidencias ?? [],

@@ -33,14 +33,17 @@ const SEL = {
   MSG_ERRO_LOGIN: '.error-message, .alert-danger, #mensagemErro, span[class*="error"]',
 
   // Formulário de consulta
-  DATA_INICIO: '#dtInicial, input[id*="DtInicial"], input[name*="dtInicial"], input[id*="DataInicio"]',
+  DATA_INICIO:
+    '#dtInicial, input[id*="DtInicial"], input[name*="dtInicial"], input[id*="DataInicio"]',
   DATA_FIM: '#dtFinal, input[id*="DtFinal"], input[name*="dtFinal"], input[id*="DataFim"]',
   CNPJ_INPUT: '#cnpj, input[id*="Cnpj"], input[name*="cnpj"]',
   COMPETENCIA_INPUT: '#competencia, input[id*="Competencia"], select[id*="Competencia"]',
-  BTN_PESQUISAR: '#btnPesquisar, button[id*="Pesquisar"], input[value="Pesquisar"], button[id*="Buscar"]',
+  BTN_PESQUISAR:
+    '#btnPesquisar, button[id*="Pesquisar"], input[value="Pesquisar"], button[id*="Buscar"]',
 
   // Tabela de resultados
-  GRID_ROWS: 'table.tabelaNfse tbody tr, table[id*="grid"] tbody tr, table[id*="Grid"] tbody tr, .gridContainer tbody tr',
+  GRID_ROWS:
+    'table.tabelaNfse tbody tr, table[id*="grid"] tbody tr, table[id*="Grid"] tbody tr, .gridContainer tbody tr',
   BTN_XML: 'a[title*="XML"], a[href*="xml"], img[alt*="XML"]',
   BTN_PDF: 'a[title*="PDF"], a[href*="pdf"], a[title*="Imprimir"], img[alt*="PDF"]',
   LINK_DETALHE: 'a[id*="lnkNota"], a[id*="lnkDetalhe"], a[href*="detalhe"]',
@@ -54,17 +57,13 @@ const SEL = {
   CAPTCHA_INPUT: '#txtCaptcha, input[id*="captcha"], input[id*="Captcha"]',
 } as const
 
-export class Prefeitura3106200Adapter
-  extends BasePLaywrightAdapter
-  implements PrefeituraAdapter
-{
+export class Prefeitura3106200Adapter extends BasePLaywrightAdapter implements PrefeituraAdapter {
   tipo = 'NFSE_EMITIDA'
   fonte = 'PREFEITURA_BH'
   municipio = 'Belo Horizonte'
   ibge = '3106200'
 
   private session: Session | null = null
-  private storage = new StorageService()
 
   // ─────────────────────────────────────────────────────────────────────────
   // Autenticação
@@ -109,7 +108,7 @@ export class Prefeitura3106200Adapter
         const loginError = await page.isVisible(SEL.MSG_ERRO_LOGIN)
         if (loginError) {
           const msg = await page.textContent(SEL.MSG_ERRO_LOGIN)
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             credData.login,
             'bh-prefeitura-login',
@@ -120,7 +119,7 @@ export class Prefeitura3106200Adapter
         // Verificar redirecionamento correto (portal autentica e redireciona ao menu)
         const currentUrl = page.url()
         if (currentUrl.includes('login') || currentUrl.includes('Login')) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             credData.login,
             'bh-prefeitura-login-redirect',
@@ -130,9 +129,7 @@ export class Prefeitura3106200Adapter
 
         // Coletar cookies da sessão
         const cookies = await page.context().cookies()
-        const cookieStr = cookies
-          .map((c) => `${c.name}=${c.value}`)
-          .join('; ')
+        const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
         return {
           cookies: cookieStr,
@@ -171,10 +168,10 @@ export class Prefeitura3106200Adapter
         await this.garantirSessao(page, cnpj, 'emitidas')
 
         // Navega à tela de consulta de NFS-e emitidas
-        await page.goto(
-          `${BASE_URL}/bhissweb/nfse/consultarNfse`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/bhissweb/nfse/consultarNfse`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroConsulta(page, cnpj, periodo, 'bh-emitidas')
 
@@ -193,10 +190,10 @@ export class Prefeitura3106200Adapter
         await this.garantirSessao(page, cnpj, 'tomadas')
 
         // Navega à tela de consulta de NFS-e recebidas (tomador)
-        await page.goto(
-          `${BASE_URL}/bhissweb/nfse/consultarNfseTomada`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/bhissweb/nfse/consultarNfseTomada`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroConsulta(page, cnpj, periodo, 'bh-tomadas')
 
@@ -235,7 +232,7 @@ export class Prefeitura3106200Adapter
 
           return Buffer.concat(chunks).toString('utf8')
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `bh-xml-${doc.numero}`,
@@ -276,7 +273,7 @@ export class Prefeitura3106200Adapter
 
           return Buffer.concat(chunks)
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `bh-pdf-${doc.numero}`,
@@ -315,7 +312,7 @@ export class Prefeitura3106200Adapter
    */
   private async garantirSessao(page: Page, cnpj: string, contexto: string): Promise<void> {
     if (!this.session) {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `bh-sem-sessao-${contexto}`,
@@ -323,7 +320,7 @@ export class Prefeitura3106200Adapter
       )
     }
     if (this.session!.expiresAt < nowBR()) {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `bh-sessao-expirada-${contexto}`,
@@ -345,7 +342,7 @@ export class Prefeitura3106200Adapter
     try {
       await page.waitForSelector(SEL.DATA_INICIO, { timeout: 15_000 })
     } catch {
-      await this.captureAndThrow(
+      return this.captureAndThrow(
         page,
         cnpj,
         `bh-filtro-${contexto}`,
@@ -483,19 +480,4 @@ export class Prefeitura3106200Adapter
    * Tira screenshot, faz upload ao S3 e lança erro.
    * Regra: screenshot obrigatório antes de qualquer throw.
    */
-  private async captureAndThrow(
-    page: Page,
-    cnpj: string,
-    jobId: string,
-    mensagem: string
-  ): Promise<never> {
-    try {
-      const screenshot = await page.screenshot({ fullPage: true })
-      const s3Key = S3KeyBuilder.erroScreenshot(cnpj, jobId)
-      await this.storage.upload(s3Key, screenshot, 'image/png')
-    } catch {
-      // não mascarar o erro original
-    }
-    throw new Error(mensagem)
-  }
 }

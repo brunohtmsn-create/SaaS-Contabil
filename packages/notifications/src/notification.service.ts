@@ -25,7 +25,9 @@ export class NotificationService {
     const { tipo, titulo, mensagem, destinatarios, tenantId, empresaId, dados } = notificacao
 
     await Promise.allSettled(
-      destinatarios.map((dest) => this.despacharParaDestinatario(dest, tipo, titulo, mensagem, dados)),
+      destinatarios.map((dest) =>
+        this.despacharParaDestinatario(dest, tipo, titulo, mensagem, dados)
+      )
     )
 
     await this.audit.registrar({
@@ -36,7 +38,11 @@ export class NotificationService {
       estadoNovo: {
         tipo,
         titulo,
-        destinatarios: destinatarios.map((d) => ({ nome: d.nome, email: d.email, whatsapp: d.whatsapp })),
+        destinatarios: destinatarios.map((d) => ({
+          nome: d.nome,
+          email: d.email,
+          whatsapp: d.whatsapp,
+        })),
         dados,
       },
       responsavel: 'SISTEMA',
@@ -54,11 +60,11 @@ export class NotificationService {
   async notificarTenant(
     tenantId: string,
     tipo: NotificacaoTipo,
-    dados: Record<string, unknown>,
+    dados: Record<string, unknown>
   ): Promise<void> {
     const usuarios = await this.db.usuario.findMany({
       where: { tenantId, ativo: true },
-      select: { nome: true, email: true },
+      select: { nome: true, email: true, telefone: true },
     })
 
     if (usuarios.length === 0) {
@@ -67,7 +73,11 @@ export class NotificationService {
     }
 
     const destinatarios: DestinatarioNotificacao[] = usuarios.map(
-      (u: { nome: string; email: string }) => ({ nome: u.nome, email: u.email }),
+      (u: { nome: string; email: string; telefone: string | null }) => ({
+        nome: u.nome,
+        email: u.email,
+        ...(u.telefone ? { whatsapp: u.telefone } : {}),
+      })
     )
 
     const { titulo, mensagem } = this.montarMensagem(tipo, dados)
@@ -82,7 +92,7 @@ export class NotificationService {
     tipo: NotificacaoTipo,
     titulo: string,
     mensagem: string,
-    dados?: Record<string, unknown>,
+    dados?: Record<string, unknown>
   ): Promise<void> {
     await Promise.allSettled([
       this.despacharEmail(dest, tipo, titulo, mensagem, dados),
@@ -95,7 +105,7 @@ export class NotificationService {
     tipo: NotificacaoTipo,
     titulo: string,
     mensagem: string,
-    dados?: Record<string, unknown>,
+    dados?: Record<string, unknown>
   ): Promise<void> {
     if (!dest.email) return
 
@@ -104,9 +114,10 @@ export class NotificationService {
         case 'VENCIMENTO_PROXIMO': {
           const obrigacao = {
             tipo: String(dados?.['obrigacao'] ?? titulo),
-            vencimento: dados?.['vencimento'] instanceof Date
-              ? dados['vencimento']
-              : new Date(String(dados?.['vencimento'] ?? Date.now())),
+            vencimento:
+              dados?.['vencimento'] instanceof Date
+                ? dados['vencimento']
+                : new Date(String(dados?.['vencimento'] ?? Date.now())),
             empresa: String(dados?.['empresa'] ?? ''),
           }
           await this.email.enviarVencimento(dest, obrigacao)
@@ -117,7 +128,7 @@ export class NotificationService {
           await this.email.enviarFechamentoConcluido(
             dest,
             String(dados?.['empresa'] ?? ''),
-            String(dados?.['competencia'] ?? ''),
+            String(dados?.['competencia'] ?? '')
           )
           break
 
@@ -126,16 +137,12 @@ export class NotificationService {
             dest,
             String(dados?.['empresa'] ?? ''),
             mensagem,
-            typeof dados?.['score'] === 'number' ? dados['score'] : 0,
+            typeof dados?.['score'] === 'number' ? dados['score'] : 0
           )
           break
 
         case 'ALERTA_EXCLUSAO_SN':
-          await this.email.enviarAlertaExclusaoSN(
-            dest,
-            String(dados?.['empresa'] ?? ''),
-            mensagem,
-          )
+          await this.email.enviarAlertaExclusaoSN(dest, String(dados?.['empresa'] ?? ''), mensagem)
           break
 
         case 'CAPTCHA_FALHOU':
@@ -155,7 +162,7 @@ export class NotificationService {
     dest: DestinatarioNotificacao,
     tipo: NotificacaoTipo,
     mensagem: string,
-    dados?: Record<string, unknown>,
+    dados?: Record<string, unknown>
   ): Promise<void> {
     if (!dest.whatsapp) return
 
@@ -164,13 +171,14 @@ export class NotificationService {
 
       switch (tipo) {
         case 'VENCIMENTO_PROXIMO': {
-          const vencimento = dados?.['vencimento'] instanceof Date
-            ? formatDate(dados['vencimento'], 'dd/MM/yyyy')
-            : String(dados?.['vencimento'] ?? '')
+          const vencimento =
+            dados?.['vencimento'] instanceof Date
+              ? formatDate(dados['vencimento'], 'dd/MM/yyyy')
+              : String(dados?.['vencimento'] ?? '')
           texto = WhatsAppService.mensagemVencimento(
             String(dados?.['empresa'] ?? ''),
             String(dados?.['obrigacao'] ?? ''),
-            vencimento,
+            vencimento
           )
           break
         }
@@ -178,21 +186,18 @@ export class NotificationService {
         case 'FECHAMENTO_CONCLUIDO':
           texto = WhatsAppService.mensagemFechamentoConcluido(
             String(dados?.['empresa'] ?? ''),
-            String(dados?.['competencia'] ?? ''),
+            String(dados?.['competencia'] ?? '')
           )
           break
 
         case 'DIVERGENCIA':
-          texto = WhatsAppService.mensagemDivergencia(
-            String(dados?.['empresa'] ?? ''),
-            mensagem,
-          )
+          texto = WhatsAppService.mensagemDivergencia(String(dados?.['empresa'] ?? ''), mensagem)
           break
 
         case 'ALERTA_EXCLUSAO_SN':
           texto = WhatsAppService.mensagemAlertaExclusaoSN(
             String(dados?.['empresa'] ?? ''),
-            mensagem,
+            mensagem
           )
           break
 
@@ -200,14 +205,14 @@ export class NotificationService {
           texto = WhatsAppService.mensagemScraperErro(
             String(dados?.['empresa'] ?? ''),
             String(dados?.['portal'] ?? ''),
-            mensagem,
+            mensagem
           )
           break
 
         case 'CAPTCHA_FALHOU':
           texto = WhatsAppService.mensagemCaptchaFalhou(
             String(dados?.['empresa'] ?? ''),
-            String(dados?.['portal'] ?? ''),
+            String(dados?.['portal'] ?? '')
           )
           break
 
@@ -229,15 +234,16 @@ export class NotificationService {
    */
   private montarMensagem(
     tipo: NotificacaoTipo,
-    dados: Record<string, unknown>,
+    dados: Record<string, unknown>
   ): { titulo: string; mensagem: string } {
     switch (tipo) {
       case 'VENCIMENTO_PROXIMO': {
         const empresa = String(dados['empresa'] ?? '')
         const obrigacao = String(dados['obrigacao'] ?? '')
-        const vencimento = dados['vencimento'] instanceof Date
-          ? formatDate(dados['vencimento'], 'dd/MM/yyyy')
-          : String(dados['vencimento'] ?? '')
+        const vencimento =
+          dados['vencimento'] instanceof Date
+            ? formatDate(dados['vencimento'], 'dd/MM/yyyy')
+            : String(dados['vencimento'] ?? '')
         return {
           titulo: `Vencimento Próximo: ${obrigacao}`,
           mensagem: `A obrigação "${obrigacao}" da empresa ${empresa} vence em ${vencimento}.`,

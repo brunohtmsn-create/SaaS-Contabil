@@ -25,7 +25,7 @@ const STATUS_COR: Record<string, string> = {
   PENDENTE_REVISAO: 'bg-yellow-100 text-yellow-700',
   NORMALIZADO: 'bg-slate-100 text-slate-600',
   PENDENTE: 'bg-slate-100 text-slate-600',
-  REJEITADO: 'bg-red-100 text-red-700',
+  DIVERGENTE: 'bg-red-100 text-red-700',
   CANCELADO: 'bg-gray-100 text-gray-500',
 }
 
@@ -45,7 +45,9 @@ export default function DocumentosPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [uploadEmpresaId, setUploadEmpresaId] = useState('')
   const [uploadFiles, setUploadFiles] = useState<File[]>([])
-  const [uploadResults, setUploadResults] = useState<{ name: string; ok: boolean; msg: string }[]>([])
+  const [uploadResults, setUploadResults] = useState<{ name: string; ok: boolean; msg: string }[]>(
+    []
+  )
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -83,7 +85,10 @@ export default function DocumentosPage() {
   const totais = {
     total: filtrados.length,
     conciliados: filtrados.filter((d) => d.status === 'CONCILIADO').length,
-    pendentes: filtrados.filter((d) => d.status === 'PENDENTE' || d.status === 'PENDENTE_REVISAO' || d.status === 'NORMALIZADO').length,
+    pendentes: filtrados.filter(
+      (d) =>
+        d.status === 'PENDENTE' || d.status === 'PENDENTE_REVISAO' || d.status === 'NORMALIZADO'
+    ).length,
     valorTotal: filtrados.reduce((s, d) => s + Number(d.valorTotal ?? 0), 0),
   }
 
@@ -122,7 +127,10 @@ export default function DocumentosPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => { setShowUpload(true); setUploadResults([]) }}
+            onClick={() => {
+              setShowUpload(true)
+              setUploadResults([])
+            }}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
           >
             Importar XML
@@ -142,7 +150,12 @@ export default function DocumentosPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">Importar XML manualmente</h2>
-              <button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+              <button
+                onClick={() => setShowUpload(false)}
+                className="text-slate-400 hover:text-slate-600 text-xl leading-none"
+              >
+                &times;
+              </button>
             </div>
 
             <div className="space-y-3">
@@ -155,13 +168,17 @@ export default function DocumentosPage() {
                 >
                   <option value="">Selecione a empresa</option>
                   {empresas.map((e) => (
-                    <option key={e.id} value={e.id}>{e.razaoSocial} ({e.cnpj})</option>
+                    <option key={e.id} value={e.id}>
+                      {e.razaoSocial} ({e.cnpj})
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Arquivos XML</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Arquivos XML
+                </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
@@ -169,10 +186,14 @@ export default function DocumentosPage() {
                   {uploadFiles.length > 0 ? (
                     <div className="text-sm text-slate-700">
                       {uploadFiles.length} arquivo(s) selecionado(s)
-                      <div className="mt-1 text-slate-400 text-xs">{uploadFiles.map((f) => f.name).join(', ')}</div>
+                      <div className="mt-1 text-slate-400 text-xs">
+                        {uploadFiles.map((f) => f.name).join(', ')}
+                      </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-400">Clique para selecionar arquivos XML (NF-e, NFC-e, NFS-e)</p>
+                    <p className="text-sm text-slate-400">
+                      Clique para selecionar arquivos XML (NF-e, NFC-e, NFS-e)
+                    </p>
                   )}
                 </div>
                 <input
@@ -189,7 +210,10 @@ export default function DocumentosPage() {
             {uploadResults.length > 0 && (
               <div className="space-y-1 max-h-40 overflow-auto">
                 {uploadResults.map((r, i) => (
-                  <div key={i} className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded ${r.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  <div
+                    key={i}
+                    className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded ${r.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}
+                  >
                     <span>{r.ok ? '✓' : '✗'}</span>
                     <span className="font-mono truncate">{r.name}</span>
                     <span className="ml-auto shrink-0">{r.msg}</span>
@@ -199,7 +223,10 @@ export default function DocumentosPage() {
             )}
 
             <div className="flex justify-end gap-3">
-              <button onClick={() => setShowUpload(false)} className="text-sm text-slate-600 hover:text-slate-900 px-4 py-2">
+              <button
+                onClick={() => setShowUpload(false)}
+                className="text-sm text-slate-600 hover:text-slate-900 px-4 py-2"
+              >
                 Fechar
               </button>
               <button
@@ -207,7 +234,9 @@ export default function DocumentosPage() {
                 disabled={!uploadEmpresaId || uploadFiles.length === 0 || uploading}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg"
               >
-                {uploading ? 'Importando...' : `Importar ${uploadFiles.length > 1 ? `${uploadFiles.length} arquivos` : 'arquivo'}`}
+                {uploading
+                  ? 'Importando...'
+                  : `Importar ${uploadFiles.length > 1 ? `${uploadFiles.length} arquivos` : 'arquivo'}`}
               </button>
             </div>
           </div>
@@ -248,7 +277,9 @@ export default function DocumentosPage() {
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
           >
             {TIPOS.map((t) => (
-              <option key={t} value={t}>{t === 'TODOS' ? 'Todos os tipos' : t}</option>
+              <option key={t} value={t}>
+                {t === 'TODOS' ? 'Todos os tipos' : t}
+              </option>
             ))}
           </select>
           <select
@@ -260,7 +291,7 @@ export default function DocumentosPage() {
             <option value="CONCILIADO">Conciliado</option>
             <option value="NORMALIZADO">Normalizado</option>
             <option value="PENDENTE_REVISAO">Pendente revisão</option>
-            <option value="REJEITADO">Rejeitado</option>
+            <option value="DIVERGENTE">Divergente</option>
           </select>
         </div>
 
@@ -274,13 +305,27 @@ export default function DocumentosPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Número</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Emitente (CNPJ)</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Emissão</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Valor</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Ação</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Tipo
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Número
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Emitente (CNPJ)
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Emissão
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                  Valor
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                  Ação
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -300,7 +345,9 @@ export default function DocumentosPage() {
                     {fmt.format(Number(doc.valorTotal))}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COR[doc.status] ?? 'bg-slate-100 text-slate-500'}`}>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COR[doc.status] ?? 'bg-slate-100 text-slate-500'}`}
+                    >
                       {doc.status.replace(/_/g, ' ')}
                     </span>
                   </td>
@@ -308,13 +355,17 @@ export default function DocumentosPage() {
                     {(doc.status === 'PENDENTE_REVISAO' || doc.status === 'NORMALIZADO') && (
                       <div className="flex items-center justify-center gap-1">
                         <button
-                          onClick={() => atualizarStatus.mutate({ id: doc.id, status: 'CONCILIADO' })}
+                          onClick={() =>
+                            atualizarStatus.mutate({ id: doc.id, status: 'CONCILIADO' })
+                          }
                           className="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-2 py-1 rounded"
                         >
                           Aprovar
                         </button>
                         <button
-                          onClick={() => atualizarStatus.mutate({ id: doc.id, status: 'REJEITADO' })}
+                          onClick={() =>
+                            atualizarStatus.mutate({ id: doc.id, status: 'DIVERGENTE' })
+                          }
                           className="text-xs bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded"
                         >
                           Rejeitar

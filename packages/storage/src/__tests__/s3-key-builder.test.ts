@@ -184,16 +184,12 @@ describe('S3KeyBuilder — relatórios', () => {
 
   it('memoriaCalcDifal() monta caminho correto', () => {
     const key = S3KeyBuilder.memoriaCalcDifal(CNPJ, COMPETENCIA)
-    expect(key).toBe(
-      `${CNPJ}/${COMPETENCIA}/relatorios/memoria-calculo-difal-${COMPETENCIA}.pdf`
-    )
+    expect(key).toBe(`${CNPJ}/${COMPETENCIA}/relatorios/memoria-calculo-difal-${COMPETENCIA}.pdf`)
   })
 
   it('relatorio() usa tenant e competencia', () => {
     const key = S3KeyBuilder.relatorio(TENANT_ID, COMPETENCIA)
-    expect(key).toBe(
-      `tenants/${TENANT_ID}/relatorios/relatorio-consolidado-${COMPETENCIA}.csv`
-    )
+    expect(key).toBe(`tenants/${TENANT_ID}/relatorios/relatorio-consolidado-${COMPETENCIA}.csv`)
   })
 
   it('relatorio() tenants diferentes → caminhos diferentes', () => {

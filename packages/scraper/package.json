@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "health-check": "tsx src/health-check.ts"
   },
   "dependencies": {
     "@saas-contabil/shared": "workspace:*",
@@ -24,6 +25,7 @@
     "typescript": "^5.5.0",
     "@types/node": "^22.0.0",
     "@types/xml2js": "^0.4.14",
+    "tsx": "^4.16.0",
     "vitest": "^1.6.0"
   }
 }

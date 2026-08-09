@@ -1,9 +1,11 @@
-import Fastify from 'fastify'
+import Fastify, { type FastifyError } from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
+import rateLimit from '@fastify/rate-limit'
 import websocket from '@fastify/websocket'
-import IORedis from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
+import { ZodError } from 'zod'
 import { getPrismaClient } from '@saas-contabil/database'
 import { authRoutes } from './routes/auth.routes.js'
 import { empresaRoutes } from './routes/empresa.routes.js'
@@ -18,6 +20,18 @@ import { credencialRoutes } from './routes/credencial.routes.js'
 import { dashboardRoutes } from './routes/dashboard.routes.js'
 import { relatorioRoutes } from './routes/relatorio.routes.js'
 import { wsRoutes } from './routes/ws.routes.js'
+import { configuracoesRoutes } from './routes/configuracoes.routes.js'
+import { filasRoutes } from './routes/filas.routes.js'
+import { alertasRoutes } from './routes/alertas.routes.js'
+
+// Recusa iniciar sem segredos obrigatórios em produção
+if (process.env['NODE_ENV'] === 'production') {
+  if (!process.env['JWT_SECRET']) throw new Error('JWT_SECRET não definido em produção')
+  if (!process.env['JWT_REFRESH_SECRET'])
+    throw new Error('JWT_REFRESH_SECRET não definido em produção')
+  if (!process.env['CREDENTIALS_MASTER_KEY'])
+    throw new Error('CREDENTIALS_MASTER_KEY não definido em produção')
+}
 
 const app = Fastify({
   logger: {
@@ -30,9 +44,33 @@ await app.register(cors, {
   credentials: true,
 })
 
-await app.register(jwt, {
-  secret: process.env['JWT_SECRET'] ?? 'dev-secret',
+// Rate limiting global — protege contra força bruta e DoS
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  // Rota de login tem limite muito mais restritivo
+  keyGenerator: (request) => {
+    const ip = request.ip
+    return `${ip}:${request.url}`
+  },
 })
+
+await app.register(jwt, {
+  // 'dev-secret' apenas aceitável fora de produção — a checagem acima garante isso
+  secret: process.env['JWT_SECRET'] ?? 'dev-secret-not-for-production',
+})
+
+// multipart DEVE ser registrado ANTES das rotas que usam request.parts()
+await app.register(multipart, {
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB — protege contra DoS por upload gigante
+    files: 50, // máx 50 arquivos por request (upload em lote)
+    fields: 10,
+  },
+})
+
+await app.register(websocket)
 
 app.addHook('onRequest', async (request, reply) => {
   const publicRoutes = ['/auth/login', '/auth/refresh', '/health']
@@ -45,7 +83,10 @@ app.addHook('onRequest', async (request, reply) => {
   }
 })
 
-app.setErrorHandler((error, _request, reply) => {
+app.setErrorHandler((error: FastifyError, _request, reply) => {
+  if (error instanceof ZodError) {
+    return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.errors })
+  }
   if (error.validation) {
     return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.validation })
   }
@@ -53,7 +94,7 @@ app.setErrorHandler((error, _request, reply) => {
   if (statusCode >= 500) {
     app.log.error(error)
   }
-  reply.code(statusCode).send({ error: error.message ?? 'Erro interno do servidor' })
+  return reply.code(statusCode).send({ error: error.message ?? 'Erro interno do servidor' })
 })
 
 await app.register(authRoutes, { prefix: '/auth' })
@@ -68,23 +109,35 @@ await app.register(fechamentoRoutes, { prefix: '/fechamento' })
 await app.register(credencialRoutes, { prefix: '/credenciais' })
 await app.register(dashboardRoutes, { prefix: '/dashboard' })
 await app.register(relatorioRoutes, { prefix: '/relatorios' })
-await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }) // 5 MB max
-await app.register(websocket)
+await app.register(configuracoesRoutes, { prefix: '/configuracoes' })
+await app.register(filasRoutes, { prefix: '/filas' })
+await app.register(alertasRoutes, { prefix: '/alertas' })
 await app.register(wsRoutes, { prefix: '/ws' })
 
 app.get('/health', async (_request, reply) => {
   const db = getPrismaClient()
-  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null, lazyConnect: true })
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+  })
 
   const [dbOk, redisOk] = await Promise.all([
     db.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
-    redis.ping().then((r) => r === 'PONG').catch(() => false),
+    redis
+      .ping()
+      .then((r: string) => r === 'PONG')
+      .catch(() => false),
   ])
   redis.disconnect()
 
   const status = dbOk && redisOk ? 'ok' : 'degraded'
   reply.code(dbOk && redisOk ? 200 : 503)
-  return { status, db: dbOk ? 'ok' : 'error', redis: redisOk ? 'ok' : 'error', timestamp: new Date().toISOString() }
+  return {
+    status,
+    db: dbOk ? 'ok' : 'error',
+    redis: redisOk ? 'ok' : 'error',
+    timestamp: new Date().toISOString(),
+  }
 })
 
 const port = Number(process.env['PORT'] ?? 3000)

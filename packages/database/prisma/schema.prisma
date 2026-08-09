@@ -36,14 +36,15 @@ enum PlanoTenant {
 // ─── USUÁRIO ───────────────────────────────────────────────────────────────
 
 model Usuario {
-  id       String   @id @default(uuid())
-  tenantId String
-  nome     String
-  email    String
+  id        String        @id @default(uuid())
+  tenantId  String
+  nome      String
+  email     String
   senhaHash String
-  perfil   PerfilUsuario @default(CONTADOR)
-  ativo    Boolean  @default(true)
-  criadoEm DateTime @default(now())
+  perfil    PerfilUsuario @default(CONTADOR)
+  ativo     Boolean       @default(true)
+  telefone  String?
+  criadoEm  DateTime      @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -337,6 +338,9 @@ enum TipoApuracao {
   CSLL_LR
   PIS
   COFINS
+  ECD
+  ECF
+  PLANEJAMENTO_TRIBUTARIO
 }
 
 enum StatusApuracao {
@@ -486,6 +490,7 @@ enum TipoAlerta {
   FATOR_R_MUDOU
   PGDAS_PENDENTE
   CERTIFICADO_VENCENDO
+  CONFIGURACAO_ISS
 }
 
 // ─── BEM DO ATIVO IMOBILIZADO ─────────────────────────────────────────────
@@ -564,6 +569,8 @@ enum EntidadeAuditavel {
   OBRIGACAO
   PORTAL_JOB
   ARQUIVO_S3
+  ALERTA
+  EMPRESA_CLIENTE
 }
 
 enum TipoEventoAudit {
@@ -609,6 +616,17 @@ enum TipoEventoAudit {
   EFDREINF_TRANSMITIDA
   DCTFWEB_TRANSMITIDA
   ESOCIAL_TRANSMITIDO
+  ALERTA_MARCADO_ENVIADO
+  RISCO_EXCLUSAO_SN_DETECTADO
+  CALENDARIO_ANUAL_GERADO
+  DMS_APURADA
+  DASN_GERADA
+  IRPJ_CSLL_LP_APURADO
+  IRPJ_CSLL_LR_APURADO
+  PIS_COFINS_LP_APURADO
+  ECF_GERADO
+  PLANEJAMENTO_TRIBUTARIO_GERADO
+  ICMS_ST_CALCULADO
 }
 
 enum TipoResponsavel {
@@ -647,6 +665,7 @@ enum TipoPortal {
   SIMPLES_NACIONAL
   SEFAZ_FEDERAL
   SEFAZ_ESTADUAL
+  DCTFWEB
   PREFEITURA
   FGTS_DIGITAL
   ESOCIAL

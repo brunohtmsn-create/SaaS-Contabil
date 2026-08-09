@@ -1,0 +1,2616 @@
+/**
+ * Testes de integração — fiscal.routes.ts
+ *
+ * Foco nos caminhos críticos:
+ *  POST /fiscal/pgdas/transmitir/:id/:comp — bloqueia se há docs não conciliados (CLAUDE.md §11)
+ *  GET  /fiscal/apuracoes — filtra por tenantId
+ *  GET  /fiscal/obrigacoes — filtra por tenantId + competência + status
+ *  POST /fiscal/pgdas/:id/:comp — chama PGDASService.apurar
+ *  GET  /fiscal/pgdas/:id/:comp — busca apuração, 404 se ausente
+ *  GET  /fiscal/fator-r/:id/:comp — retorna fatorR e anexo
+ *  POST /fiscal/obrigacoes/calendario/:id/:ano — valida ano com regex
+ */
+
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
+import Fastify, { FastifyInstance } from 'fastify'
+import jwt from '@fastify/jwt'
+import { ZodError } from 'zod'
+
+// ---------------------------------------------------------------------------
+// Mocks de serviços fiscais e Prisma
+// ---------------------------------------------------------------------------
+
+const mockPGDAS = { apurar: vi.fn() }
+const mockDifal = { calcular: vi.fn() }
+const mockGNRE = { gerar: vi.fn() }
+const mockDeSTDA = { gerar: vi.fn() }
+const mockDCTFWeb = { gerar: vi.fn() }
+const mockESocial = { processar: vi.fn() }
+const mockMonitoramento = {
+  gerarCalendarioAnual: vi.fn(),
+  verificarRiscoExclusao: vi.fn(),
+  verificarVencimentos: vi.fn(),
+}
+const mockFatorR = { calcular: vi.fn() }
+const mockFGTS = { apurar: vi.fn() }
+const mockEFDReinf = { processar: vi.fn() }
+const mockDMS = { apurar: vi.fn() }
+const mockDasn = { gerar: vi.fn() }
+const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn() }
+const mockIrpjCsllLP = { apurar: vi.fn() }
+const mockPisCofinsLP = { apurar: vi.fn() }
+const mockECF = { gerar: vi.fn() }
+const mockDCTFMensal = { gerar: vi.fn() }
+const mockSpedFiscal = { gerar: vi.fn() }
+const mockSpedContrib = { gerar: vi.fn() }
+const mockIrpjCsllLR = { apurar: vi.fn() }
+const mockCreditosLR = { apurar: vi.fn() }
+const mockLALUR = { apurar: vi.fn() }
+const mockSimulador = { simular: vi.fn() }
+const mockRelatorio = { gerar: vi.fn() }
+const mockRetencoes = { apurar: vi.fn() }
+const mockEstimativaLR = { apurar: vi.fn() }
+const mockPrejuizos = { registrarPrejuizo: vi.fn(), compensar: vi.fn() }
+const mockDepreciacaoLR = {
+  apurar: vi.fn(),
+  getCategorias: vi.fn(() => ['maquinas_equipamentos', 'veiculos', 'computadores_perifericos']),
+  getTaxaDepreciacao: vi.fn(() => ({ vidaUtilAnos: 5, taxaAnual: '0.2' })),
+}
+const mockINSS = { calcular: vi.fn() }
+const mockAjusteAnual = { apurar: vi.fn() }
+const mockPlanejamento = { analisar: vi.fn() }
+const mockDiagnostico = { diagnosticar: vi.fn() }
+
+vi.mock('@saas-contabil/fiscal', () => ({
+  PGDASService: vi.fn(() => mockPGDAS),
+  DifalService: vi.fn(() => mockDifal),
+  GNREService: vi.fn(() => mockGNRE),
+  DeSTDAService: vi.fn(() => mockDeSTDA),
+  DCTFWebService: vi.fn(() => mockDCTFWeb),
+  ESocialService: vi.fn(() => mockESocial),
+  MonitoramentoSNService: vi.fn(() => mockMonitoramento),
+  FatorRService: vi.fn(() => mockFatorR),
+  FGTSDigitalService: vi.fn(() => mockFGTS),
+  EFDReinfService: vi.fn(() => mockEFDReinf),
+  DMSService: vi.fn(() => mockDMS),
+  DasnService: vi.fn(() => mockDasn),
+  CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
+  IrpjCsllLPService: vi.fn(() => mockIrpjCsllLP),
+  PisCofinsLPService: vi.fn(() => mockPisCofinsLP),
+  ECFService: vi.fn(() => mockECF),
+  DCTFMensalService: vi.fn(() => mockDCTFMensal),
+  SpedFiscalService: vi.fn(() => mockSpedFiscal),
+  SpedContribuicoesService: vi.fn(() => mockSpedContrib),
+  IrpjCsllLRService: vi.fn(() => mockIrpjCsllLR),
+  CreditosPisCofinsLRService: vi.fn(() => mockCreditosLR),
+  RetencoesNaFonteService: vi.fn(() => mockRetencoes),
+  IrpjCsllLREstimativaService: vi.fn(() => mockEstimativaLR),
+  PrejuizosFiscaisLRService: vi.fn(() => mockPrejuizos),
+  DepreciacaoLRService: vi.fn(() => mockDepreciacaoLR),
+  INSSPatronalService: vi.fn(() => mockINSS),
+  AjusteAnualLRService: vi.fn(() => mockAjusteAnual),
+  LALURService: vi.fn(() => mockLALUR),
+  SimuladorTributarioService: vi.fn(() => mockSimulador),
+  PlanejamentoTributarioService: vi.fn(() => mockPlanejamento),
+  DiagnosticoFiscalService: vi.fn(() => mockDiagnostico),
+  RelatorioFiscalService: vi.fn(() => mockRelatorio),
+}))
+
+const { mockDb, mockQueue } = vi.hoisted(() => ({
+  mockDb: {
+    apuracaoFiscal: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
+    documentoFiscal: {
+      count: vi.fn(),
+    },
+    obrigacao: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    empresaCliente: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
+    alerta: {
+      findMany: vi.fn(),
+    },
+  },
+  mockQueue: { add: vi.fn() },
+}))
+
+vi.mock('@saas-contabil/database', () => ({
+  getPrismaClient: vi.fn(() => mockDb),
+}))
+
+vi.mock('bullmq', () => ({
+  Queue: vi.fn(() => mockQueue),
+}))
+
+vi.mock('ioredis', () => ({
+  Redis: vi.fn(() => ({})),
+}))
+
+vi.mock('@saas-contabil/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@saas-contabil/shared')>()
+  return {
+    ...actual,
+    nowBR: vi.fn(() => new Date('2025-06-01T12:00:00Z')),
+  }
+})
+
+import { fiscalRoutes } from '../routes/fiscal.routes.js'
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+const TENANT_ID = 'tenant-fiscal'
+const USER_ID = 'user-fiscal'
+const EMPRESA_ID = '550e8400-e29b-41d4-a716-446655440000'
+const COMPETENCIA = '2025-05'
+
+let app: FastifyInstance
+
+beforeAll(async () => {
+  app = Fastify({ logger: false })
+  await app.register(jwt, { secret: 'test-secret-key-32-chars-minimum!!' })
+
+  app.addHook('onRequest', async (request) => {
+    if (request.headers['x-test-skip-auth'] === '1') {
+      ;(request as any).user = { sub: USER_ID, tenantId: TENANT_ID, perfil: 'CONTADOR' }
+    }
+  })
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.errors })
+    }
+    const statusCode = error.statusCode ?? 500
+    return reply.code(statusCode).send({ error: error.message ?? 'Erro interno' })
+  })
+
+  await app.register(fiscalRoutes, { prefix: '/fiscal' })
+  await app.ready()
+})
+
+afterAll(async () => {
+  await app.close()
+})
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockQueue.add.mockResolvedValue({ id: 'job-123' })
+})
+
+function req(method: string, url: string, payload?: unknown) {
+  return app.inject({
+    method: method as any,
+    url,
+    headers: { 'x-test-skip-auth': '1' },
+    payload: payload as any,
+  })
+}
+
+// ===========================================================================
+// POST /fiscal/pgdas/transmitir — regra crítica CLAUDE.md §11
+// ===========================================================================
+
+describe('POST /fiscal/pgdas/transmitir/:empresaId/:competencia', () => {
+  const url = `/fiscal/pgdas/transmitir/${EMPRESA_ID}/${COMPETENCIA}`
+
+  it('com todos documentos conciliados → 200 e status TRANSMITIDO', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0) // sem pendentes
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'apuracao-1', status: 'CALCULADO' })
+    mockDb.apuracaoFiscal.update.mockResolvedValueOnce({})
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().success).toBe(true)
+    expect(res.json().status).toBe('TRANSMITIDO')
+  })
+
+  it('com documentos PENDENTE_REVISAO → 422 (bloqueia transmissão)', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(3) // 3 pendentes
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error).toMatch(/não conciliados/i)
+    // Não deve atualizar o status
+    expect(mockDb.apuracaoFiscal.update).not.toHaveBeenCalled()
+  })
+
+  it('com 1 documento pendente → 422 com count correto na mensagem', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(1)
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().error).toMatch(/1/)
+  })
+
+  it('PGDAS não apurado → 404', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0) // sem pendentes
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/não apurado/i)
+  })
+
+  it('update seta status TRANSMITIDO na apuração', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0)
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'apuracao-1' })
+    mockDb.apuracaoFiscal.update.mockResolvedValueOnce({})
+
+    await req('POST', url)
+
+    const updateData = mockDb.apuracaoFiscal.update.mock.calls[0][0].data
+    expect(updateData.status).toBe('TRANSMITIDO')
+  })
+
+  it('count filtra por tenantId e empresaId (isolamento)', async () => {
+    mockDb.documentoFiscal.count.mockResolvedValueOnce(0)
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'ap-1' })
+    mockDb.apuracaoFiscal.update.mockResolvedValueOnce({})
+
+    await req('POST', url)
+
+    const countWhere = mockDb.documentoFiscal.count.mock.calls[0][0].where
+    expect(countWhere.tenantId).toBe(TENANT_ID)
+    expect(countWhere.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('competencia inválida (não YYYY-MM) → 400', async () => {
+    const res = await req('POST', `/fiscal/pgdas/transmitir/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('empresaId inválido (não UUID) → 400', async () => {
+    const res = await req('POST', `/fiscal/pgdas/transmitir/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/pgdas/:id/:comp — apuração
+// ===========================================================================
+
+describe('POST /fiscal/pgdas/:empresaId/:competencia', () => {
+  it('chama PGDASService.apurar e retorna resultado', async () => {
+    const resultado = { tipo: 'PGDAS', status: 'CALCULADO', valorDAS: '1500.00' }
+    mockPGDAS.apurar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/pgdas/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockPGDAS.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().valorDAS).toBe('1500.00')
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/pgdas/:id/:comp — busca apuração
+// ===========================================================================
+
+describe('GET /fiscal/pgdas/:empresaId/:competencia', () => {
+  it('apuração encontrada → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-1',
+      tipo: 'PGDAS',
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/pgdas/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('PGDAS')
+  })
+
+  it('apuração não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/pgdas/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/não encontrado/i)
+  })
+
+  it('busca com tenantId do JWT', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'ap-1' })
+
+    await req('GET', `/fiscal/pgdas/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe(EMPRESA_ID)
+    expect(where.tipo).toBe('PGDAS')
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/apuracoes
+// ===========================================================================
+
+describe('GET /fiscal/apuracoes', () => {
+  it('retorna apurações do tenant', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([{ id: 'ap-1', tipo: 'PGDAS' }])
+
+    const res = await req('GET', '/fiscal/apuracoes')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(1)
+  })
+
+  it('filtra por tenantId (isolamento)', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/apuracoes')
+
+    const { where } = mockDb.apuracaoFiscal.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
+
+  it('com ?competencia=YYYY-MM adiciona filtro', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/apuracoes?competencia=2025-05')
+
+    const { where } = mockDb.apuracaoFiscal.findMany.mock.calls[0][0]
+    expect(where.competencia).toBe('2025-05')
+  })
+
+  it('com ?tipo=PGDAS adiciona filtro de tipo', async () => {
+    mockDb.apuracaoFiscal.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/apuracoes?tipo=PGDAS')
+
+    const { where } = mockDb.apuracaoFiscal.findMany.mock.calls[0][0]
+    expect(where.tipo).toBe('PGDAS')
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/obrigacoes
+// ===========================================================================
+
+describe('GET /fiscal/obrigacoes', () => {
+  it('retorna obrigações do tenant', async () => {
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([{ id: 'obr-1', tipo: 'DAS' }])
+
+    const res = await req('GET', '/fiscal/obrigacoes')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(1)
+  })
+
+  it('filtra por tenantId', async () => {
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/obrigacoes')
+
+    const { where } = mockDb.obrigacao.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
+
+  it('com ?status=PENDENTE adiciona filtro de status', async () => {
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/obrigacoes?status=PENDENTE')
+
+    const { where } = mockDb.obrigacao.findMany.mock.calls[0][0]
+    expect(where.status).toBe('PENDENTE')
+  })
+
+  it('com ?competencia=YYYY-MM adiciona filtro de vencimento por período', async () => {
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/obrigacoes?competencia=2025-05')
+
+    const { where } = mockDb.obrigacao.findMany.mock.calls[0][0]
+    expect(where.vencimento).toBeDefined()
+    expect(where.vencimento.gte).toBeDefined()
+    expect(where.vencimento.lte).toBeDefined()
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/fator-r/:id/:comp
+// ===========================================================================
+
+describe('GET /fiscal/fator-r/:empresaId/:competencia', () => {
+  it('retorna ResultadoFatorR completo com fatorR, anexo e alíquotas', async () => {
+    mockFatorR.calcular.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Teste Ltda',
+      competencia: COMPETENCIA,
+      folha12meses: '280000.00',
+      receita12meses: '1000000.00',
+      fatorR: '28.00',
+      anexo: 'III',
+      aliquotaAnexoIII: '8.7200',
+      aliquotaAnexoV: '13.0000',
+      economiaAnexoIII: '3566.67',
+      recomendacao: 'Fator R de 28.00% permite enquadramento no Anexo III.',
+    })
+
+    const res = await req('GET', `/fiscal/fator-r/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.fatorR).toBe('28.00')
+    expect(body.anexo).toBe('III')
+    expect(body.cnpj).toBe('12345678000195')
+    expect(body.aliquotaAnexoIII).toBeDefined()
+    expect(body.recomendacao).toBeDefined()
+  })
+
+  it('chama FatorRService.calcular com tenantId, empresaId e competencia', async () => {
+    mockFatorR.calcular.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Ltda',
+      competencia: COMPETENCIA,
+      folha12meses: '0.00',
+      receita12meses: '0.00',
+      fatorR: '0.00',
+      anexo: 'V',
+      aliquotaAnexoIII: '0.0000',
+      aliquotaAnexoV: '0.0000',
+      economiaAnexoIII: '0.00',
+      recomendacao: 'Sem receita no período.',
+    })
+
+    await req('GET', `/fiscal/fator-r/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(mockFatorR.calcular).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/irpj-csll-lp/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/irpj-csll-lp/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama IrpjCsllLPService.apurar com tenantId e competencia → 200', async () => {
+    const { Decimal } = await import('@saas-contabil/shared')
+    mockIrpjCsllLP.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      trimestreLabel: '2025-T2',
+      categoria: 'servicos_gerais',
+      percentualPresuncaoIRPJ: 32,
+      percentualPresuncaoCSLL: 32,
+      receitaBrutaTrimestral: new Decimal('300000'),
+      baseCalculoIRPJ: new Decimal('96000'),
+      baseCalculoCSLL: new Decimal('96000'),
+      irpjNormal: new Decimal('14400'),
+      irpjAdicional: new Decimal('3600'),
+      irpjTotal: new Decimal('18000'),
+      csllTotal: new Decimal('8640'),
+      totalDevido: new Decimal('26640'),
+    })
+
+    const res = await req('POST', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.trimestreLabel).toBe('2025-T2')
+    expect(body.irpjTotal).toBe('18000.00')
+    expect(body.csllTotal).toBe('8640.00')
+    expect(mockIrpjCsllLP.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/2025-AB`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/irpj-csll-lp/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/irpj-csll-lp/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna apuração existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-irpj-1',
+      tipo: 'IRPJ_LP',
+      competencia: '2025-T2',
+      dados: {},
+    })
+
+    const res = await req('GET', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('IRPJ_LP')
+  })
+
+  it('apuração não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('busca com tenantId correto (isolamento multi-tenant)', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({ id: 'ap-1', tipo: 'IRPJ_LP' })
+
+    await req('GET', `/fiscal/irpj-csll-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    const { where } = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('IRPJ_LP')
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/pis-cofins-lp/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/pis-cofins-lp/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('apura PIS e COFINS para empresa LP → 200 com valores', async () => {
+    const { Decimal } = await import('@saas-contabil/shared')
+    mockPisCofinsLP.apurar.mockResolvedValueOnce({
+      cnpj: '77666555000144',
+      competencia: COMPETENCIA,
+      receitaBruta: new Decimal('100000'),
+      baseCalculo: new Decimal('100000'),
+      pis: new Decimal('650'),
+      cofins: new Decimal('3000'),
+      totalDevido: new Decimal('3650'),
+    })
+
+    const res = await req('POST', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.pis).toBe('650.00')
+    expect(body.cofins).toBe('3000.00')
+    expect(body.totalDevido).toBe('3650.00')
+    expect(mockPisCofinsLP.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/pis-cofins-lp/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/pis-cofins-lp/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna apuração existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-pis-1',
+      tipo: 'PIS',
+      competencia: COMPETENCIA,
+      dados: {},
+    })
+
+    const res = await req('GET', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('PIS')
+  })
+
+  it('apuração não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/pis-cofins-lp/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/sped-contribuicoes/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/sped-contribuicoes/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama SpedContribuicoesService.gerar e retorna 201', async () => {
+    mockSpedContrib.gerar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalPIS: '650',
+      totalCOFINS: '3000',
+      prazoEntrega: '2025-07-10',
+    })
+
+    const res = await req('POST', `/fiscal/sped-contribuicoes/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockSpedContrib.gerar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/sped-contribuicoes/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/sped-fiscal/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/sped-fiscal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama SpedFiscalService.gerar e retorna 201', async () => {
+    mockSpedFiscal.gerar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalDocumentos: 5,
+      totalICMS: '2760',
+      prazoEntrega: '2025-07-15',
+    })
+
+    const res = await req('POST', `/fiscal/sped-fiscal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockSpedFiscal.gerar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/sped-fiscal/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('regime inválido → propaga erro', async () => {
+    mockSpedFiscal.gerar.mockRejectedValueOnce(
+      new Error('SPED Fiscal é aplicável apenas para Lucro Presumido')
+    )
+    const res = await req('POST', `/fiscal/sped-fiscal/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(500)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/sped-fiscal/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/sped-fiscal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna SPED existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'sped-1',
+      tipo: 'DESTDA',
+      competencia: COMPETENCIA,
+      dados: { totalICMS: '2760' },
+    })
+
+    const res = await req('GET', `/fiscal/sped-fiscal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DESTDA')
+  })
+
+  it('SPED não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/sped-fiscal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/dctf-mensal/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/dctf-mensal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama DCTFMensalService.gerar e retorna 201', async () => {
+    const dctfData = {
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      regime: 'LUCRO_PRESUMIDO',
+      totalDebitos: '3650',
+      saldoDevedor: '3650',
+      prazoEntrega: '2025-07-15',
+      itens: [],
+    }
+    mockDCTFMensal.gerar.mockResolvedValueOnce(dctfData)
+
+    const res = await req('POST', `/fiscal/dctf-mensal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockDCTFMensal.gerar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/dctf-mensal/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('erro no serviço → propaga exceção', async () => {
+    mockDCTFMensal.gerar.mockRejectedValueOnce(
+      new Error('DCTF Mensal é obrigatória apenas para Lucro Presumido')
+    )
+    const res = await req('POST', `/fiscal/dctf-mensal/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(500)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/dctf-mensal/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/dctf-mensal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna DCTF existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'dctf-1',
+      tipo: 'DCTFWEB',
+      competencia: COMPETENCIA,
+      dados: { totalDebitos: '3650' },
+    })
+
+    const res = await req('GET', `/fiscal/dctf-mensal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DCTFWEB')
+  })
+
+  it('DCTF não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/dctf-mensal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/ecf/:empresaId/:ano
+// ===========================================================================
+
+describe('POST /fiscal/ecf/:empresaId/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama ECFService.gerar e retorna 201', async () => {
+    const ecfData = {
+      cnpj: '12345678000195',
+      ano: 2025,
+      regime: 'LUCRO_PRESUMIDO',
+      receitaBrutaAnual: '500000',
+      totalDevidoAnual: '15000',
+      dataEntrega: '2026-07-31',
+      situacao: 'GERADO',
+      trimestres: [],
+    }
+    mockECF.gerar.mockResolvedValueOnce(ecfData)
+
+    const res = await req('POST', `/fiscal/ecf/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockECF.gerar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, 2025)
+    expect(res.json().ano).toBe(2025)
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/ecf/${EMPRESA_ID}/abc`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('ECFService lança erro → propaga exceção', async () => {
+    mockECF.gerar.mockRejectedValueOnce(new Error('ECF é obrigatória apenas para Lucro Presumido'))
+
+    const res = await req('POST', `/fiscal/ecf/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(500)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/ecf/:empresaId/:ano
+// ===========================================================================
+
+describe('GET /fiscal/ecf/:empresaId/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna ECF existente → 200', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ecf-1',
+      tipo: 'ECF',
+      competencia: '2025',
+      dados: { ano: 2025, totalDevidoAnual: '15000' },
+    })
+
+    const res = await req('GET', `/fiscal/ecf/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('ECF')
+  })
+
+  it('ECF não encontrada → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/ecf/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/obrigacoes/calendario/:empresaId/:ano
+// ===========================================================================
+
+describe('POST /fiscal/obrigacoes/calendario/:empresaId/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('empresa SN → chama MonitoramentoSNService.gerarCalendarioAnual', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      regime: 'SIMPLES_NACIONAL',
+    })
+    mockMonitoramento.gerarCalendarioAnual.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, 2025)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).not.toHaveBeenCalled()
+  })
+
+  it('empresa MEI → chama MonitoramentoSNService.gerarCalendarioAnual', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({ id: EMPRESA_ID, regime: 'MEI' })
+    mockMonitoramento.gerarCalendarioAnual.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledOnce()
+  })
+
+  it('empresa LP → chama CalendarioLPLRService.gerarCalendarioAnual', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      regime: 'LUCRO_PRESUMIDO',
+    })
+    mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith(
+      TENANT_ID,
+      EMPRESA_ID,
+      2025
+    )
+    expect(mockMonitoramento.gerarCalendarioAnual).not.toHaveBeenCalled()
+  })
+
+  it('empresa LR → chama CalendarioLPLRService.gerarCalendarioAnual', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      regime: 'LUCRO_REAL',
+    })
+    mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledOnce()
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/2025`)
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('ano inválido (texto) → 400', async () => {
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/${EMPRESA_ID}/ABCD`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('empresaId não-UUID → 400', async () => {
+    const res = await req('POST', `/fiscal/obrigacoes/calendario/nao-uuid/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/obrigacoes/calendario/batch/:ano
+// ===========================================================================
+
+describe('POST /fiscal/obrigacoes/calendario/batch/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('gera calendário para todas as empresas SN/MEI ativas → 200 com totais', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, razaoSocial: 'Empresa A' },
+      { id: '550e8400-e29b-41d4-a716-446655440001', razaoSocial: 'Empresa B' },
+    ])
+    mockMonitoramento.gerarCalendarioAnual.mockResolvedValue([])
+
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch/2025')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.ano).toBe(2025)
+    expect(body.totalEmpresas).toBe(2)
+    expect(body.sucesso).toBe(2)
+    expect(body.erros).toHaveLength(0)
+  })
+
+  it('empresa com erro → retorna no array erros mas conta sucesso correto', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, razaoSocial: 'Empresa OK' },
+      { id: '550e8400-e29b-41d4-a716-446655440001', razaoSocial: 'Empresa Erro' },
+    ])
+    mockMonitoramento.gerarCalendarioAnual
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('DB timeout'))
+
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch/2025')
+
+    const body = res.json()
+    expect(body.sucesso).toBe(1)
+    expect(body.erros).toHaveLength(1)
+    expect(body.erros[0].erro).toContain('timeout')
+  })
+
+  it('filtra por tenantId, ativa=true e regime SN/MEI', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('POST', '/fiscal/obrigacoes/calendario/batch/2025')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+    expect(where.regime.in).toContain('SIMPLES_NACIONAL')
+    expect(where.regime.in).toContain('MEI')
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch/XYZ')
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/obrigacoes/calendario/batch-lplr/:ano
+// ===========================================================================
+
+describe('POST /fiscal/obrigacoes/calendario/batch-lplr/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('gera calendário para todas as empresas LP/LR ativas → 200 com totais', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, razaoSocial: 'Empresa LP' },
+      { id: '550e8400-e29b-41d4-a716-446655440002', razaoSocial: 'Empresa LR' },
+    ])
+    mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValue([])
+
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch-lplr/2025')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.ano).toBe(2025)
+    expect(body.totalEmpresas).toBe(2)
+    expect(body.sucesso).toBe(2)
+    expect(body.erros).toHaveLength(0)
+  })
+
+  it('empresa com erro → retorna no array erros mas conta sucesso correto', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, razaoSocial: 'Empresa OK' },
+      { id: '550e8400-e29b-41d4-a716-446655440002', razaoSocial: 'Empresa Erro' },
+    ])
+    mockCalendarioLPLR.gerarCalendarioAnual
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('regime inválido'))
+
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch-lplr/2025')
+
+    const body = res.json()
+    expect(body.sucesso).toBe(1)
+    expect(body.erros).toHaveLength(1)
+    expect(body.erros[0].erro).toContain('regime')
+  })
+
+  it('filtra por tenantId, ativa=true e regime LP/LR', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('POST', '/fiscal/obrigacoes/calendario/batch-lplr/2025')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+    expect(where.regime.in).toContain('LUCRO_PRESUMIDO')
+    expect(where.regime.in).toContain('LUCRO_REAL')
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('POST', '/fiscal/obrigacoes/calendario/batch-lplr/XYZ')
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// PATCH /fiscal/obrigacoes/:id
+// ===========================================================================
+
+describe('PATCH /fiscal/obrigacoes/:id', () => {
+  it('atualiza status para PAGA → 200', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({ id: 'obr-1', tenantId: TENANT_ID })
+    mockDb.obrigacao.update.mockResolvedValueOnce({ id: 'obr-1', status: 'PAGA' })
+
+    const res = await req('PATCH', '/fiscal/obrigacoes/obr-1', { status: 'PAGA' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('PAGA')
+  })
+
+  it('atualiza para DISPENSADA → 200', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({ id: 'obr-2' })
+    mockDb.obrigacao.update.mockResolvedValueOnce({ id: 'obr-2', status: 'DISPENSADA' })
+
+    const res = await req('PATCH', '/fiscal/obrigacoes/obr-2', { status: 'DISPENSADA' })
+
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('obrigação não encontrada → 404', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('PATCH', '/fiscal/obrigacoes/nao-existe', { status: 'PAGA' })
+
+    expect(res.statusCode).toBe(404)
+    expect(mockDb.obrigacao.update).not.toHaveBeenCalled()
+  })
+
+  it('status inválido → 400', async () => {
+    const res = await req('PATCH', '/fiscal/obrigacoes/obr-1', { status: 'STATUS_INVENTADO' })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('update usa tenantId do JWT no where (isolamento)', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({ id: 'obr-iso' })
+    mockDb.obrigacao.update.mockResolvedValueOnce({ id: 'obr-iso', status: 'PAGA' })
+
+    await req('PATCH', '/fiscal/obrigacoes/obr-iso', { status: 'PAGA' })
+
+    const updateWhere = mockDb.obrigacao.update.mock.calls[0][0].where
+    expect(updateWhere.tenantId).toBe(TENANT_ID)
+    expect(updateWhere.id).toBe('obr-iso')
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/fgts/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/fgts/:empresaId/:competencia', () => {
+  it('chama FGTSDigitalService.apurar e retorna resultado', async () => {
+    const resultado = { tipo: 'FGTS', status: 'CALCULADO', totalFGTS: '800.00' }
+    mockFGTS.apurar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/fgts/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockFGTS.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().totalFGTS).toBe('800.00')
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/fgts/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/fgts/${EMPRESA_ID}/202505`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/fgts/grrf/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/fgts/grrf/:empresaId/:competencia', () => {
+  it('chama FGTSDigitalService.gerarGRRF e retorna resultado', async () => {
+    const resultado = { saldoFGTS: '3000.00', multaRescisoria: '1200.00', totalGuia: '4200.00' }
+    mockFGTS.gerarGRRF = vi.fn().mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/fgts/grrf/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockFGTS.gerarGRRF).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().totalGuia).toBe('4200.00')
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/fgts/grrf/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/fgts/grrf/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/efdreinf/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/efdreinf/:empresaId/:competencia', () => {
+  it('chama EFDReinfService.processar e retorna resultado', async () => {
+    const resultado = { eventos: ['R-2010', 'R-2020'], status: 'PROCESSADO' }
+    mockEFDReinf.processar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/efdreinf/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockEFDReinf.processar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().status).toBe('PROCESSADO')
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/efdreinf/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/efdreinf/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/job/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/job/:empresaId/:competencia', () => {
+  it('empresa encontrada → enfileira job e retorna jobId', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+
+    const res = await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, {
+      operacao: 'PGDAS',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().jobId).toBe('job-123')
+    expect(res.json().operacao).toBe('PGDAS')
+    expect(res.json().status).toBe('ENFILEIRADO')
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, {
+      operacao: 'TODOS',
+    })
+
+    expect(res.statusCode).toBe(404)
+    expect(mockQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('sem operacao no body → usa TODOS por default', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+
+    const res = await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, {})
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().operacao).toBe('TODOS')
+  })
+
+  it('operacao inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, {
+      operacao: 'OPERACAO_INEXISTENTE',
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('job enfileirado inclui tenantId do JWT', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+
+    await req('POST', `/fiscal/job/${EMPRESA_ID}/${COMPETENCIA}`, { operacao: 'DIFAL' })
+
+    const jobData = mockQueue.add.mock.calls[0][1]
+    expect(jobData.tenantId).toBe(TENANT_ID)
+    expect(jobData.empresaId).toBe(EMPRESA_ID)
+    expect(jobData.operacao).toBe('DIFAL')
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/batch/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/batch/:competencia', () => {
+  it('enfileira job para cada empresa ativa', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181' },
+      { id: 'emp-2', cnpj: '99888777000166' },
+    ])
+
+    const res = await req('POST', `/fiscal/batch/${COMPETENCIA}`, { operacao: 'PGDAS' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(2)
+    expect(res.json().jobIds).toHaveLength(2)
+    expect(mockQueue.add).toHaveBeenCalledTimes(2)
+  })
+
+  it('sem empresas ativas → total: 0', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    const res = await req('POST', `/fiscal/batch/${COMPETENCIA}`, {})
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(0)
+    expect(mockQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('sem operacao → usa TODOS por default', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([{ id: 'emp-1', cnpj: '11111111000191' }])
+
+    const res = await req('POST', `/fiscal/batch/${COMPETENCIA}`, {})
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().operacao).toBe('TODOS')
+  })
+
+  it('filtra empresas por tenantId do JWT', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('POST', `/fiscal/batch/${COMPETENCIA}`, {})
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', '/fiscal/batch/202505', {})
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/monitoramento/risco-exclusao/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/monitoramento/risco-exclusao/:empresaId/:competencia', () => {
+  const url = `/fiscal/monitoramento/risco-exclusao/${EMPRESA_ID}/${COMPETENCIA}`
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/empresa não encontrada/i)
+    expect(mockMonitoramento.verificarRiscoExclusao).not.toHaveBeenCalled()
+  })
+
+  it('empresa encontrada → chama verificarRiscoExclusao com tenantId e competencia', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+    mockMonitoramento.verificarRiscoExclusao.mockResolvedValueOnce(undefined)
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    expect(mockMonitoramento.verificarRiscoExclusao).toHaveBeenCalledWith(
+      TENANT_ID,
+      EMPRESA_ID,
+      COMPETENCIA
+    )
+  })
+
+  it('retorna empresaId, cnpj, competencia e alertas', async () => {
+    const cnpj = '11222333000181'
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({ id: EMPRESA_ID, cnpj })
+    mockMonitoramento.verificarRiscoExclusao.mockResolvedValueOnce(undefined)
+    mockDb.alerta.findMany.mockResolvedValueOnce([
+      { id: 'al-1', tipo: 'RISCO_EXCLUSAO_SN', mensagem: 'Receita excedida' },
+    ])
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.empresaId).toBe(EMPRESA_ID)
+    expect(body.cnpj).toBe(cnpj)
+    expect(body.competencia).toBe(COMPETENCIA)
+    expect(body.alertas).toHaveLength(1)
+    expect(body.alertas[0].tipo).toBe('RISCO_EXCLUSAO_SN')
+  })
+
+  it('alerta.findMany filtra por tenantId e empresaId (isolamento)', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+    mockMonitoramento.verificarRiscoExclusao.mockResolvedValueOnce(undefined)
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const { where } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe(EMPRESA_ID)
+  })
+
+  it('alerta.findMany filtra tipos RISCO_EXCLUSAO_SN e SUBLIMITE_ESTADUAL', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce({
+      id: EMPRESA_ID,
+      cnpj: '11222333000181',
+    })
+    mockMonitoramento.verificarRiscoExclusao.mockResolvedValueOnce(undefined)
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const { where } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(where.tipo.in).toContain('RISCO_EXCLUSAO_SN')
+    expect(where.tipo.in).toContain('SUBLIMITE_ESTADUAL')
+  })
+
+  it('empresaId não-UUID → 400', async () => {
+    const res = await req('GET', `/fiscal/monitoramento/risco-exclusao/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('GET', `/fiscal/monitoramento/risco-exclusao/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/monitoramento/vencimentos
+// ===========================================================================
+
+describe('GET /fiscal/monitoramento/vencimentos', () => {
+  const OBRIGACAO_PENDENTE = {
+    id: 'obr-1',
+    tipo: 'DAS',
+    status: 'PENDENTE',
+    vencimento: new Date('2025-06-05T00:00:00Z'),
+  }
+  const OBRIGACAO_FUTURA = {
+    id: 'obr-2',
+    tipo: 'EFD_REINF',
+    status: 'PENDENTE',
+    vencimento: new Date('2025-06-30T00:00:00Z'),
+  }
+
+  it('retorna empresas ativas com obrigações próximas', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([OBRIGACAO_PENDENTE])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(Array.isArray(body)).toBe(true)
+    expect(body).toHaveLength(1)
+    expect(body[0].cnpj).toBe('11222333000181')
+  })
+
+  it('filtra obrigações com vencimento dentro do prazo padrão (7 dias)', async () => {
+    // nowBR mocked to 2025-06-01 → vencendoEm = 2025-06-08
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([
+      OBRIGACAO_PENDENTE, // 2025-06-05 → dentro do prazo
+      OBRIGACAO_FUTURA, // 2025-06-30 → fora do prazo
+    ])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    const body = res.json()
+    expect(body[0].obrigacoesProximas).toBe(1)
+    expect(body[0].obrigacoes).toHaveLength(1)
+    expect(body[0].obrigacoes[0].tipo).toBe('DAS')
+  })
+
+  it('filtra por tenantId do JWT (isolamento)', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+  })
+
+  it('respeita ?diasAntecedencia=1 (apenas vencimento amanhã)', async () => {
+    // nowBR = 2025-06-01 → vencendoEm com 1 dia = 2025-06-02
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([
+      OBRIGACAO_PENDENTE, // 2025-06-05 → fora do prazo de 1 dia
+    ])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos?diasAntecedencia=1')
+
+    const body = res.json()
+    expect(body[0].obrigacoesProximas).toBe(0)
+    expect(body[0].obrigacoes).toHaveLength(0)
+  })
+
+  it('usa competencia atual quando não informada', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    // nowBR mocked to '2025-06-01' → competencia = '2025-06'
+    expect(mockMonitoramento.verificarVencimentos).toHaveBeenCalledWith(
+      TENANT_ID,
+      'emp-1',
+      '2025-06'
+    )
+  })
+
+  it('respeita ?competencia=YYYY-MM passada na query', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-2', cnpj: '99888777000166', razaoSocial: 'Beta LTDA' },
+    ])
+    mockMonitoramento.verificarVencimentos.mockResolvedValueOnce([])
+
+    await req('GET', '/fiscal/monitoramento/vencimentos?competencia=2025-03')
+
+    expect(mockMonitoramento.verificarVencimentos).toHaveBeenCalledWith(
+      TENANT_ID,
+      'emp-2',
+      '2025-03'
+    )
+  })
+
+  it('processa múltiplas empresas em paralelo', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: 'emp-1', cnpj: '11222333000181', razaoSocial: 'Acme' },
+      { id: 'emp-2', cnpj: '99888777000166', razaoSocial: 'Beta' },
+      { id: 'emp-3', cnpj: '55444333000122', razaoSocial: 'Gama' },
+    ])
+    mockMonitoramento.verificarVencimentos
+      .mockResolvedValueOnce([OBRIGACAO_PENDENTE])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([OBRIGACAO_PENDENTE, OBRIGACAO_PENDENTE])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    expect(res.statusCode).toBe(200)
+    expect(mockMonitoramento.verificarVencimentos).toHaveBeenCalledTimes(3)
+    const body = res.json()
+    expect(body).toHaveLength(3)
+    expect(body[2].obrigacoesProximas).toBe(2)
+  })
+
+  it('sem empresas ativas → retorna array vazio', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    const res = await req('GET', '/fiscal/monitoramento/vencimentos')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(0)
+    expect(mockMonitoramento.verificarVencimentos).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/dms/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/dms/:empresaId/:competencia', () => {
+  it('chama DMSService.apurar e retorna resultado', async () => {
+    const resultado = {
+      competencia: COMPETENCIA,
+      cnpj: '11222333000181',
+      totalNFSe: 3,
+      totalServicos: '15000.00',
+      totalISS: '300.00',
+      porMunicipio: [],
+    }
+    mockDMS.apurar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/dms/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(mockDMS.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    expect(res.json().totalNFSe).toBe(3)
+    expect(res.json().totalISS).toBe('300.00')
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/dms/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/dms/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/difal/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/difal/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-difal-1',
+      tipo: 'DIFAL',
+      competencia: COMPETENCIA,
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/difal/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DIFAL')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('DIFAL')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/difal/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('GET', `/fiscal/difal/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/gnre/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/gnre/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-gnre-1',
+      tipo: 'GNRE',
+      competencia: COMPETENCIA,
+      status: 'PENDENTE',
+    })
+
+    const res = await req('GET', `/fiscal/gnre/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('GNRE')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('GNRE')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/gnre/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/destda/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/destda/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-destda-1',
+      tipo: 'DESTDA',
+      competencia: COMPETENCIA,
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/destda/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DESTDA')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tipo).toBe('DESTDA')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/destda/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/dms/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/dms/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-dms-1',
+      tipo: 'DMS',
+      competencia: COMPETENCIA,
+      status: 'PENDENTE',
+    })
+
+    const res = await req('GET', `/fiscal/dms/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DMS')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('DMS')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/dms/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('empresaId inválido → 400', async () => {
+    const res = await req('GET', `/fiscal/dms/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/efdreinf/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/efdreinf/:empresaId/:competencia', () => {
+  it('apuração existente → 200 com dados', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-reinf-1',
+      tipo: 'EFD_REINF',
+      competencia: COMPETENCIA,
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/efdreinf/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('EFD_REINF')
+    const where = mockDb.apuracaoFiscal.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('EFD_REINF')
+  })
+
+  it('não encontrado → 404', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/efdreinf/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('GET', `/fiscal/efdreinf/${EMPRESA_ID}/202505`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST + GET /fiscal/dasn/:empresaId/:ano
+// ===========================================================================
+
+describe('POST /fiscal/dasn/:empresaId/:ano', () => {
+  const ANO = '2024'
+  const url = `/fiscal/dasn/${EMPRESA_ID}/${ANO}`
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockDb.empresaCliente.findFirst.mockResolvedValue({
+      id: EMPRESA_ID,
+      regime: 'SIMPLES_NACIONAL',
+    })
+  })
+
+  it('retorna resultado do DasnService → 200', async () => {
+    const resultado = {
+      cnpj: '12345678000195',
+      ano: 2024,
+      receitaMensal: [],
+      receitaAnualTotal: '120000.00',
+      mesesComPGDAS: 12,
+      mesesCompletos: true,
+      obrigacaoId: 'obrig-1',
+      vencimento: '2025-03-31T12:00:00.000Z',
+    }
+    mockDasn.gerar.mockResolvedValue(resultado)
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().mesesCompletos).toBe(true)
+    expect(res.json().receitaAnualTotal).toBe('120000.00')
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('POST', url)
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/dasn/${EMPRESA_ID}/abc`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('passa tenantId para isolamento multi-tenant', async () => {
+    mockDasn.gerar.mockResolvedValue({ mesesCompletos: true, receitaAnualTotal: '0' })
+
+    await req('POST', url)
+
+    expect(mockDb.empresaCliente.findFirst.mock.calls[0][0].where.tenantId).toBe(TENANT_ID)
+  })
+})
+
+describe('GET /fiscal/dasn/:empresaId/:ano', () => {
+  const ANO = '2024'
+  const url = `/fiscal/dasn/${EMPRESA_ID}/${ANO}`
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna obrigacao DASN → 200', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({
+      id: 'obrig-1',
+      tipo: 'DASN',
+      competencia: ANO,
+      status: 'PENDENTE',
+    })
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().tipo).toBe('DASN')
+  })
+
+  it('DASN não gerada → 404', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('filtra por tenantId (isolamento)', async () => {
+    mockDb.obrigacao.findFirst.mockResolvedValueOnce({
+      id: 'obrig-1',
+      tipo: 'DASN',
+    })
+
+    await req('GET', url)
+
+    const where = mockDb.obrigacao.findFirst.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.tipo).toBe('DASN')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// GET /fiscal/compliance/resumo
+// ---------------------------------------------------------------------------
+
+describe('GET /fiscal/compliance/resumo', () => {
+  const url = '/fiscal/compliance/resumo?competencia=2025-01'
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna totais e lista de empresas → 200', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      {
+        id: EMPRESA_ID,
+        cnpj: '11111111000111',
+        razaoSocial: 'Empresa A',
+        regime: 'SIMPLES_NACIONAL',
+      },
+    ])
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([
+      { id: 'o1', tipo: 'DAS', vencimento: new Date('2025-01-20'), status: 'PAGA' },
+    ])
+
+    const res = await req('GET', url)
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.competencia).toBe('2025-01')
+    expect(body.totais.totalEmpresas).toBe(1)
+    expect(body.empresas).toHaveLength(1)
+    expect(body.empresas[0].statusGeral).toBe('EM_DIA')
+    expect(body.empresas[0].cumpridas).toBe(1)
+  })
+
+  it('empresa com obrigação atrasada → statusGeral ATRASADA', async () => {
+    // nowBR mocked to 2025-06-01T12:00:00Z — usar data anterior ao mock
+    const vencidaOntem = new Date('2025-05-20T12:00:00Z')
+
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      {
+        id: EMPRESA_ID,
+        cnpj: '11111111000111',
+        razaoSocial: 'Empresa B',
+        regime: 'SIMPLES_NACIONAL',
+      },
+    ])
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([
+      { id: 'o2', tipo: 'DAS', vencimento: vencidaOntem, status: 'PENDENTE' },
+    ])
+
+    const res = await req('GET', url)
+
+    const empresa = res.json().empresas[0]
+    expect(empresa.statusGeral).toBe('ATRASADA')
+    expect(empresa.atrasadas).toBe(1)
+    expect(res.json().totais.totalAtrasadas).toBe(1)
+  })
+
+  it('sem obrigações → statusGeral SEM_OBRIGACOES', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([
+      { id: EMPRESA_ID, cnpj: '11111111000111', razaoSocial: 'Empresa C', regime: 'MEI' },
+    ])
+    mockDb.obrigacao.findMany.mockResolvedValueOnce([])
+
+    const res = await req('GET', url)
+
+    expect(res.json().empresas[0].statusGeral).toBe('SEM_OBRIGACOES')
+  })
+
+  it('filtra obrigações pelo tenantId', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('GET', url)
+
+    const where = mockDb.empresaCliente.findMany.mock.calls[0][0].where
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.ativa).toBe(true)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/irpj-csll-lr/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/irpj-csll-lr/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama IrpjCsllLRService.apurar e retorna 201', async () => {
+    mockIrpjCsllLR.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      trimestreLabel: '2025-T2',
+      irpjTotal: '19000',
+      csllTotal: '9000',
+      totalDevido: '28000',
+    })
+
+    const res = await req('POST', `/fiscal/irpj-csll-lr/${EMPRESA_ID}/${COMPETENCIA}`, {
+      lucroContabilTrimestral: '100000',
+      adicoesLALUR: '0',
+      exclusoesLALUR: '0',
+    })
+
+    expect(res.statusCode).toBe(201)
+    expect(mockIrpjCsllLR.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('body vazio usa defaults (lucro = 0)', async () => {
+    mockIrpjCsllLR.apurar.mockResolvedValueOnce({
+      irpjTotal: '0',
+      csllTotal: '0',
+      totalDevido: '0',
+    })
+
+    const res = await req('POST', `/fiscal/irpj-csll-lr/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(201)
+    expect(mockIrpjCsllLR.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/irpj-csll-lr/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/creditos-pis-cofins-lr/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/creditos-pis-cofins-lr/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama CreditosPisCofinsLRService.apurar e retorna 201', async () => {
+    mockCreditosLR.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalDocumentosEntrada: 3,
+      totalCreditoPIS: '1650',
+      totalCreditoCOFINS: '7600',
+      totalCreditosCombinados: '9250',
+    })
+
+    const res = await req('POST', `/fiscal/creditos-pis-cofins-lr/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(201)
+    expect(mockCreditosLR.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/creditos-pis-cofins-lr/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/lalur/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/lalur/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama LALURService.apurar e retorna 201', async () => {
+    mockLALUR.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      lucroReal: '180000',
+      baseCSLL: '180000',
+    })
+
+    const res = await req('POST', `/fiscal/lalur/${EMPRESA_ID}/${COMPETENCIA}`, {
+      lucroLiquido: '200000',
+      adicoes: [{ descricao: 'Multa não dedutível', valor: '10000' }],
+      exclusoes: [{ descricao: 'Dividendos', valor: '30000' }],
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(mockLALUR.apurar).toHaveBeenCalledOnce()
+    const [tid, eid, comp] = mockLALUR.apurar.mock.calls[0]
+    expect(tid).toBe(TENANT_ID)
+    expect(eid).toBe(EMPRESA_ID)
+    expect(comp).toBe(COMPETENCIA)
+  })
+
+  it('sem adicoes/exclusoes (defaults) → 200', async () => {
+    mockLALUR.apurar.mockResolvedValueOnce({ lucroReal: '200000', baseCSLL: '200000' })
+
+    const res = await req('POST', `/fiscal/lalur/${EMPRESA_ID}/${COMPETENCIA}`, {
+      lucroLiquido: '200000',
+    })
+
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/lalur/${EMPRESA_ID}/2025-ZZ`, {
+      lucroLiquido: '100000',
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/lalur/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/lalur/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna apuração existente', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ap-1',
+      tipo: 'IRPJ_LR',
+      dados: { tipo: 'LALUR', lucroReal: '150000' },
+    })
+
+    const res = await req('GET', `/fiscal/lalur/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('404 quando não encontrado', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', `/fiscal/lalur/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/simulador-tributario
+// ===========================================================================
+
+describe('POST /fiscal/simulador-tributario', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama SimuladorTributarioService.simular e retorna resultado', async () => {
+    mockSimulador.simular.mockResolvedValueOnce({
+      receitaBrutaAnual: '500000',
+      atividade: 'comercio',
+      resultados: [
+        { regime: 'SIMPLES_NACIONAL', totalTributos: '47500', cargaEfetiva: '0.095' },
+        { regime: 'LUCRO_PRESUMIDO', totalTributos: '91000', cargaEfetiva: '0.182' },
+        { regime: 'LUCRO_REAL', totalTributos: '100000', cargaEfetiva: '0.200' },
+      ],
+      melhorRegime: 'SIMPLES_NACIONAL',
+      economiaAnual: '52500',
+    })
+
+    const res = await req('POST', '/fiscal/simulador-tributario', {
+      receitaBrutaAnual: '500000',
+      atividade: 'comercio',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body)
+    expect(body.melhorRegime).toBe('SIMPLES_NACIONAL')
+    expect(mockSimulador.simular).toHaveBeenCalledOnce()
+    const [tid] = mockSimulador.simular.mock.calls[0]
+    expect(tid).toBe(TENANT_ID)
+  })
+
+  it('atividade default é servicos quando não informada', async () => {
+    mockSimulador.simular.mockResolvedValueOnce({
+      resultados: [],
+      melhorRegime: 'LUCRO_REAL',
+      economiaAnual: '0',
+    })
+
+    await req('POST', '/fiscal/simulador-tributario', { receitaBrutaAnual: '300000' })
+
+    const [, , atividade] = mockSimulador.simular.mock.calls[0]
+    expect(atividade).toBe('servicos')
+  })
+
+  it('body sem receitaBrutaAnual → 400', async () => {
+    const res = await req('POST', '/fiscal/simulador-tributario', {})
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/diagnostico/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/diagnostico/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna diagnóstico fiscal', async () => {
+    const mockDiagnostico = {
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Ltda',
+      regime: 'SIMPLES_NACIONAL',
+      competencia: COMPETENCIA,
+      itens: [],
+      indicador: { total: 0, ok: 0, pendentes: 0, atrasados: 0, percentualCompliance: 100 },
+      alertasAtivos: 0,
+      documentosPendenteConciliacao: 0,
+      recomendacoes: [],
+    }
+
+    const diagService = (await import('@saas-contabil/fiscal')).DiagnosticoFiscalService as any
+    diagService.mockImplementation(() => ({
+      diagnosticar: vi.fn().mockResolvedValue(mockDiagnostico),
+    }))
+
+    const res = await req('GET', `/fiscal/diagnostico/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(200)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/relatorio/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/relatorio/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna relatório fiscal consolidado', async () => {
+    mockRelatorio.gerar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      razaoSocial: 'Empresa Ltda',
+      competencia: COMPETENCIA,
+      geradoEm: new Date(),
+      regime: 'SIMPLES_NACIONAL',
+      tributos: [
+        {
+          tributo: 'DAS (Simples Nacional)',
+          regime: 'SIMPLES_NACIONAL',
+          baseCalculo: '300000',
+          aliquota: '0.073',
+          valorApurado: '21900',
+          valorPago: '21900',
+          status: 'PAGO',
+        },
+      ],
+      totalApurado: '21900',
+      totalPago: '21900',
+      totalPendente: '0',
+      percentualPago: 100,
+    })
+
+    const res = await req('GET', `/fiscal/relatorio/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body)
+    expect(body.percentualPago).toBe(100)
+    expect(mockRelatorio.gerar).toHaveBeenCalledOnce()
+    const [tid, eid, comp] = mockRelatorio.gerar.mock.calls[0]
+    expect(tid).toBe(TENANT_ID)
+    expect(eid).toBe(EMPRESA_ID)
+    expect(comp).toBe(COMPETENCIA)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/retencoes-fonte/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/retencoes-fonte/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama RetencoesNaFonteService.apurar e retorna 201', async () => {
+    mockRetencoes.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalIRRF: '5000',
+      totalINSS: '2200',
+      totalCSLL: '1500',
+      totalPIS: '800',
+      totalCOFINS: '1700',
+      totalRetencoes: '11200',
+    })
+
+    const res = await req('POST', `/fiscal/retencoes-fonte/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(201)
+    expect(mockRetencoes.apurar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/retencoes-fonte/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/retencoes-fonte/:empresaId/:competencia
+// ===========================================================================
+
+describe('GET /fiscal/retencoes-fonte/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna 200 com apuração existente', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'ret-1',
+      tipo: 'DCTFWEB',
+      dados: { totalRetencoes: '11200' },
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/retencoes-fonte/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('retorna 404 se não encontrada', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/retencoes-fonte/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/irpj-csll-lr-estimativa/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/irpj-csll-lr-estimativa/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('chama IrpjCsllLREstimativaService.apurar e retorna 201', async () => {
+    mockEstimativaLR.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      receitaBruta: '200000',
+      baseIRPJEstimada: '64000',
+      irpjEstimativa: '9600',
+      csllEstimativa: '5760',
+      totalEstimativa: '15360',
+      adicionalIRPJ: '0',
+    })
+
+    const res = await req('POST', `/fiscal/irpj-csll-lr-estimativa/${EMPRESA_ID}/${COMPETENCIA}`, {
+      atividadePrincipal: 'servicos',
+    })
+    expect(res.statusCode).toBe(201)
+    expect(mockEstimativaLR.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('body vazio usa defaults', async () => {
+    mockEstimativaLR.apurar.mockResolvedValueOnce({ irpjEstimativa: '0', csllEstimativa: '0' })
+    const res = await req('POST', `/fiscal/irpj-csll-lr-estimativa/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(201)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/irpj-csll-lr-estimativa/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/prejuizos-fiscais-lr/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/prejuizos-fiscais-lr/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('registra prejuízo e retorna 201', async () => {
+    mockPrejuizos.registrarPrejuizo.mockResolvedValueOnce(undefined)
+
+    const res = await req('POST', `/fiscal/prejuizos-fiscais-lr/${EMPRESA_ID}/${COMPETENCIA}`, {
+      prejuizoIRPJ: '50000',
+      prejuizoCSLL: '50000',
+    })
+    expect(res.statusCode).toBe(201)
+    const body = JSON.parse(res.body)
+    expect(body.ok).toBe(true)
+    expect(mockPrejuizos.registrarPrejuizo).toHaveBeenCalledOnce()
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/prejuizos-fiscais-lr/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/prejuizos-fiscais-lr/:empresaId/:competencia/compensar
+// ===========================================================================
+
+describe('POST /fiscal/prejuizos-fiscais-lr/:empresaId/:competencia/compensar', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('calcula compensação e retorna 200', async () => {
+    mockPrejuizos.compensar.mockResolvedValueOnce({
+      razaoSocial: 'Empresa Teste',
+      compensacaoIRPJ: '30000',
+      compensacaoCSLL: '30000',
+      saldoPrejuizoIRPJ: '20000',
+      saldoPrejuizoCSLL: '20000',
+      prejuizosAcumulados: [],
+    })
+
+    const res = await req(
+      'POST',
+      `/fiscal/prejuizos-fiscais-lr/${EMPRESA_ID}/${COMPETENCIA}/compensar`,
+      { lucroRealDoperiodo: '100000', baseCSLLdoPeriodo: '100000' }
+    )
+    expect(res.statusCode).toBe(200)
+    expect(mockPrejuizos.compensar).toHaveBeenCalledOnce()
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/prejuizos-fiscais-lr/${EMPRESA_ID}/2025-ZZ/compensar`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/depreciacao-lr/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/depreciacao-lr/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('calcula depreciação com lista de bens e retorna 200', async () => {
+    mockDepreciacaoLR.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalBens: 1,
+      totalValorAquisicao: '50000',
+      totalDepreciacaoMensal: '833.33',
+      totalDepreciacaoAcumulada: '5000',
+      totalValorContabil: '45000',
+      itens: [],
+    })
+
+    const res = await req('POST', `/fiscal/depreciacao-lr/${EMPRESA_ID}/${COMPETENCIA}`, {
+      bens: [
+        {
+          id: 'bem-1',
+          descricao: 'Servidor',
+          categoria: 'computadores_perifericos',
+          valorAquisicao: '50000',
+          dataAquisicao: '2023-01-01',
+          turnoTrabalho: 'simples',
+          valorResidual: '0',
+        },
+      ],
+    })
+    expect(res.statusCode).toBe(200)
+    expect(mockDepreciacaoLR.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('lista de bens vazia usa default (array vazio)', async () => {
+    mockDepreciacaoLR.apurar.mockResolvedValueOnce({ totalBens: 0, itens: [] })
+    const res = await req('POST', `/fiscal/depreciacao-lr/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/depreciacao-lr/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/depreciacao-lr/categorias
+// ===========================================================================
+
+describe('GET /fiscal/depreciacao-lr/categorias', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna lista de categorias de depreciação', async () => {
+    const res = await req('GET', '/fiscal/depreciacao-lr/categorias')
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body)
+    expect(body.categorias).toBeDefined()
+    expect(Array.isArray(body.categorias)).toBe(true)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/inss-patronal/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/inss-patronal/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('calcula INSS patronal e retorna 200', async () => {
+    mockINSS.calcular.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      competencia: COMPETENCIA,
+      totalFolha: '50000',
+      totalCPP: '11000',
+      totalGILRAT: '1000',
+      totalTerceiros: '1500',
+      totalEncargos: '13500',
+      itensPorFuncionario: [],
+    })
+
+    const res = await req('POST', `/fiscal/inss-patronal/${EMPRESA_ID}/${COMPETENCIA}`, {
+      funcionarios: [{ id: 'f1', nome: 'João Silva', salarioBase: '5000' }],
+      grauRisco: 'medio',
+      fap: '1.0',
+      atividadeTerceiros: 'comercio',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(mockINSS.calcular).toHaveBeenCalledOnce()
+  })
+
+  it('body vazio usa defaults (sem funcionários)', async () => {
+    mockINSS.calcular.mockResolvedValueOnce({ totalEncargos: '0', itensPorFuncionario: [] })
+    const res = await req('POST', `/fiscal/inss-patronal/${EMPRESA_ID}/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('competencia inválida → 400', async () => {
+    const res = await req('POST', `/fiscal/inss-patronal/${EMPRESA_ID}/2025-ZZ`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/ajuste-anual-lr/:empresaId/:ano
+// ===========================================================================
+
+describe('POST /fiscal/ajuste-anual-lr/:empresaId/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('apura ajuste anual LR e retorna 200', async () => {
+    mockAjusteAnual.apurar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      ano: 2025,
+      lucroRealAnual: '500000',
+      irpjDevido: '75000',
+      csllDevida: '45000',
+      totalDevido: '120000',
+    })
+
+    const res = await req('POST', `/fiscal/ajuste-anual-lr/${EMPRESA_ID}/2025`, {
+      lucroRealAnual: '500000',
+      adicoesLALUR: '0',
+      exclusoesLALUR: '0',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(mockAjusteAnual.apurar).toHaveBeenCalledOnce()
+  })
+
+  it('ano inválido (não numérico) → 400', async () => {
+    const res = await req('POST', `/fiscal/ajuste-anual-lr/${EMPRESA_ID}/ABCD`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/ajuste-anual-lr/:empresaId/:ano
+// ===========================================================================
+
+describe('GET /fiscal/ajuste-anual-lr/:empresaId/:ano', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna 200 com apuração existente', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'aj-1',
+      tipo: 'IRPJ_LR',
+      dados: { lucroRealAnual: '500000' },
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/ajuste-anual-lr/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('retorna 404 quando não encontrado', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/ajuste-anual-lr/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('ano inválido → 400', async () => {
+    const res = await req('GET', `/fiscal/ajuste-anual-lr/${EMPRESA_ID}/ABCD`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/planejamento-tributario/:empresaId
+// ===========================================================================
+
+describe('POST /fiscal/planejamento-tributario/:empresaId', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('analisa planejamento tributário e retorna resultado', async () => {
+    mockPlanejamento.analisar.mockResolvedValueOnce({
+      cnpj: '12345678000195',
+      exercicio: '2025',
+      melhorRegime: 'SIMPLES_NACIONAL',
+      economiaEstimada: '50000',
+      comparativo: [],
+    })
+
+    const res = await req('POST', `/fiscal/planejamento-tributario/${EMPRESA_ID}`, {
+      exercicio: 2025,
+      receitaProjetadaAnual: '1200000',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(mockPlanejamento.analisar).toHaveBeenCalledOnce()
+  })
+
+  it('empresaId inválido (não UUID) → 400', async () => {
+    const res = await req('POST', '/fiscal/planejamento-tributario/nao-uuid', {
+      exercicio: 2025,
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// GET /fiscal/planejamento-tributario/:empresaId/:exercicio
+// ===========================================================================
+
+describe('GET /fiscal/planejamento-tributario/:empresaId/:exercicio', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('retorna 200 com planejamento existente', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce({
+      id: 'plan-1',
+      tipo: 'PLANEJAMENTO_TRIBUTARIO',
+      dados: { melhorRegime: 'SIMPLES_NACIONAL' },
+      status: 'CALCULADO',
+    })
+
+    const res = await req('GET', `/fiscal/planejamento-tributario/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('retorna 404 quando não encontrado', async () => {
+    mockDb.apuracaoFiscal.findFirst.mockResolvedValueOnce(null)
+    const res = await req('GET', `/fiscal/planejamento-tributario/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('exercicio inválido (não 4 dígitos) → 400', async () => {
+    const res = await req('GET', `/fiscal/planejamento-tributario/${EMPRESA_ID}/25`)
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// POST /fiscal/esocial/:empresaId/:competencia
+// ===========================================================================
+
+describe('POST /fiscal/esocial/:empresaId/:competencia', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('processa eSocial e retorna resultado → 200', async () => {
+    const resultado = {
+      empresaId: EMPRESA_ID,
+      competencia: COMPETENCIA,
+      eventos: ['S-1200', 'S-1210'],
+      status: 'TRANSMITIDO',
+    }
+    mockESocial.processar.mockResolvedValueOnce(resultado)
+
+    const res = await req('POST', `/fiscal/esocial/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual(resultado)
+  })
+
+  it('chama ESocialService.processar com tenantId, empresaId e competencia corretos', async () => {
+    mockESocial.processar.mockResolvedValueOnce({ status: 'TRANSMITIDO' })
+
+    await req('POST', `/fiscal/esocial/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(mockESocial.processar).toHaveBeenCalledOnce()
+    expect(mockESocial.processar).toHaveBeenCalledWith(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+  })
+
+  it('empresaId inválido (não UUID) → 400', async () => {
+    const res = await req('POST', `/fiscal/esocial/nao-uuid/${COMPETENCIA}`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('competencia com formato inválido → 400', async () => {
+    const res = await req('POST', `/fiscal/esocial/${EMPRESA_ID}/2025`)
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('erro no serviço → 500', async () => {
+    mockESocial.processar.mockRejectedValueOnce(new Error('Falha eSocial'))
+
+    const res = await req('POST', `/fiscal/esocial/${EMPRESA_ID}/${COMPETENCIA}`)
+
+    expect(res.statusCode).toBe(500)
+  })
+})

@@ -26,5 +26,8 @@ export function isZero(value: Decimal): boolean {
 }
 
 export function formatBRL(value: Decimal): string {
-  return value.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return value
+    .toFixed(2)
+    .replace('.', ',')
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }

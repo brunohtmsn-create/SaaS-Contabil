@@ -1,9 +1,11 @@
 import { FastifyInstance } from 'fastify'
-import { Queue, QueueEvents } from 'bullmq'
-import IORedis from 'ioredis'
+import { Queue, QueueEvents, JobProgress } from 'bullmq'
+import { Redis as IORedis } from 'ioredis'
 
 export async function wsRoutes(app: FastifyInstance) {
-  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null })
+  const redis = new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+  })
   const fechamentoQueue = new Queue('fechamento', { connection: redis })
 
   // WS: status em tempo real do job de fechamento
@@ -12,7 +14,9 @@ export async function wsRoutes(app: FastifyInstance) {
     const { jobId } = request.params as { jobId: string }
 
     const queueEvents = new QueueEvents('fechamento', {
-      connection: new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', { maxRetriesPerRequest: null }),
+      connection: new IORedis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+        maxRetriesPerRequest: null,
+      }),
     })
 
     const send = (data: object) => {
@@ -21,7 +25,7 @@ export async function wsRoutes(app: FastifyInstance) {
       }
     }
 
-    const onProgress = async ({ jobId: jid, data }: { jobId: string; data: number | object }) => {
+    const onProgress = ({ jobId: jid, data }: { jobId: string; data: JobProgress }) => {
       if (jid !== jobId) return
       send({ type: 'progress', progress: data, jobId })
     }
@@ -38,16 +42,10 @@ export async function wsRoutes(app: FastifyInstance) {
       cleanup()
     }
 
-    const onLog = ({ jobId: jid, log }: { jobId: string; log: string }) => {
-      if (jid !== jobId) return
-      send({ type: 'log', jobId, log })
-    }
-
     const cleanup = () => {
       queueEvents.off('progress', onProgress)
       queueEvents.off('completed', onCompleted)
       queueEvents.off('failed', onFailed)
-      queueEvents.off('added', onLog)
       queueEvents.close()
     }
 

@@ -17,7 +17,12 @@ export class ConciliacaoBancariaService {
     })
 
     const docs = await this.db.documentoFiscal.findMany({
-      where: { tenantId, empresaId, dataCompetencia: { gte: inicio, lte: fim }, status: 'CONCILIADO' },
+      where: {
+        tenantId,
+        empresaId,
+        dataCompetencia: { gte: inicio, lte: fim },
+        status: 'CONCILIADO',
+      },
     })
 
     for (const tx of transacoes) {

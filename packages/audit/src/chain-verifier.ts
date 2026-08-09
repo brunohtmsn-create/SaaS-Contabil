@@ -31,8 +31,8 @@ export class AuditChainVerifier {
       const payload = { ...rest, hashAnterior }
       const expectedHash = sha256(
         JSON.stringify(payload, (_key, value) =>
-          typeof value === 'bigint' ? value.toString() : value,
-        ),
+          typeof value === 'bigint' ? value.toString() : value
+        )
       )
 
       if (expectedHash !== hashEvento) {
@@ -46,10 +46,8 @@ export class AuditChainVerifier {
     return {
       integro: !primeiraFalha,
       totalEventos: eventos.length,
-      eventosVerificados: primeiraFalha
-        ? Number(primeiraFalha.sequencia) - 1
-        : eventos.length,
-      primeiraFalha,
+      eventosVerificados: primeiraFalha ? Number(primeiraFalha.sequencia) - 1 : eventos.length,
+      ...(primeiraFalha !== undefined && { primeiraFalha }),
     }
   }
 }

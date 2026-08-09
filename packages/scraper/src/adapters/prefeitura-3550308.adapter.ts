@@ -45,17 +45,13 @@ const SEL = {
   BTN_PROXIMA: 'a[title="Próxima página"]',
 } as const
 
-export class Prefeitura3550308Adapter
-  extends BasePLaywrightAdapter
-  implements PrefeituraAdapter
-{
+export class Prefeitura3550308Adapter extends BasePLaywrightAdapter implements PrefeituraAdapter {
   tipo = 'NFSE_EMITIDA'
   fonte = 'PREFEITURA_SP'
   municipio = 'São Paulo'
   ibge = '3550308'
 
   private session: Session | null = null
-  private storage = new StorageService()
 
   // ─────────────────────────────────────────────────────────────────────────
   // Autenticação
@@ -77,7 +73,7 @@ export class Prefeitura3550308Adapter
         // Resolver CAPTCHA se presente
         const hasCaptcha = await page.isVisible(SEL.CAPTCHA_IMG)
         if (hasCaptcha) {
-          await this.solveCaptcha(page)
+          await this.resolverCaptchaLocal(page)
         }
 
         // Preencher credenciais
@@ -91,7 +87,7 @@ export class Prefeitura3550308Adapter
         const loginError = await page.isVisible(SEL.MSG_ERRO_LOGIN)
         if (loginError) {
           const msg = await page.textContent(SEL.MSG_ERRO_LOGIN)
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             credData.login,
             'sp-prefeitura-login',
@@ -101,9 +97,7 @@ export class Prefeitura3550308Adapter
 
         // Coletar cookies da sessão
         const cookies = await page.context().cookies()
-        const cookieStr = cookies
-          .map((c) => `${c.name}=${c.value}`)
-          .join('; ')
+        const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
         return {
           cookies: cookieStr,
@@ -141,10 +135,10 @@ export class Prefeitura3550308Adapter
       this.withPage(async (page) => {
         await this.aplicarSessao(page)
 
-        await page.goto(
-          `${BASE_URL}/contribuinte/nota/consultanota.aspx`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/contribuinte/nota/consultanota.aspx`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroData(page, periodo)
 
@@ -184,10 +178,10 @@ export class Prefeitura3550308Adapter
       this.withPage(async (page) => {
         await this.aplicarSessao(page)
 
-        await page.goto(
-          `${BASE_URL}/contribuinte/nota/consultanotatomador.aspx`,
-          { waitUntil: 'networkidle', timeout: 60_000 }
-        )
+        await page.goto(`${BASE_URL}/contribuinte/nota/consultanotatomador.aspx`, {
+          waitUntil: 'networkidle',
+          timeout: 60_000,
+        })
 
         await this.preencherFiltroData(page, periodo)
 
@@ -245,7 +239,7 @@ export class Prefeitura3550308Adapter
 
           return Buffer.concat(chunks).toString('utf8')
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `sp-xml-${doc.numero}`,
@@ -283,7 +277,7 @@ export class Prefeitura3550308Adapter
 
           return Buffer.concat(chunks)
         } catch (err) {
-          await this.captureAndThrow(
+          return this.captureAndThrow(
             page,
             doc.cnpjEmitente,
             `sp-pdf-${doc.numero}`,
@@ -384,7 +378,7 @@ export class Prefeitura3550308Adapter
    * Placeholder — a lógica real de 2Captcha/AntiCaptcha será implementada
    * no módulo dedicado de CAPTCHA.
    */
-  private async solveCaptcha(page: Page): Promise<void> {
+  private async resolverCaptchaLocal(page: Page): Promise<void> {
     // TODO: integrar com CaptchaSolverService (2Captcha → AntiCaptcha)
     // O serviço receberá a imagem em base64 e retornará o texto
     const captchaImg = page.locator(SEL.CAPTCHA_IMG)
@@ -397,28 +391,6 @@ export class Prefeitura3550308Adapter
       return
     }
 
-    throw new Error(
-      'Prefeitura SP: CAPTCHA detectado — CaptchaSolverService ainda não integrado'
-    )
-  }
-
-  /**
-   * Tira screenshot, faz upload ao S3 e lança erro com a mensagem fornecida.
-   * Garante conformidade com a regra: screenshot obrigatório antes de throw.
-   */
-  private async captureAndThrow(
-    page: Page,
-    cnpj: string,
-    jobId: string,
-    mensagem: string
-  ): Promise<never> {
-    try {
-      const screenshot = await page.screenshot({ fullPage: true })
-      const s3Key = S3KeyBuilder.erroScreenshot(cnpj, jobId)
-      await this.storage.upload(s3Key, screenshot, 'image/png')
-    } catch {
-      // não mascarar o erro original
-    }
-    throw new Error(mensagem)
+    throw new Error('Prefeitura SP: CAPTCHA detectado — CaptchaSolverService ainda não integrado')
   }
 }

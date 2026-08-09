@@ -1,0 +1,751 @@
+/**
+ * Testes de integração — empresa.routes.ts
+ *
+ * Cobre:
+ *  GET /empresas — lista empresas ativas do tenant com filtros
+ *  GET /empresas/:id — detalhe com 404 em ausência
+ *  POST /empresas — cria empresa, verifica duplicata CNPJ, valida campos
+ *  PATCH /empresas/:id — atualiza parcialmente, 404 em ausência
+ *  DELETE /empresas/:id — soft delete (ativa: false)
+ *  GET /empresas/:id/alertas — alertas não lidos da empresa
+ *
+ * Isolamento: PrismaClient mockado; JWT bypassed via hook de teste.
+ */
+
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
+import Fastify, { FastifyInstance } from 'fastify'
+import jwt from '@fastify/jwt'
+import { ZodError } from 'zod'
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+const { mockDb } = vi.hoisted(() => ({
+  mockDb: {
+    empresaCliente: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    alerta: {
+      findMany: vi.fn(),
+    },
+  },
+}))
+
+vi.mock('@saas-contabil/database', () => ({
+  getPrismaClient: vi.fn(() => mockDb),
+}))
+
+const mockMonitoramento = { gerarCalendarioAnual: vi.fn().mockResolvedValue([]) }
+const mockCalendarioLPLR = { gerarCalendarioAnual: vi.fn().mockResolvedValue([]) }
+
+vi.mock('@saas-contabil/fiscal', () => ({
+  MonitoramentoSNService: vi.fn(() => mockMonitoramento),
+  CalendarioLPLRService: vi.fn(() => mockCalendarioLPLR),
+}))
+
+vi.mock('@saas-contabil/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@saas-contabil/shared')>()
+  return { ...actual, nowBR: vi.fn(() => new Date('2025-06-01T12:00:00Z')) }
+})
+
+import { empresaRoutes, limparCacheCNPJ } from '../routes/empresa.routes.js'
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+const TENANT_ID = 'tenant-abc'
+const USER_ID = 'user-abc'
+
+let app: FastifyInstance
+
+beforeAll(async () => {
+  app = Fastify({ logger: false })
+  await app.register(jwt, { secret: 'test-secret-key-32-chars-minimum!!' })
+
+  app.addHook('onRequest', async (request) => {
+    if (request.headers['x-test-skip-auth'] === '1') {
+      ;(request as any).user = { sub: USER_ID, tenantId: TENANT_ID, perfil: 'ADMIN' }
+    }
+  })
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({ error: 'Dados inválidos', detalhes: error.errors })
+    }
+    const statusCode = error.statusCode ?? 500
+    return reply.code(statusCode).send({ error: error.message ?? 'Erro interno' })
+  })
+
+  await app.register(empresaRoutes, { prefix: '/empresas' })
+  await app.ready()
+})
+
+afterAll(async () => {
+  await app.close()
+})
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockMonitoramento.gerarCalendarioAnual.mockResolvedValue([])
+  mockCalendarioLPLR.gerarCalendarioAnual.mockResolvedValue([])
+})
+
+function req(method: string, url: string, payload?: unknown) {
+  return app.inject({
+    method: method as any,
+    url,
+    headers: { 'x-test-skip-auth': '1' },
+    payload: payload as any,
+  })
+}
+
+function empresaBase(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'emp-1',
+    tenantId: TENANT_ID,
+    cnpj: '11222333000181',
+    razaoSocial: 'Tech Ltda',
+    nomeFantasia: 'Tech',
+    regime: 'SIMPLES_NACIONAL',
+    cnae: '6201500',
+    uf: 'SP',
+    municipio: 'São Paulo',
+    ibge: '3550308',
+    dataAbertura: new Date('2020-01-01'),
+    ativa: true,
+    criadoEm: new Date(),
+    ...overrides,
+  }
+}
+
+// ===========================================================================
+// GET /empresas
+// ===========================================================================
+
+describe('GET /empresas', () => {
+  it('retorna lista de empresas do tenant', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([empresaBase()])
+
+    const res = await req('GET', '/empresas')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(1)
+    expect(res.json()[0].cnpj).toBe('11222333000181')
+  })
+
+  it('filtra por tenantId do JWT (isolamento)', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/empresas')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
+
+  it('por padrão filtra ativa: true', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/empresas')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.ativa).toBe(true)
+  })
+
+  it('com incluiInativas=true não adiciona filtro ativa', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/empresas?incluiInativas=true')
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.ativa).toBeUndefined()
+  })
+
+  it('retorna array vazio quando não há empresas', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+
+    const res = await req('GET', '/empresas')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([])
+  })
+})
+
+// ===========================================================================
+// GET /empresas/:id
+// ===========================================================================
+
+describe('GET /empresas/:id', () => {
+  it('empresa encontrada → 200 com dados', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(empresaBase())
+
+    const res = await req('GET', '/empresas/emp-1')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().id).toBe('emp-1')
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('GET', '/empresas/nao-existe')
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/não encontrada/i)
+  })
+
+  it('busca com tenantId do JWT (não qualquer tenant)', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(empresaBase())
+
+    await req('GET', '/empresas/emp-1')
+
+    const { where } = mockDb.empresaCliente.findFirst.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.id).toBe('emp-1')
+  })
+})
+
+// ===========================================================================
+// POST /empresas
+// ===========================================================================
+
+describe('POST /empresas', () => {
+  const payload = {
+    cnpj: '11222333000181',
+    razaoSocial: 'Nova Empresa Ltda',
+    regime: 'SIMPLES_NACIONAL',
+    cnae: '6201500',
+    uf: 'SP',
+    municipio: 'São Paulo',
+    ibge: '3550308',
+    dataAbertura: '2022-01-01',
+  }
+
+  it('empresa criada → 200 com id', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-new', ...payload })
+
+    const res = await req('POST', '/empresas', payload)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().id).toBe('emp-new')
+  })
+
+  it('CNPJ com length errado → 400', async () => {
+    const res = await req('POST', '/empresas', { ...payload, cnpj: '123456' })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('CNPJ com dígitos verificadores inválidos → 400', async () => {
+    // 11222333000100 tem dígitos verificadores errados (correto seria 81)
+    const res = await req('POST', '/empresas', { ...payload, cnpj: '11222333000100' })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('regime inválido → 400', async () => {
+    const res = await req('POST', '/empresas', { ...payload, regime: 'MEI_GOLD' })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('CNPJ duplicado no tenant → 409', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(empresaBase())
+
+    const res = await req('POST', '/empresas', payload)
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error).toMatch(/já cadastrado/i)
+  })
+
+  it('cria empresa com tenantId do JWT', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-new' })
+
+    await req('POST', '/empresas', payload)
+
+    const { data } = mockDb.empresaCliente.create.mock.calls[0][0]
+    expect(data.tenantId).toBe(TENANT_ID)
+  })
+
+  it('nomeFantasia é opcional', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-new' })
+
+    const res = await req('POST', '/empresas', payload) // sem nomeFantasia
+
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('SN → gera calendário anual automaticamente após criação', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-sn' })
+
+    await req('POST', '/empresas', { ...payload, regime: 'SIMPLES_NACIONAL' })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledOnce()
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-sn', 2025)
+  })
+
+  it('MEI → gera calendário anual automaticamente após criação', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-mei' })
+
+    await req('POST', '/empresas', { ...payload, regime: 'MEI' })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledOnce()
+  })
+
+  it('LUCRO_PRESUMIDO → gera calendário LP/LR (não SN)', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-lp' })
+
+    await req('POST', '/empresas', { ...payload, regime: 'LUCRO_PRESUMIDO' })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).not.toHaveBeenCalled()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledOnce()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-lp', 2025)
+  })
+
+  it('LUCRO_REAL → gera calendário LP/LR automaticamente', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-lr' })
+
+    await req('POST', '/empresas', { ...payload, regime: 'LUCRO_REAL' })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).not.toHaveBeenCalled()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledOnce()
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-lr', 2025)
+  })
+
+  it('falha no calendário LP/LR não bloqueia cadastro da empresa', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-lp2' })
+    mockCalendarioLPLR.gerarCalendarioAnual.mockRejectedValueOnce(new Error('DB error'))
+
+    const res = await req('POST', '/empresas', { ...payload, regime: 'LUCRO_PRESUMIDO' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().id).toBe('emp-lp2')
+  })
+
+  it('falha no calendário SN não bloqueia cadastro da empresa', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-sn2' })
+    mockMonitoramento.gerarCalendarioAnual.mockRejectedValueOnce(new Error('DB error'))
+
+    const res = await req('POST', '/empresas', payload)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().id).toBe('emp-sn2')
+  })
+})
+
+// ===========================================================================
+// GET /empresas/consultar-cnpj/:cnpj
+// ===========================================================================
+
+describe('GET /empresas/consultar-cnpj/:cnpj', () => {
+  const brasilApiResposta = {
+    razao_social: 'Empresa Consultada Ltda',
+    nome_fantasia: 'Consultada',
+    cnae_fiscal: 6201500,
+    uf: 'SP',
+    municipio: 'SAO PAULO',
+    codigo_municipio_ibge: 3550308,
+    data_inicio_atividade: '2019-03-20',
+    opcao_pelo_simples: true,
+    opcao_pelo_mei: false,
+    descricao_situacao_cadastral: 'ATIVA',
+  }
+
+  const mockFetch = vi.fn()
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch)
+    mockFetch.mockReset()
+    limparCacheCNPJ()
+  })
+
+  it('CNPJ válido → 200 com dados mapeados e regime sugerido', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => brasilApiResposta,
+    })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.razaoSocial).toBe('Empresa Consultada Ltda')
+    expect(body.cnae).toBe('6201500')
+    expect(body.ibge).toBe('3550308')
+    expect(body.dataAbertura).toBe('2019-03-20')
+    expect(body.regimeSugerido).toBe('SIMPLES_NACIONAL')
+    expect(body.situacaoCadastral).toBe('ATIVA')
+  })
+
+  it('aceita CNPJ com máscara (pontuação)', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => brasilApiResposta,
+    })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11.222.333%2F0001-81')
+
+    expect(res.statusCode).toBe(200)
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('11222333000181'),
+      expect.any(Object)
+    )
+  })
+
+  it('opcao_pelo_mei=true → regimeSugerido MEI', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ...brasilApiResposta, opcao_pelo_mei: true }),
+    })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.json().regimeSugerido).toBe('MEI')
+  })
+
+  it('sem opção pelo Simples nem MEI → regimeSugerido null', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ...brasilApiResposta,
+        opcao_pelo_simples: false,
+        opcao_pelo_mei: false,
+      }),
+    })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.json().regimeSugerido).toBeNull()
+  })
+
+  it('CNPJ com dígitos verificadores inválidos → 400 sem chamar BrasilAPI', async () => {
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000100')
+
+    expect(res.statusCode).toBe(400)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('BrasilAPI retorna 404 → 404 CNPJ não encontrado', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({}) })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error).toMatch(/não encontrado/i)
+  })
+
+  it('BrasilAPI fora do ar (erro de rede) → 502', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('network error'))
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.statusCode).toBe(502)
+  })
+
+  it('BrasilAPI retorna 500 → 502', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+
+    const res = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res.statusCode).toBe(502)
+  })
+
+  it('segunda consulta do mesmo CNPJ usa cache (não chama BrasilAPI de novo)', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => brasilApiResposta,
+    })
+
+    const res1 = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+    const res2 = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res1.statusCode).toBe(200)
+    expect(res2.statusCode).toBe(200)
+    expect(res2.json().razaoSocial).toBe('Empresa Consultada Ltda')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('erro da BrasilAPI não entra no cache — próxima consulta tenta de novo', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => brasilApiResposta })
+
+    const res1 = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+    const res2 = await req('GET', '/empresas/consultar-cnpj/11222333000181')
+
+    expect(res1.statusCode).toBe(502)
+    expect(res2.statusCode).toBe(200)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ===========================================================================
+// POST /empresas/importar
+// ===========================================================================
+
+describe('POST /empresas/importar', () => {
+  // CNPJs válidos distintos
+  const empresa1 = {
+    cnpj: '11222333000181',
+    razaoSocial: 'Empresa Um Ltda',
+    regime: 'SIMPLES_NACIONAL',
+    cnae: '6201500',
+    uf: 'SP',
+    municipio: 'São Paulo',
+    ibge: '3550308',
+    dataAbertura: '2022-01-01',
+  }
+  const empresa2 = {
+    cnpj: '11444777000161',
+    razaoSocial: 'Empresa Dois Ltda',
+    regime: 'LUCRO_PRESUMIDO',
+    cnae: '4711302',
+    uf: 'RJ',
+    municipio: 'Rio de Janeiro',
+    ibge: '3304557',
+    dataAbertura: '2021-05-10',
+  }
+
+  it('importa lote válido → 201 com contagens corretas', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([]) // nenhum CNPJ existente
+    mockDb.empresaCliente.create
+      .mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+      .mockResolvedValueOnce({ id: 'emp-i2', cnpj: empresa2.cnpj })
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1, empresa2] })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json()
+    expect(body.total).toBe(2)
+    expect(body.importadas).toBe(2)
+    expect(body.rejeitadas).toBe(0)
+    expect(body.criadas).toHaveLength(2)
+  })
+
+  it('linha inválida não bloqueia as demais', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-ok', cnpj: empresa1.cnpj })
+
+    const invalida = { ...empresa2, cnpj: '123' } // CNPJ inválido
+    const res = await req('POST', '/empresas/importar', { empresas: [invalida, empresa1] })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json()
+    expect(body.importadas).toBe(1)
+    expect(body.rejeitadas).toBe(1)
+    expect(body.erros[0].linha).toBe(1)
+    expect(body.erros[0].motivo).toMatch(/cnpj/i)
+  })
+
+  it('CNPJ já cadastrado no tenant → rejeitado com motivo', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([{ cnpj: empresa1.cnpj }])
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1] })
+
+    const body = res.json()
+    expect(body.importadas).toBe(0)
+    expect(body.erros[0].motivo).toMatch(/já cadastrado/i)
+    expect(mockDb.empresaCliente.create).not.toHaveBeenCalled()
+  })
+
+  it('CNPJ duplicado dentro do próprio arquivo → segunda ocorrência rejeitada', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1, empresa1] })
+
+    const body = res.json()
+    expect(body.importadas).toBe(1)
+    expect(body.rejeitadas).toBe(1)
+    expect(body.erros[0].motivo).toMatch(/duplicado no arquivo/i)
+  })
+
+  it('cria empresas com tenantId do JWT', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+
+    await req('POST', '/empresas/importar', { empresas: [empresa1] })
+
+    const { data } = mockDb.empresaCliente.create.mock.calls[0][0]
+    expect(data.tenantId).toBe(TENANT_ID)
+  })
+
+  it('consulta CNPJs existentes com tenantId (isolamento)', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+
+    await req('POST', '/empresas/importar', { empresas: [empresa1] })
+
+    const { where } = mockDb.empresaCliente.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+  })
+
+  it('SN → gera calendário SN; LP → gera calendário LP/LR', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create
+      .mockResolvedValueOnce({ id: 'emp-sn', cnpj: empresa1.cnpj })
+      .mockResolvedValueOnce({ id: 'emp-lp', cnpj: empresa2.cnpj })
+
+    await req('POST', '/empresas/importar', { empresas: [empresa1, empresa2] })
+
+    expect(mockMonitoramento.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-sn', 2025)
+    expect(mockCalendarioLPLR.gerarCalendarioAnual).toHaveBeenCalledWith(TENANT_ID, 'emp-lp', 2025)
+  })
+
+  it('falha no calendário não bloqueia importação', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create.mockResolvedValueOnce({ id: 'emp-i1', cnpj: empresa1.cnpj })
+    mockMonitoramento.gerarCalendarioAnual.mockRejectedValueOnce(new Error('DB error'))
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1] })
+
+    expect(res.json().importadas).toBe(1)
+  })
+
+  it('erro do banco em uma linha → registrado nos erros, demais continuam', async () => {
+    mockDb.empresaCliente.findMany.mockResolvedValueOnce([])
+    mockDb.empresaCliente.create
+      .mockRejectedValueOnce(new Error('constraint violation'))
+      .mockResolvedValueOnce({ id: 'emp-i2', cnpj: empresa2.cnpj })
+
+    const res = await req('POST', '/empresas/importar', { empresas: [empresa1, empresa2] })
+
+    const body = res.json()
+    expect(body.importadas).toBe(1)
+    expect(body.rejeitadas).toBe(1)
+    expect(body.erros[0].motivo).toMatch(/constraint violation/)
+  })
+
+  it('lista vazia → 400', async () => {
+    const res = await req('POST', '/empresas/importar', { empresas: [] })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('mais de 1000 empresas → 400', async () => {
+    const res = await req('POST', '/empresas/importar', {
+      empresas: Array.from({ length: 1001 }, () => empresa1),
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ===========================================================================
+// PATCH /empresas/:id
+// ===========================================================================
+
+describe('PATCH /empresas/:id', () => {
+  it('atualiza razão social → 200', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(empresaBase())
+    mockDb.empresaCliente.update.mockResolvedValueOnce(empresaBase({ razaoSocial: 'Novo Nome' }))
+
+    const res = await req('PATCH', '/empresas/emp-1', { razaoSocial: 'Novo Nome' })
+
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('PATCH', '/empresas/nao-existe', { razaoSocial: 'X' })
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('update usa tenantId do JWT no where', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(empresaBase())
+    mockDb.empresaCliente.update.mockResolvedValueOnce(empresaBase())
+
+    await req('PATCH', '/empresas/emp-1', { razaoSocial: 'Testando' })
+
+    const { where } = mockDb.empresaCliente.update.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.id).toBe('emp-1')
+  })
+})
+
+// ===========================================================================
+// DELETE /empresas/:id
+// ===========================================================================
+
+describe('DELETE /empresas/:id', () => {
+  it('desativa empresa → 200 com success: true', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(empresaBase())
+    mockDb.empresaCliente.update.mockResolvedValueOnce({})
+
+    const res = await req('DELETE', '/empresas/emp-1')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().success).toBe(true)
+  })
+
+  it('empresa não encontrada → 404', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(null)
+
+    const res = await req('DELETE', '/empresas/nao-existe')
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('soft delete: seta ativa: false (não deleta fisicamente)', async () => {
+    mockDb.empresaCliente.findFirst.mockResolvedValueOnce(empresaBase())
+    mockDb.empresaCliente.update.mockResolvedValueOnce({})
+
+    await req('DELETE', '/empresas/emp-1')
+
+    const { data } = mockDb.empresaCliente.update.mock.calls[0][0]
+    expect(data).toEqual({ ativa: false })
+  })
+})
+
+// ===========================================================================
+// GET /empresas/:id/alertas
+// ===========================================================================
+
+describe('GET /empresas/:id/alertas', () => {
+  it('retorna alertas não lidos da empresa', async () => {
+    const alertas = [
+      { id: 'al-1', tipo: 'VENCIMENTO_OBRIGACAO', mensagem: 'DAS vence hoje', lido: false },
+    ]
+    mockDb.alerta.findMany.mockResolvedValueOnce(alertas)
+
+    const res = await req('GET', '/empresas/emp-1/alertas')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveLength(1)
+  })
+
+  it('filtra por tenantId, empresaId e lido: false', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    await req('GET', '/empresas/emp-1/alertas')
+
+    const { where } = mockDb.alerta.findMany.mock.calls[0][0]
+    expect(where.tenantId).toBe(TENANT_ID)
+    expect(where.empresaId).toBe('emp-1')
+    expect(where.lido).toBe(false)
+  })
+
+  it('lista vazia → array vazio', async () => {
+    mockDb.alerta.findMany.mockResolvedValueOnce([])
+
+    const res = await req('GET', '/empresas/emp-1/alertas')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([])
+  })
+})

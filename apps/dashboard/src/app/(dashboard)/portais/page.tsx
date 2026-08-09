@@ -18,6 +18,7 @@ const PORTAL_ICONS: Record<string, string> = {
   SEFAZ_FEDERAL: '🏛️',
   SIMPLES_NACIONAL: '💰',
   ECAC: '📋',
+  DCTFWEB: '📄',
   SEFAZ_ESTADUAL: '🗺️',
   PREFEITURA: '🏙️',
 }
@@ -64,6 +65,16 @@ export default function PortaisPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['portais-status', empresaId] }),
   })
 
+  const transmitirDCTFWeb = useMutation({
+    mutationFn: () => api.post(`/portais/dctfweb/transmitir/${empresaId}/${competencia}`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portais-status', empresaId] }),
+  })
+
+  const consultarDCTFWeb = useMutation({
+    mutationFn: () => api.get(`/portais/dctfweb/consultar/${empresaId}/${competencia}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portais-status', empresaId] }),
+  })
+
   const empresa = empresas.find((e) => e.id === empresaId)
 
   return (
@@ -71,7 +82,9 @@ export default function PortaisPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Portais Governamentais</h1>
-          <p className="text-slate-500 text-sm mt-1">SEFAZ, Simples Nacional, e-CAC, Prefeitura</p>
+          <p className="text-slate-500 text-sm mt-1">
+            SEFAZ, Simples Nacional, e-CAC, DCTFWeb, Prefeitura
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <select
@@ -81,7 +94,9 @@ export default function PortaisPage() {
           >
             <option value="">Selecionar empresa...</option>
             {empresas.map((e) => (
-              <option key={e.id} value={e.id}>{e.razaoSocial}</option>
+              <option key={e.id} value={e.id}>
+                {e.razaoSocial}
+              </option>
             ))}
           </select>
           <input
@@ -128,6 +143,20 @@ export default function PortaisPage() {
                   >
                     {transmitirPGDAS.isPending ? 'Transmitindo...' : '💰 Transmitir PGDAS'}
                   </button>
+                  <button
+                    onClick={() => transmitirDCTFWeb.mutate()}
+                    disabled={transmitirDCTFWeb.isPending}
+                    className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {transmitirDCTFWeb.isPending ? 'Transmitindo...' : '📄 Transmitir DCTFWeb'}
+                  </button>
+                  <button
+                    onClick={() => consultarDCTFWeb.mutate()}
+                    disabled={consultarDCTFWeb.isPending}
+                    className="text-sm border border-slate-300 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {consultarDCTFWeb.isPending ? 'Consultando...' : '🔍 Consultar DCTFWeb'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -144,7 +173,10 @@ export default function PortaisPage() {
               </div>
             ) : (
               portaisStatus.map((portal) => (
-                <div key={portal.portal} className="bg-white rounded-xl border border-slate-200 p-5">
+                <div
+                  key={portal.portal}
+                  className="bg-white rounded-xl border border-slate-200 p-5"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{PORTAL_ICONS[portal.portal] ?? '🌐'}</span>
@@ -155,16 +187,22 @@ export default function PortaisPage() {
                         )}
                         {portal.ultimaVerificacao && (
                           <p className="text-xs text-slate-400 mt-0.5">
-                            Última verificação: {new Date(portal.ultimaVerificacao).toLocaleString('pt-BR')}
+                            Última verificação:{' '}
+                            {new Date(portal.ultimaVerificacao).toLocaleString('pt-BR')}
                           </p>
                         )}
                       </div>
                     </div>
-                    <span className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COR[portal.status] ?? 'bg-slate-100 text-slate-500'}`}>
-                      {portal.status === 'OK' ? 'Operacional' :
-                       portal.status === 'ERRO' ? 'Com erro' :
-                       portal.status === 'PROCESSANDO' ? 'Processando...' :
-                       'Pendente'}
+                    <span
+                      className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COR[portal.status] ?? 'bg-slate-100 text-slate-500'}`}
+                    >
+                      {portal.status === 'OK'
+                        ? 'Operacional'
+                        : portal.status === 'ERRO'
+                          ? 'Com erro'
+                          : portal.status === 'PROCESSANDO'
+                            ? 'Processando...'
+                            : 'Pendente'}
                     </span>
                   </div>
                 </div>

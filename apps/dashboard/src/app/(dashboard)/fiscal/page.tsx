@@ -34,10 +34,14 @@ function formatBRL(value: unknown): string {
 function statusBadge(status: string) {
   const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold'
   switch (status) {
-    case 'TRANSMITIDO': return <span className={`${base} bg-green-100 text-green-700`}>Transmitido</span>
-    case 'CALCULADO':   return <span className={`${base} bg-blue-100 text-blue-700`}>Calculado</span>
-    case 'ERRO':        return <span className={`${base} bg-red-100 text-red-700`}>Erro</span>
-    default:            return <span className={`${base} bg-slate-100 text-slate-500`}>Pendente</span>
+    case 'TRANSMITIDO':
+      return <span className={`${base} bg-green-100 text-green-700`}>Transmitido</span>
+    case 'CALCULADO':
+      return <span className={`${base} bg-blue-100 text-blue-700`}>Calculado</span>
+    case 'ERRO':
+      return <span className={`${base} bg-red-100 text-red-700`}>Erro</span>
+    default:
+      return <span className={`${base} bg-slate-100 text-slate-500`}>Pendente</span>
   }
 }
 
@@ -59,6 +63,19 @@ export default function FiscalPage() {
     mutationFn: ({ empresaId }: { empresaId: string }) =>
       api.post(`/fiscal/pgdas/${empresaId}/${competencia}`).then((r) => r.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['apuracoes', competencia] }),
+  })
+
+  const [batchResult, setBatchResult] = useState<{
+    total: number
+    semCredencial: number
+  } | null>(null)
+
+  const fechamentoBatch = useMutation({
+    mutationFn: () => api.post(`/fechamento/batch/${competencia}`).then((r) => r.data),
+    onSuccess: (data) => {
+      setBatchResult(data)
+      queryClient.invalidateQueries({ queryKey: ['apuracoes', competencia] })
+    },
   })
 
   const transmitirPGDAS = useMutation({
@@ -106,6 +123,48 @@ export default function FiscalPage() {
         </div>
       </div>
 
+      {/* Fechamento em Lote */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 flex-wrap">
+        <span className="text-lg flex-shrink-0">🔄</span>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-700">Fechamento em Lote</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Processa todas as empresas ativas para a competência selecionada
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setBatchResult(null)
+            fechamentoBatch.mutate()
+          }}
+          disabled={fechamentoBatch.isPending}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {fechamentoBatch.isPending ? (
+            <RefreshCw className="w-4 h-4 animate-spin" />
+          ) : (
+            <Play className="w-4 h-4" />
+          )}
+          {fechamentoBatch.isPending ? 'Enfileirando...' : `Fechar ${competencia} — Lote`}
+        </button>
+        {batchResult && (
+          <div className="text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+            <span className="text-green-600 font-semibold">{batchResult.total} jobs</span>{' '}
+            enfileirados
+            {batchResult.semCredencial > 0 && (
+              <span className="text-yellow-600 ml-2">
+                ({batchResult.semCredencial} sem credencial)
+              </span>
+            )}
+          </div>
+        )}
+        {fechamentoBatch.isError && (
+          <span className="text-sm text-red-600 font-medium">
+            Erro ao enfileirar. Tente novamente.
+          </span>
+        )}
+      </div>
+
       {/* KPI */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -130,14 +189,33 @@ export default function FiscalPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Empresa</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">CNPJ</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">Fator R</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">PGDAS</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">Valor DAS</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">DIFAL</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">DeSTDA</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">Ações</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                Empresa
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                CNPJ
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                Fator R
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                PGDAS
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                Valor DAS
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                DIFAL
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                DeSTDA
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                DMS
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -145,10 +223,12 @@ export default function FiscalPage() {
               const pgdas = apuracaoPorEmpresa(emp.id, 'PGDAS')
               const difal = apuracaoPorEmpresa(emp.id, 'DIFAL')
               const destda = apuracaoPorEmpresa(emp.id, 'DESTDA')
+              const dms = apuracaoPorEmpresa(emp.id, 'DMS')
               const dados = pgdas?.dados as any
               const fatorR = dados?.fatorR != null ? `${Number(dados.fatorR).toFixed(1)}%` : '—'
               const anexo = dados?.faixaAnexo ? `Anexo ${dados.faixaAnexo}` : null
-              const isPending = apurarPGDAS.isPending && (apurarPGDAS.variables as any)?.empresaId === emp.id
+              const isPending =
+                apurarPGDAS.isPending && (apurarPGDAS.variables as any)?.empresaId === emp.id
 
               return (
                 <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
@@ -158,9 +238,7 @@ export default function FiscalPage() {
                     {pgdas ? (
                       <div>
                         <span className="font-mono text-sm">{fatorR}</span>
-                        {anexo && (
-                          <span className="ml-1 text-xs text-slate-400">({anexo})</span>
-                        )}
+                        {anexo && <span className="ml-1 text-xs text-slate-400">({anexo})</span>}
                       </div>
                     ) : (
                       <span className="text-slate-300">—</span>
@@ -170,13 +248,24 @@ export default function FiscalPage() {
                     {pgdas ? statusBadge(pgdas.status) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-6 py-4 text-right font-mono">
-                    {dados?.valorDAS ? formatBRL(dados.valorDAS) : <span className="text-slate-300">—</span>}
+                    {dados?.valorDAS ? (
+                      formatBRL(dados.valorDAS)
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {difal ? statusBadge(difal.status) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    {destda ? statusBadge(destda.status) : <span className="text-slate-300">—</span>}
+                    {destda ? (
+                      statusBadge(destda.status)
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {dms ? statusBadge(dms.status) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
@@ -186,7 +275,11 @@ export default function FiscalPage() {
                           disabled={isPending}
                           className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
                         >
-                          {isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                          {isPending ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Play className="w-3 h-3" />
+                          )}
                           Apurar
                         </button>
                       )}
@@ -209,7 +302,7 @@ export default function FiscalPage() {
             })}
             {snEmpresas.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
                   Nenhuma empresa do Simples Nacional cadastrada.
                 </td>
               </tr>

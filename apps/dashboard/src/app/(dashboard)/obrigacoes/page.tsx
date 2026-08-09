@@ -71,7 +71,11 @@ function statusBadge(status: StatusObrigacao) {
       return <span className={`${base} bg-yellow-100 text-yellow-700`}>Pendente</span>
     case 'PAGA':
     case 'TRANSMITIDA':
-      return <span className={`${base} bg-green-100 text-green-700`}>{status === 'PAGA' ? 'Paga' : 'Transmitida'}</span>
+      return (
+        <span className={`${base} bg-green-100 text-green-700`}>
+          {status === 'PAGA' ? 'Paga' : 'Transmitida'}
+        </span>
+      )
     case 'DISPENSADA':
       return <span className={`${base} bg-slate-100 text-slate-600`}>Dispensada</span>
     case 'ERRO':
@@ -84,8 +88,18 @@ function statusBadge(status: StatusObrigacao) {
 function formatCompetencia(value: string): string {
   const [year, month] = value.split('-')
   const months = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
   ]
   return `${months[Number(month) - 1]} ${year}`
 }
@@ -117,9 +131,7 @@ function nextMonth(ym: string): string {
 
 export default function ObrigacoesPage() {
   const queryClient = useQueryClient()
-  const [competencia, setCompetencia] = useState<string>(
-    () => new Date().toISOString().slice(0, 7)
-  )
+  const [competencia, setCompetencia] = useState<string>(() => new Date().toISOString().slice(0, 7))
   const [statusFiltro, setStatusFiltro] = useState<StatusObrigacao | 'TODAS'>('TODAS')
   const [calendarioEmpresaId, setCalendarioEmpresaId] = useState<string>('')
 
@@ -129,7 +141,7 @@ export default function ObrigacoesPage() {
     queryFn: () => {
       const params = new URLSearchParams({ competencia })
       if (statusFiltro !== 'TODAS') params.set('status', statusFiltro)
-      return api.get(`/obrigacoes?${params.toString()}`).then((r) => r.data)
+      return api.get(`/fiscal/obrigacoes?${params.toString()}`).then((r) => r.data)
     },
   })
 
@@ -139,10 +151,37 @@ export default function ObrigacoesPage() {
     queryFn: () => api.get('/empresas').then((r) => r.data),
   })
 
-  // Mutation para gerar calendário anual
+  // Mutation para gerar calendário anual de uma empresa
   const gerarCalendario = useMutation({
     mutationFn: ({ empresaId, ano }: { empresaId: string; ano: number }) =>
-      api.post(`/obrigacoes/calendario/${empresaId}/${ano}`).then((r) => r.data),
+      api.post(`/fiscal/obrigacoes/calendario/${empresaId}/${ano}`).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
+    },
+  })
+
+  // Mutation para gerar calendário de TODAS as empresas SN/MEI
+  const gerarCalendarioTodas = useMutation({
+    mutationFn: (ano: number) =>
+      api.post(`/fiscal/obrigacoes/calendario/batch/${ano}`).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
+    },
+  })
+
+  // Mutation para gerar calendário de TODAS as empresas LP/LR
+  const gerarCalendarioTodasLPLR = useMutation({
+    mutationFn: (ano: number) =>
+      api.post(`/fiscal/obrigacoes/calendario/batch-lplr/${ano}`).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
+    },
+  })
+
+  // Mutation para atualizar status da obrigação
+  const atualizarStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: StatusObrigacao }) =>
+      api.patch(`/fiscal/obrigacoes/${id}`, { status }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['obrigacoes'] })
     },
@@ -207,9 +246,7 @@ export default function ObrigacoesPage() {
         </select>
         <button
           disabled={!calendarioEmpresaId || gerarCalendario.isPending}
-          onClick={() =>
-            gerarCalendario.mutate({ empresaId: calendarioEmpresaId, ano: anoAtual })
-          }
+          onClick={() => gerarCalendario.mutate({ empresaId: calendarioEmpresaId, ano: anoAtual })}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {gerarCalendario.isPending ? (
@@ -225,6 +262,50 @@ export default function ObrigacoesPage() {
         {gerarCalendario.isError && (
           <span className="text-sm text-red-600 font-medium">Erro ao gerar calendário.</span>
         )}
+
+        <div className="border-l border-slate-200 pl-4 ml-2 flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-slate-500 font-medium">SN / MEI</span>
+            <button
+              disabled={gerarCalendarioTodas.isPending}
+              onClick={() => gerarCalendarioTodas.mutate(anoAtual)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {gerarCalendarioTodas.isPending ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <CalendarDays className="w-4 h-4" />
+              )}
+              Gerar Todas ({anoAtual})
+            </button>
+            {gerarCalendarioTodas.isSuccess && (
+              <span className="text-xs text-green-600 font-medium">
+                {(gerarCalendarioTodas.data as any)?.sucesso} empresa(s) gerada(s)!
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-slate-500 font-medium">LP / LR</span>
+            <button
+              disabled={gerarCalendarioTodasLPLR.isPending}
+              onClick={() => gerarCalendarioTodasLPLR.mutate(anoAtual)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {gerarCalendarioTodasLPLR.isPending ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <CalendarDays className="w-4 h-4" />
+              )}
+              Gerar Todas ({anoAtual})
+            </button>
+            {gerarCalendarioTodasLPLR.isSuccess && (
+              <span className="text-xs text-green-600 font-medium">
+                {(gerarCalendarioTodasLPLR.data as any)?.sucesso} empresa(s) gerada(s)!
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Filtro por status */}
@@ -285,14 +366,14 @@ export default function ObrigacoesPage() {
               </tr>
             ) : (
               obrigacoesOrdenadas.map((obr) => {
-                const vencida =
-                  obr.status === 'PENDENTE' &&
-                  new Date(obr.vencimento) < new Date()
+                const vencida = obr.status === 'PENDENTE' && new Date(obr.vencimento) < new Date()
 
                 return (
                   <tr key={obr.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">{obr.empresa?.razaoSocial ?? '—'}</div>
+                      <div className="font-medium text-slate-800">
+                        {obr.empresa?.razaoSocial ?? '—'}
+                      </div>
                       <div className="text-xs text-slate-400 font-mono mt-0.5">
                         {obr.empresa?.cnpj ?? ''}
                       </div>
@@ -302,12 +383,12 @@ export default function ObrigacoesPage() {
                         {obr.tipo.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className={`px-6 py-4 ${vencida ? 'text-red-600 font-semibold' : 'text-slate-700'}`}>
+                    <td
+                      className={`px-6 py-4 ${vencida ? 'text-red-600 font-semibold' : 'text-slate-700'}`}
+                    >
                       {formatDate(obr.vencimento)}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      {statusBadge(obr.status)}
-                    </td>
+                    <td className="px-6 py-4 text-center">{statusBadge(obr.status)}</td>
                     <td className="px-6 py-4 text-right font-mono text-slate-700">
                       {formatMoney(obr.valor)}
                     </td>
@@ -316,6 +397,25 @@ export default function ObrigacoesPage() {
                         <span className="text-xs text-green-600 font-medium">
                           Recibo: {obr.recibo.slice(0, 12)}…
                         </span>
+                      ) : obr.status === 'PENDENTE' || obr.status === 'ATRASADA' ? (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => atualizarStatus.mutate({ id: obr.id, status: 'PAGA' })}
+                            disabled={atualizarStatus.isPending}
+                            className="text-xs px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          >
+                            Paga
+                          </button>
+                          <button
+                            onClick={() =>
+                              atualizarStatus.mutate({ id: obr.id, status: 'DISPENSADA' })
+                            }
+                            disabled={atualizarStatus.isPending}
+                            className="text-xs px-2 py-1 border border-slate-300 text-slate-600 rounded-md hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                          >
+                            Dispensar
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-xs text-slate-400">—</span>
                       )}
@@ -329,7 +429,8 @@ export default function ObrigacoesPage() {
 
         {obrigacoesOrdenadas.length > 0 && (
           <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500">
-            {obrigacoesOrdenadas.length} obrigação{obrigacoesOrdenadas.length !== 1 ? 'ões' : ''} encontrada{obrigacoesOrdenadas.length !== 1 ? 's' : ''}
+            {obrigacoesOrdenadas.length} obrigação{obrigacoesOrdenadas.length !== 1 ? 'ões' : ''}{' '}
+            encontrada{obrigacoesOrdenadas.length !== 1 ? 's' : ''}
           </div>
         )}
       </div>

@@ -28,8 +28,7 @@ export default function ConciliacaoPage() {
   })
 
   const conciliarTodas = useMutation({
-    mutationFn: (empresaId: string) =>
-      api.post(`/conciliacao/run/${empresaId}/${competencia}`),
+    mutationFn: (empresaId: string) => api.post(`/conciliacao/run/${empresaId}/${competencia}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conciliacao-status', competencia] }),
   })
 
@@ -72,7 +71,10 @@ export default function ConciliacaoPage() {
           <p className="text-sm text-slate-500">Progresso geral</p>
           <p className="text-3xl font-bold text-slate-900 mt-1">{pctGeral}%</p>
           <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pctGeral}%` }} />
+            <div
+              className="h-full bg-green-500 rounded-full transition-all"
+              style={{ width: `${pctGeral}%` }}
+            />
           </div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -100,20 +102,33 @@ export default function ConciliacaoPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Empresa</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Total</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Conciliados</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Pendentes</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Revisão</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Progresso</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  Empresa
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                  Total
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                  Conciliados
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                  Pendentes
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                  Revisão
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                  Progresso
+                </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {empresas.map((emp) => {
-                const pct = emp.totalDocumentos > 0
-                  ? Math.round((emp.conciliados / emp.totalDocumentos) * 100)
-                  : 0
+                const pct =
+                  emp.totalDocumentos > 0
+                    ? Math.round((emp.conciliados / emp.totalDocumentos) * 100)
+                    : 0
                 return (
                   <tr key={emp.empresaId} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
@@ -121,11 +136,17 @@ export default function ConciliacaoPage() {
                       <p className="font-mono text-xs text-slate-400">{emp.cnpj}</p>
                     </td>
                     <td className="px-4 py-3 text-right font-mono">{emp.totalDocumentos}</td>
-                    <td className="px-4 py-3 text-right font-mono text-green-600">{emp.conciliados}</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-500">{emp.pendentes}</td>
+                    <td className="px-4 py-3 text-right font-mono text-green-600">
+                      {emp.conciliados}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-slate-500">
+                      {emp.pendentes}
+                    </td>
                     <td className="px-4 py-3 text-right font-mono">
                       {emp.pendentesRevisao > 0 ? (
-                        <span className="text-yellow-600 font-semibold">{emp.pendentesRevisao}</span>
+                        <span className="text-yellow-600 font-semibold">
+                          {emp.pendentesRevisao}
+                        </span>
                       ) : (
                         <span className="text-slate-300">0</span>
                       )}

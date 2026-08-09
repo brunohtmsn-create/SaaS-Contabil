@@ -61,13 +61,15 @@ import type { ResultadoConciliacao } from '../types.js'
 // Helper: cria um DocumentoFiscal mínimo para testes
 // ---------------------------------------------------------------------------
 
-function makeDoc(overrides: Partial<{
-  id: string
-  cnpjEmitente: string
-  valorTotal: Decimal
-  dataCompetencia: Date
-  numero: string
-}> = {}) {
+function makeDoc(
+  overrides: Partial<{
+    id: string
+    cnpjEmitente: string
+    valorTotal: Decimal
+    dataCompetencia: Date
+    numero: string
+  }> = {}
+) {
   return {
     id: overrides.id ?? 'doc-001',
     tenantId: 'tenant-abc',
@@ -366,7 +368,11 @@ describe('ConciliationService — conciliarNFSeTomadas()', () => {
   })
 
   it('Um documento válido → retorna um resultado com status', async () => {
-    const doc = makeDoc({ id: 'doc-999', cnpjEmitente: '11111111000191', valorTotal: new Decimal('800') })
+    const doc = makeDoc({
+      id: 'doc-999',
+      cnpjEmitente: '11111111000191',
+      valorTotal: new Decimal('800'),
+    })
     mockDocumentoFiscal.findMany.mockResolvedValue([doc])
     mockDocumentoFiscal.update.mockResolvedValue({ ...doc, status: 'CONCILIADO' })
 
@@ -381,7 +387,11 @@ describe('ConciliationService — conciliarNFSeTomadas()', () => {
   })
 
   it('Documento conciliado → chama db.documentoFiscal.update para persistir status', async () => {
-    const doc = makeDoc({ id: 'doc-888', cnpjEmitente: '11111111000191', valorTotal: new Decimal('500') })
+    const doc = makeDoc({
+      id: 'doc-888',
+      cnpjEmitente: '11111111000191',
+      valorTotal: new Decimal('500'),
+    })
     mockDocumentoFiscal.findMany.mockResolvedValue([doc])
     mockDocumentoFiscal.update.mockResolvedValue({ ...doc })
 
@@ -408,6 +418,38 @@ describe('ConciliationService — conciliarNFSeTomadas()', () => {
     const [alertArgs] = mockAlerta.createMany.mock.calls
     expect(alertArgs[0].data[0].tenantId).toBe(TENANT_ID)
     expect(alertArgs[0].data[0].tipo).toBe('DIVERGENCIA_CONCILIACAO')
+  })
+
+  it('Documento CONCILIADO → alerta.createMany NÃO chamado (branch Promise.resolve())', async () => {
+    // cnpjEmitente válido e valor > 0 → deve gerar status CONCILIADA → sem alertas
+    const doc = makeDoc({
+      id: 'doc-ok',
+      cnpjEmitente: '11111111000191',
+      valorTotal: new Decimal('1500'),
+    })
+    mockDocumentoFiscal.findMany.mockResolvedValue([doc])
+    mockDocumentoFiscal.update.mockResolvedValue({})
+
+    const service = new ConciliationService()
+    await service.conciliarNFSeTomadas(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+
+    expect(mockAlerta.createMany).not.toHaveBeenCalled()
+  })
+
+  it('empresa não encontrada → usa cnpj="" via nullish coalescing (não lança erro)', async () => {
+    mockEmpresaCliente.findUnique.mockResolvedValueOnce(null)
+    const doc = makeDoc({
+      id: 'doc-sem-emp',
+      cnpjEmitente: '11111111000191',
+      valorTotal: new Decimal('500'),
+    })
+    mockDocumentoFiscal.findMany.mockResolvedValue([doc])
+
+    const service = new ConciliationService()
+    // empresa null → cnpj = empresa?.cnpj ?? '' = '' — serviço não deve lançar erro
+    await expect(
+      service.conciliarNFSeTomadas(TENANT_ID, EMPRESA_ID, COMPETENCIA)
+    ).resolves.toHaveLength(1)
   })
 
   it('Múltiplos documentos → retorna resultado para cada um', async () => {

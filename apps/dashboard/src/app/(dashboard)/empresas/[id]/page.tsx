@@ -7,10 +7,13 @@ import { FechamentoPanel } from '@/components/empresa/FechamentoPanel'
 import { DocumentosPanel } from '@/components/empresa/DocumentosPanel'
 import { ApuracoesPanel } from '@/components/empresa/ApuracoesPanel'
 import { EmpresaAuditoriaPanel } from '@/components/empresa/EmpresaAuditoriaPanel'
+import { CredenciaisPanel } from '@/components/empresa/CredenciaisPanel'
 
 export default function EmpresaDetailPage({ params }: { params: { id: string } }) {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<'documentos' | 'fiscal' | 'fechamento' | 'auditoria'>('documentos')
+  const [tab, setTab] = useState<
+    'documentos' | 'fiscal' | 'fechamento' | 'credenciais' | 'auditoria'
+  >('documentos')
   const [competencia, setCompetencia] = useState(() => new Date().toISOString().slice(0, 7))
 
   const { data: empresa } = useQuery({
@@ -20,7 +23,8 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
 
   const iniciarFechamento = useMutation({
     mutationFn: () => api.post(`/fechamento/run/${params.id}/${competencia}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fechamento-status', params.id, competencia] }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['fechamento-status', params.id, competencia] }),
   })
 
   return (
@@ -52,33 +56,36 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
       </div>
 
       <div className="flex border-b border-slate-200">
-        {(['documentos', 'fiscal', 'fechamento', 'auditoria'] as const).map((t) => (
+        {(
+          [
+            { key: 'documentos', label: 'Documentos' },
+            { key: 'fiscal', label: 'Fiscal' },
+            { key: 'fechamento', label: 'Fechamento' },
+            { key: 'credenciais', label: 'Credenciais' },
+            { key: 'auditoria', label: 'Auditoria' },
+          ] as const
+        ).map(({ key, label }) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-6 py-3 text-sm font-medium capitalize transition-colors ${
-              tab === t
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              tab === key
                 ? 'border-b-2 border-blue-600 text-blue-600'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            {t}
+            {label}
           </button>
         ))}
       </div>
 
-      {tab === 'documentos' && (
-        <DocumentosPanel empresaId={params.id} competencia={competencia} />
+      {tab === 'documentos' && <DocumentosPanel empresaId={params.id} competencia={competencia} />}
+      {tab === 'fiscal' && <ApuracoesPanel empresaId={params.id} competencia={competencia} />}
+      {tab === 'fechamento' && <FechamentoPanel empresaId={params.id} competencia={competencia} />}
+      {tab === 'credenciais' && (
+        <CredenciaisPanel empresaId={params.id} cnpj={empresa?.cnpj ?? ''} />
       )}
-      {tab === 'fiscal' && (
-        <ApuracoesPanel empresaId={params.id} competencia={competencia} />
-      )}
-      {tab === 'fechamento' && (
-        <FechamentoPanel empresaId={params.id} competencia={competencia} />
-      )}
-      {tab === 'auditoria' && (
-        <EmpresaAuditoriaPanel empresaId={params.id} />
-      )}
+      {tab === 'auditoria' && <EmpresaAuditoriaPanel empresaId={params.id} />}
     </div>
   )
 }

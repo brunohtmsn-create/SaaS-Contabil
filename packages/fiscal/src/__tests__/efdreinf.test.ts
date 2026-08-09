@@ -227,6 +227,44 @@ describe('EFDReinfService — processar()', () => {
     expect(queryWhere.tenantId).toBe('t-abc')
     expect(queryWhere.empresaId).toBe('emp-xyz')
   })
+
+  it('NFSE_TOMADA com INSS e IRRF ambos > 0 → gera R-2010 E R-4020 no mesmo doc', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce(empresa)
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([
+      makeDoc({
+        tipo: 'NFSE_TOMADA',
+        valorInss: new Decimal('200'),
+        valorIrrf: new Decimal('50'),
+      }),
+    ])
+
+    const service = new EFDReinfService()
+    await service.processar('t-1', 'emp-1', '2025-01')
+
+    const dados = mockDb.apuracaoFiscal.upsert.mock.calls[0][0].update.dados
+    expect(dados.r2010).toHaveLength(1)
+    expect(dados.r2010[0].vrRetencao.toString()).toBe('200')
+    expect(dados.r4020).toHaveLength(1)
+    expect(dados.r4020[0].vrIR.toString()).toBe('50')
+  })
+
+  it('NFE com valorInss > 0 NÃO gera R-2010 (somente NFSE_TOMADA gera R-2010)', async () => {
+    mockDb.empresaCliente.findUnique.mockResolvedValueOnce(empresa)
+    mockDb.documentoFiscal.findMany.mockResolvedValueOnce([
+      makeDoc({
+        tipo: 'NFE',
+        valorInss: new Decimal('300'),
+        valorIrrf: new Decimal('0'),
+      }),
+    ])
+
+    const service = new EFDReinfService()
+    await service.processar('t-1', 'emp-1', '2025-01')
+
+    const dados = mockDb.apuracaoFiscal.upsert.mock.calls[0][0].update.dados
+    expect(dados.r2010).toHaveLength(0)
+    expect(dados.r4020).toHaveLength(0)
+  })
 })
 
 // ===========================================================================
@@ -237,9 +275,7 @@ describe('DeSTDAService — gerar()', () => {
   it('empresa não encontrada → lança erro', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
     const service = new DeSTDAService()
-    await expect(service.gerar('t-1', 'emp-x', '2025-01')).rejects.toThrow(
-      'Empresa não encontrada'
-    )
+    await expect(service.gerar('t-1', 'emp-x', '2025-01')).rejects.toThrow('Empresa não encontrada')
   })
 
   it('arquivo gerado contém linha 0000 com CNPJ da empresa', async () => {
@@ -294,9 +330,7 @@ describe('GNREService — gerar()', () => {
   it('empresa não encontrada → lança erro', async () => {
     mockDb.empresaCliente.findUnique.mockResolvedValueOnce(null)
     const service = new GNREService()
-    await expect(service.gerar('t-1', 'emp-x', '2025-01')).rejects.toThrow(
-      'Empresa não encontrada'
-    )
+    await expect(service.gerar('t-1', 'emp-x', '2025-01')).rejects.toThrow('Empresa não encontrada')
   })
 
   it('sem documentos com DIFAL → retorna array vazio e não faz upsert', async () => {

@@ -73,6 +73,24 @@ vi.mock('@saas-contabil/shared', () => ({
     fim: new Date('2025-01-31'),
     competencia: comp,
   })),
+  formatDate: vi.fn((d: Date) => d.toISOString().slice(0, 10)),
+  nowBR: vi.fn(() => new Date()),
+}))
+
+// Impede que adapters não mockados puxem @saas-contabil/storage
+// → @saas-contabil/database → @prisma/client (não gerado no CI)
+vi.mock('@saas-contabil/storage', () => ({
+  StorageService: vi.fn().mockImplementation(() => ({
+    upload: vi.fn().mockResolvedValue(undefined),
+    download: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+    exists: vi.fn().mockResolvedValue(false),
+    delete: vi.fn().mockResolvedValue(undefined),
+  })),
+  S3KeyBuilder: {
+    erroScreenshot: vi.fn((_cnpj: string, _ctx: string) => 'mock/error-screenshot.png'),
+    nfseXml: vi.fn(() => 'mock/nfse.xml'),
+    nfsePdf: vi.fn(() => 'mock/nfse.pdf'),
+  },
 }))
 
 import { ScraperOrchestrator } from '../scraper-orchestrator.js'
@@ -296,11 +314,11 @@ describe('ScraperOrchestrator — healthCheckPrefeituras()', () => {
     expect(result.get('3304557')).toBe(true)
   })
 
-  it('retorna mapa com 3 entradas (uma por prefeitura registrada)', async () => {
+  it('retorna mapa com uma entrada por prefeitura registrada', async () => {
     const orch = new ScraperOrchestrator()
     const result = await orch.healthCheckPrefeituras()
 
-    expect(result.size).toBe(3)
+    expect(result.size).toBe(31)
   })
 
   it('adapter retorna false → mapa preserva false', async () => {
@@ -310,6 +328,45 @@ describe('ScraperOrchestrator — healthCheckPrefeituras()', () => {
     const result = await orch.healthCheckPrefeituras()
 
     expect(result.get('3304557')).toBe(false)
+  })
+})
+
+// ===========================================================================
+// healthCheckPrefeitura() individual + listarPrefeituras()
+// ===========================================================================
+
+describe('ScraperOrchestrator — healthCheckPrefeitura() individual', () => {
+  it('portal disponível → true', async () => {
+    const orch = new ScraperOrchestrator()
+    const result = await orch.healthCheckPrefeitura('3550308')
+
+    expect(result).toBe(true)
+  })
+
+  it('adapter lança erro → false (não propaga)', async () => {
+    mockPref3550308.healthCheck.mockRejectedValueOnce(new Error('Site fora do ar'))
+
+    const orch = new ScraperOrchestrator()
+    const result = await orch.healthCheckPrefeitura('3550308')
+
+    expect(result).toBe(false)
+  })
+
+  it('IBGE sem adapter registrado → lança erro com lista de disponíveis', async () => {
+    const orch = new ScraperOrchestrator()
+
+    await expect(orch.healthCheckPrefeitura('9999999')).rejects.toThrow(/nenhum adapter registrado/)
+  })
+})
+
+describe('ScraperOrchestrator — listarPrefeituras()', () => {
+  it('retorna todos os códigos IBGE registrados', () => {
+    const orch = new ScraperOrchestrator()
+    const lista = orch.listarPrefeituras()
+
+    expect(lista).toHaveLength(31)
+    expect(lista).toContain('3550308')
+    expect(lista).toContain('3304557')
   })
 })
 
@@ -338,5 +395,60 @@ describe('ScraperOrchestrator — capturarNFe() e capturarNFCe()', () => {
     expect(result).toHaveLength(1)
     expect(mockNFCe.authenticate).toHaveBeenCalledTimes(1)
     expect(mockNFe.authenticate).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// capturarNFSe() — Portal Nacional
+// ===========================================================================
+
+describe('ScraperOrchestrator — capturarNFSe()', () => {
+  it('autentica no Portal Nacional e retorna emitidas e tomadas', async () => {
+    mockNFSe.fetchEmitidas.mockResolvedValueOnce([makeDoc('NFSE_EMITIDA', 'SN-001')])
+    mockNFSe.fetchTomadas.mockResolvedValueOnce([makeDoc('NFSE_TOMADA', 'SN-T-001')])
+
+    const orch = new ScraperOrchestrator()
+    const result = await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(result.emitidas).toHaveLength(1)
+    expect(result.tomadas).toHaveLength(1)
+    expect(mockNFSe.authenticate).toHaveBeenCalledOnce()
+  })
+
+  it('passa credencial correta para authenticate', async () => {
+    const orch = new ScraperOrchestrator()
+    await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(mockNFSe.authenticate).toHaveBeenCalledWith(CREDENCIAL)
+  })
+
+  it('busca emitidas e tomadas independentemente', async () => {
+    mockNFSe.fetchEmitidas.mockResolvedValueOnce([
+      makeDoc('NFSE_EMITIDA', 'E-001'),
+      makeDoc('NFSE_EMITIDA', 'E-002'),
+    ])
+    mockNFSe.fetchTomadas.mockResolvedValueOnce([makeDoc('NFSE_TOMADA', 'T-001')])
+
+    const orch = new ScraperOrchestrator()
+    const result = await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(result.emitidas).toHaveLength(2)
+    expect(result.tomadas).toHaveLength(1)
+  })
+
+  it('não autentica adapters NF-e ou NFC-e', async () => {
+    const orch = new ScraperOrchestrator()
+    await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(mockNFe.authenticate).not.toHaveBeenCalled()
+    expect(mockNFCe.authenticate).not.toHaveBeenCalled()
+  })
+
+  it('sem NFS-e emitidas ou tomadas → retorna arrays vazios', async () => {
+    const orch = new ScraperOrchestrator()
+    const result = await orch.capturarNFSe(CNPJ, COMPETENCIA, CREDENCIAL)
+
+    expect(result.emitidas).toHaveLength(0)
+    expect(result.tomadas).toHaveLength(0)
   })
 })
