@@ -9,6 +9,29 @@ O formato segue, de modo simplificado, o [Keep a Changelog](https://keepachangel
 
 ---
 
+## 2026-08-09 — CI: scan de segurança vira report-only (fim do treadmill)
+
+### Alterado
+
+- **`security.yml` (job "pnpm audit — high severity") agora é REPORT-ONLY.**
+  Contexto: é um scan **agendado semanal** (não roda em push/PR), então nunca foi
+  um gate de merge — mas dava _hard-fail_ toda semana conforme a base de
+  advisories da npm avança e sinaliza novas CVEs transitivas (só nesta semana:
+  `nanoid` via `vitest → vite → postcss`, dependência de teste). Perseguir cada
+  CVE com `ignoreCves` virou um treadmill insustentável (3 rodadas em 2 semanas).
+  - O passo continua rodando `pnpm audit --audit-level=high`, imprime o relatório
+    completo, gera um **GitHub Step Summary** com o resumo e emite `::warning::`
+    quando há achados — mas **sai sempre com exit 0** (não bloqueia o pipeline).
+  - Mantém o retry para o bug de gzip/registry do pnpm.
+
+> ⚠️ **A dívida de segurança continua registrada e obrigatória.** Report-only não
+> significa "resolvido": as CVEs produção-facing (`next` SSRF, `axios`, `fastify`)
+> **devem** ser corrigidas via upgrade de dependência no hardening pré-produção,
+> antes de qualquer deploy com dados reais. O scan agora _informa_ em vez de
+> _travar_ — a decisão de bloquear volta a ser humana, no momento certo.
+
+---
+
 ## 2026-08-02 — CI: novas CVEs transitivas ignoradas (a resolver no hardening)
 
 ### Corrigido
